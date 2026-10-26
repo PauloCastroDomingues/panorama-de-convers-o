@@ -7,3 +7,5 @@ __pycache__/
 .env
 *credentials*.json
 config.local.json
+
+.vercel
