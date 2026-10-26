@@ -41,7 +41,11 @@ const state = {
   end: "",
   compareStart: "",
   compareEnd: "",
+  compareMode: "previous",
+  availableStart: "",
+  availableEnd: "",
   selectedChannel: "",
+  productSearch: "",
   selectedModel: "",
   selectedColor: "",
   selectedSize: "",
@@ -75,6 +79,22 @@ function toDate(value) { return new Date(`${value}T12:00:00`); }
 function isoDate(date) { return date.toISOString().slice(0, 10); }
 function monthRange(start, end) { if (!start || !end) return []; const result = []; const cursor = toDate(start); const last = toDate(end); cursor.setDate(1); while (cursor <= last) { result.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`); cursor.setMonth(cursor.getMonth() + 1); } return result; }
 function fold(value) { return cleanText(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+function searchKey(value) { return fold(value).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim(); }
+function editDistance(left, right) {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row += 1) {
+    const current = [row];
+    for (let column = 1; column <= right.length; column += 1) current[column] = Math.min(current[column - 1] + 1, previous[column] + 1, previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1));
+    for (let column = 0; column <= right.length; column += 1) previous[column] = current[column];
+  }
+  return previous[right.length];
+}
+function fuzzyMatch(value, query) {
+  const text = searchKey(value); const terms = searchKey(query).split(" ").filter(Boolean); if (!terms.length) return true;
+  const words = text.split(" ").filter(Boolean);
+  return terms.every((term) => words.some((word) => word.includes(term) || term.includes(word) || (term.length >= 4 && editDistance(word, term) <= 2)));
+}
+function productFilterLabel(value) { return cleanText(value).replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim() || "Nao informado"; }
 function displayChannel(value) { const key = fold(value); return { "google ads": "Google Ads", "meta ads 1": "Meta Ads 1", "meta ads 2": "Meta Ads 2", "whatsapp nao oficial": "WhatsApp Organico", "whatsapp organico": "WhatsApp Organico", "organico": "Organico" }[key] || cleanText(value); }
 function isPaidRawChannel(value) { const key = fold(value); return [...PAID_RAW_CHANNELS].some((raw) => fold(raw) === key); }
 function isAnalysisRow(row) { return isPaidRawChannel(row.canal || row.origem); }
@@ -98,7 +118,7 @@ const PRODUCT_SIZE_PATTERN = /(?:^|[\s/_-])(PP|P|M|G|GG|XG|XXG|U|UNICO|3[4-9]|4[
 const NON_PRODUCT_PATTERN = /(?:\(not set\)|not set|nao informado|não informado|cupom|coupon|cartao de presente|cartão de presente|gift card|frete|shipping|taxa de entrega|desconto aplicado)/i;
 function isMerchandiseProduct(row) {
   const name = cleanText(row.productName || row.product || row.produto || row.product_name || row.produto_nome || "");
-  return Boolean(name && !NON_PRODUCT_PATTERN.test(name));
+  return Boolean(name && !NON_PRODUCT_PATTERN.test(fold(name)));
 }
 function productAttributes(row) {
   const name = cleanText(row.product || row.produto || row.product_name || row.produto_nome || "");
@@ -111,7 +131,7 @@ function productAttributes(row) {
   let model = explicitModel || name;
   if (!explicitModel && color) model = model.replace(new RegExp(`\\b${color.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\b`, "ig"), "");
   if (!explicitModel && size) model = model.replace(new RegExp(`(?:^|[\\s/_-])${String(size).replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}(?=$|[\\s/_-])`, "ig"), " ");
-  return { model: model.replace(/\s{2,}/g, " ").trim() || "Nao informado", color: color || "Nao informado", size: size || "Nao informado" };
+  return { model: productFilterLabel(model), color: productFilterLabel(color), size: productFilterLabel(size) };
 }
 function normalizeRow(row) {
   const attrs = productAttributes(row);
@@ -157,7 +177,7 @@ function consolidatedChannelRows(rows) {
   return [...groups.values()].map((row) => { delete row._knownSessions; return row; });
 }
 function channelSourceRows(period) {
-  const entryRows = normalizedRows(viewEntry("channel")?.rows || []).filter((row) => isPaidRawChannel(row.canal) && (row.period === period || (!row.period || row.period === "current") && inPeriod(row, period)));
+  const entryRows = normalizedRows(viewEntry("channel")?.rows || []).filter((row) => isPaidRawChannel(row.canal) && (row.period === period || (period === "current" && (!row.period || row.period === "current"))) && inPeriod(row, period));
   const consolidated = consolidatedChannelRows(entryRows);
   if (consolidated.length && consolidated.some((row) => row.sessoes !== null)) return consolidated;
   return consolidatedChannelRows(state.rows.filter((row) => isPaidRawChannel(row.canal) && inPeriod(row, period)));
@@ -196,11 +216,12 @@ function viewRows(view, period) {
     if (!isAnalysisRow(row)) return false;
     if (hasPeriod && row.period !== period) return false;
     if (!hasPeriod && period === "compare") return false;
+    if (row.data && !inPeriod(row, period)) return false;
     if (!matchesSelectedChannel(row)) return false;
     if (view.product && state.selectedModel && row.productModel !== state.selectedModel) return false;
     if (view.product && state.selectedColor && row.productColor !== state.selectedColor) return false;
     if (view.product && state.selectedSize && row.productSize !== state.selectedSize) return false;
-    return hasPeriod || inPeriod(row, period);
+    return true;
   });
 }
 function dimensionKey(view, row) {
@@ -254,7 +275,7 @@ function alternativeRecords(view) {
 }
 
 function sortRecords(records, sort) { return [...records].sort((a, b) => { const av = a[sort] === null || a[sort] === undefined ? -1 : a[sort]; const bv = b[sort] === null || b[sort] === undefined ? -1 : b[sort]; return bv - av || a.dimension.localeCompare(b.dimension, "pt-BR"); }); }
-function filterText(record) { return [record.dimension, record.channel, record.campaign, record.group, record.ad, record.product].join(" ").toLowerCase(); }
+function filterText(record) { return [record.dimension, record.channel, record.campaign, record.group, record.ad, record.product].join(" "); }
 function coverageLabel(record) { if (record.source === "GA4 alternativa") return "GA4 / nao SSOT"; if (record.complete) return "Completa"; if (record.coverage > 0) return `${Math.round(record.coverage * 100)}% conhecida`; return "Ausente"; }
 
 function filtersForProducts() {
@@ -262,10 +283,36 @@ function filtersForProducts() {
   const alternativeProductRows = VIEWS.filter((view) => view.product).flatMap((view) => alternativeRows(view.key)).filter(isMerchandiseProduct).map((row) => { const attrs = productAttributes(row); return { productModel: attrs.model, productColor: attrs.color, productSize: attrs.size }; });
   const rows = [...officialRows, ...alternativeProductRows];
   const configs = [["product-model-filter", "selectedModel", "Todos os modelos", "productModel"], ["product-color-filter", "selectedColor", "Todas as cores", "productColor"], ["product-size-filter", "selectedSize", "Todos os tamanhos", "productSize"]];
-  configs.forEach(([id, key, empty, field]) => { const select = $(`#${id}`); const values = [...new Set(rows.map((row) => row[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR")); select.innerHTML = `<option value="">${empty}</option>${values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")}`; select.value = values.includes(state[key]) ? state[key] : ""; state[key] = select.value; select.onchange = () => { state[key] = select.value; renderExplorer(); }; });
+  configs.forEach(([id, key, empty, field]) => { const select = $(`#${id}`); const values = [...new Set(rows.map((row) => row[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR")); const visibleValues = state.productSearch ? values.filter((value) => fuzzyMatch(value, state.productSearch)) : values; select.innerHTML = `<option value="">${empty}</option>${visibleValues.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")}`; select.value = visibleValues.includes(state[key]) ? state[key] : ""; state[key] = select.value; select.onchange = () => { state[key] = select.value; renderExplorer(); }; });
+  const productSearch = $("#product-search"); if (productSearch) productSearch.value = state.productSearch;
 }
+function shiftDate(value, days) { const date = toDate(value); date.setDate(date.getDate() + days); return isoDate(date); }
+function shiftYear(value, years) { const date = toDate(value); date.setFullYear(date.getFullYear() + years); return isoDate(date); }
+function dateSpan(start, end) { return start && end ? Math.round((toDate(end) - toDate(start)) / 86400000) + 1 : 0; }
+function availableEnd() { return state.availableEnd || state.end || isoDate(new Date()); }
+function applyComparison() {
+  if (!state.start || !state.end || state.compareMode === "custom") return;
+  if (state.compareMode === "year-ago") { state.compareStart = shiftYear(state.start, -1); state.compareEnd = shiftYear(state.end, -1); return; }
+  const days = dateSpan(state.start, state.end); state.compareEnd = shiftDate(state.start, -1); state.compareStart = shiftDate(state.compareEnd, -(days - 1));
+}
+function applyPeriodPreset(preset) {
+  const end = availableEnd(); if (!end || preset === "custom") return;
+  const date = toDate(end); let start = end; let finish = end;
+  if (preset === "previous-day") start = finish = shiftDate(end, -1);
+  if (preset === "week") { const day = date.getDay() || 7; start = shiftDate(end, -day + 1); }
+  if (preset === "fortnight") start = isoDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() <= 15 ? 1 : 16, 12));
+  if (preset === "month") start = isoDate(new Date(date.getFullYear(), date.getMonth(), 1, 12));
+  if (preset === "quarter") { const month = Math.floor(date.getMonth() / 3) * 3; start = isoDate(new Date(date.getFullYear(), month, 1, 12)); }
+  if (preset === "semester") { const month = date.getMonth() < 6 ? 0 : 6; start = isoDate(new Date(date.getFullYear(), month, 1, 12)); }
+  if (preset === "year") start = isoDate(new Date(date.getFullYear(), 0, 1, 12));
+  if (preset === "last-complete") { const last = new Date(date.getFullYear(), date.getMonth(), 0, 12); finish = isoDate(last); start = isoDate(new Date(last.getFullYear(), last.getMonth() - 11, 1, 12)); }
+  if (preset === "all") { start = state.availableStart || start; finish = availableEnd(); }
+  state.start = start; state.end = finish; applyComparison();
+}
+function comparisonWindowLabel() { return state.compareStart && state.compareEnd ? `Comparacao: ${dayLabel(state.compareStart)} a ${dayLabel(state.compareEnd)}` : "Comparacao nao definida"; }
 function setupFilters() {
   const channelSelect = $("#global-channel-filter"); const grouped = CHANNEL_FILTERS.filter((item) => item.key.startsWith("group-")); const individual = PAID_CHANNEL_VIEWS; channelSelect.innerHTML = `<option value="">Todos os canais pagos</option><optgroup label="Grupos de canal">${grouped.map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("")}</optgroup><optgroup label="Leituras declaradas">${individual.map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("")}</optgroup>`; channelSelect.value = state.selectedChannel; channelSelect.onchange = () => { state.selectedChannel = channelSelect.value; state.chartFilter = state.selectedChannel; state.chartChannels = selectedScopes().map((scope) => scope.key); renderAll(); };
+  const compareMode = $("#compare-mode"); if (compareMode) { compareMode.value = state.compareMode; $("#compare-custom-fields")?.classList.toggle("is-hidden", state.compareMode !== "custom"); $("#compare-start").value = state.compareStart; $("#compare-end").value = state.compareEnd; $("#comparison-window").textContent = comparisonWindowLabel(); }
   const level = $("#explorer-level"); level.innerHTML = VIEWS.map((view) => `<option value="${view.key}">${view.number} · ${view.short}</option>`).join(""); level.value = state.selectedView; level.onchange = () => { state.selectedView = level.value; renderExplorer(); };
   filtersForProducts();
 }
@@ -366,7 +413,7 @@ function recordsForDisplay(view) {
   return { records: officialRecords, official: true, sourceLabel: "SSOT" };
 }
 function renderExplorer() {
-  const view = VIEWS.find((item) => item.key === state.selectedView) || VIEWS[0]; const info = readiness(view.key); const selection = recordsForDisplay(view); let records = selection.records; const query = state.explorerSearch.trim().toLowerCase(); if (query) records = records.filter((record) => filterText(record).includes(query)); records = sortRecords(records, state.explorerSort); const total = records.length; const visible = records.slice(0, 25); const columns = explorerColumns(view); $("#explorer-head").innerHTML = `<tr>${columns.map(([label]) => `<th>${label}</th>`).join("")}</tr>`; $("#explorer-status").textContent = selection.sourceLabel; $("#explorer-status").className = `status-pill ${selection.official ? "ok" : "warn"}`; $("#explorer-count").textContent = `${total} resultado(s) · Top ${Math.min(25, total)}`; $("#explorer-summary").innerHTML = `<span><strong>${escapeHtml(view.title)}</strong> · ${escapeHtml(view.question)}</span><span>Fonte: <b>${selection.sourceLabel}</b> · ${escapeHtml(view.grain)}</span>`;
+  const view = VIEWS.find((item) => item.key === state.selectedView) || VIEWS[0]; const info = readiness(view.key); const selection = recordsForDisplay(view); let records = selection.records; const query = state.explorerSearch.trim(); if (query) records = records.filter((record) => fuzzyMatch(filterText(record), query)); if (view.product && state.productSearch) records = records.filter((record) => fuzzyMatch(record.product || record.dimension, state.productSearch)); records = sortRecords(records, state.explorerSort); const total = records.length; const visible = records.slice(0, 25); const columns = explorerColumns(view); $("#explorer-head").innerHTML = `<tr>${columns.map(([label]) => `<th>${label}</th>`).join("")}</tr>`; $("#explorer-status").textContent = selection.sourceLabel; $("#explorer-status").className = `status-pill ${selection.official ? "ok" : "warn"}`; $("#explorer-count").textContent = `${total} resultado(s) · Top ${Math.min(25, total)}`; $("#explorer-summary").innerHTML = `<span><strong>${escapeHtml(view.title)}</strong> · ${escapeHtml(view.question)}</span><span>Fonte: <b>${selection.sourceLabel}</b> · ${escapeHtml(view.grain)}</span>`;
   $("#explorer-body").innerHTML = visible.length ? visible.map((record) => `<tr>${columns.map(([, key]) => `<td>${key === "dimension" ? `<strong>${escapeHtml(record.dimension)}</strong>` : explorerCell(record, key)}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${columns.length}" class="table-empty">${escapeHtml(info?.reason || "Nenhuma linha encontrada para os filtros selecionados.")}</td></tr>`;
 }
 
@@ -386,16 +433,20 @@ async function loadData() {
   $("#source-status").textContent = "Carregando SSOT"; $("#source-pill").textContent = "Validando fonte"; $("#source-pill").className = "status-pill pending";
   try {
     const [commercial, growth, alternative] = await Promise.all([loadJson("data/ssot-commercial-channels.json"), loadGrowth(), loadAlternative()]); state.commercial = commercial; state.rows = normalizedRows(commercial.rows || []); state.growthPayload = growth && growth.ok !== false && Array.isArray(growth.data) ? growth : null; state.growthViews = state.growthPayload?.data || []; state.alternativePayload = alternative && alternative.ok !== false ? alternative : null;
-    const fallback = defaultWindow(state.rows); state.start = growth?.window?.start || fallback.start; state.end = growth?.window?.end || fallback.end; state.compareStart = growth?.window?.compareStart || ""; state.compareEnd = growth?.window?.compareEnd || ""; if (!state.compareStart && state.start) { const start = toDate(state.start); const end = toDate(state.end); const days = Math.round((end - start) / 86400000) + 1; state.compareEnd = isoDate(new Date(start.getTime() - 86400000)); state.compareStart = isoDate(new Date(start.getTime() - days * 86400000)); }
-    $("#date-start").value = state.start; $("#date-end").value = state.end; $("#source-name").textContent = commercial.source || "SSOT"; $("#extracted-at").textContent = commercial.extracted_at || growth?.generatedAt || "Atualizacao nao informada"; $("#source-status").textContent = state.growthPayload ? "SSOT conectado" : "SSOT de canais conectado"; $("#source-pill").textContent = state.growthPayload ? "Fonte conectada" : "Canais conectados"; $("#source-pill").className = `status-pill ${state.growthPayload ? "ok" : "warn"}`; $("#validation-title").textContent = "Base carregada"; $("#validation-summary").textContent = `${state.rows.length.toLocaleString("pt-BR")} linhas de canais; ${state.growthViews.length} visoes growth; pedidos e receita continuam disponiveis mesmo com cobertura parcial.`; $("#validation-banner").className = "validation-banner valid"; renderAll();
+    const availableDates = [...state.rows.map((row) => row.data), ...state.growthViews.flatMap((view) => (Array.isArray(view.rows) ? view.rows : []).map((row) => dateKey(row.data || row.date || row.event_date)))].filter(Boolean).sort(); state.availableStart = availableDates[0] || ""; state.availableEnd = availableDates.at(-1) || ""; const fallback = defaultWindow(state.rows); state.start = growth?.window?.start || fallback.start; state.end = growth?.window?.end || fallback.end; state.compareMode = "previous"; applyComparison();
+    $("#period-preset").value = "custom"; $("#date-start").value = state.start; $("#date-end").value = state.end; $("#source-name").textContent = commercial.source || "SSOT"; $("#extracted-at").textContent = commercial.extracted_at || growth?.generatedAt || "Atualizacao nao informada"; $("#source-status").textContent = state.growthPayload ? "SSOT conectado" : "SSOT de canais conectado"; $("#source-pill").textContent = state.growthPayload ? "Fonte conectada" : "Canais conectados"; $("#source-pill").className = `status-pill ${state.growthPayload ? "ok" : "warn"}`; $("#validation-title").textContent = "Base carregada"; $("#validation-summary").textContent = `${state.rows.length.toLocaleString("pt-BR")} linhas de canais; ${state.growthViews.length} visoes growth; pedidos e receita continuam disponiveis mesmo com cobertura parcial.`; $("#validation-banner").className = "validation-banner valid"; renderAll();
   } catch (error) { $("#source-status").textContent = "Fonte indisponivel"; $("#source-pill").textContent = "Erro de fonte"; $("#source-pill").className = "status-pill error"; $("#validation-title").textContent = "Falha na leitura"; $("#validation-summary").textContent = error.message; $("#validation-banner").className = "validation-banner error"; }
 }
 function setupEvents() {
   $("#reload-data").onclick = loadData;
-  $("#clear-filters").onclick = () => { state.selectedChannel = ""; state.selectedModel = ""; state.selectedColor = ""; state.selectedSize = ""; state.chartChannels = []; state.chartFilter = ""; state.explorerSearch = ""; $("#explorer-search").value = ""; renderAll(); };
-  $("#period-preset").onchange = (event) => { const value = event.target.value; if (value === "last-complete") { const max = toDate(state.end); const last = new Date(max.getFullYear(), max.getMonth(), 0, 12); const first = new Date(last.getFullYear(), last.getMonth() - 11, 1, 12); state.start = isoDate(first); state.end = isoDate(last); } else if (value === "year-2026") { state.start = "2026-01-01"; state.end = "2026-12-31"; } else if (value === "year-2025") { state.start = "2025-01-01"; state.end = "2025-12-31"; } else if (value === "all") { const dates = state.rows.map((row) => row.data).filter(Boolean).sort(); state.start = dates[0]; state.end = dates.at(-1); } $("#date-start").value = state.start; $("#date-end").value = state.end; renderAll(); };
-  $("#date-start").onchange = (event) => { state.start = event.target.value; $("#period-preset").value = "custom"; renderAll(); };
-  $("#date-end").onchange = (event) => { state.end = event.target.value; $("#period-preset").value = "custom"; renderAll(); };
+  $("#clear-filters").onclick = () => { state.selectedChannel = ""; state.selectedModel = ""; state.selectedColor = ""; state.selectedSize = ""; state.productSearch = ""; state.chartChannels = []; state.chartFilter = ""; state.explorerSearch = ""; $("#explorer-search").value = ""; renderAll(); };
+  $("#period-preset").onchange = (event) => { applyPeriodPreset(event.target.value); $("#date-start").value = state.start; $("#date-end").value = state.end; renderAll(); };
+  $("#date-start").onchange = (event) => { state.start = event.target.value; $("#period-preset").value = "custom"; applyComparison(); renderAll(); };
+  $("#date-end").onchange = (event) => { state.end = event.target.value; $("#period-preset").value = "custom"; applyComparison(); renderAll(); };
+  $("#compare-mode").onchange = (event) => { state.compareMode = event.target.value; applyComparison(); renderAll(); };
+  $("#compare-start").onchange = (event) => { state.compareMode = "custom"; state.compareStart = event.target.value; renderAll(); };
+  $("#compare-end").onchange = (event) => { state.compareMode = "custom"; state.compareEnd = event.target.value; renderAll(); };
+  $("#product-search").oninput = (event) => { state.productSearch = event.target.value; filtersForProducts(); renderExplorer(); };
   document.querySelectorAll("[data-granularity]").forEach((button) => { button.onclick = () => { state.selectedGranularity = button.dataset.granularity; renderRhythm(); }; });
   $("#rhythm-metric").onchange = (event) => { state.rhythmMetric = event.target.value; renderRhythm(); };
   $("#chart-metric").onchange = (event) => { state.chartMetric = event.target.value; renderChart(); };
