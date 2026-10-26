@@ -432,9 +432,40 @@ function defaultWindow(rows) { const dates = rows.map((row) => row.data).filter(
 async function loadData() {
   $("#source-status").textContent = "Carregando SSOT"; $("#source-pill").textContent = "Validando fonte"; $("#source-pill").className = "status-pill pending";
   try {
-    const [commercial, growth, alternative] = await Promise.all([loadJson("data/ssot-commercial-channels.json"), loadGrowth(), loadAlternative()]); state.commercial = commercial; state.rows = normalizedRows(commercial.rows || []); state.growthPayload = growth && growth.ok !== false && Array.isArray(growth.data) ? growth : null; state.growthViews = state.growthPayload?.data || []; state.alternativePayload = alternative && alternative.ok !== false ? alternative : null;
-    const availableDates = [...state.rows.map((row) => row.data), ...state.growthViews.flatMap((view) => (Array.isArray(view.rows) ? view.rows : []).map((row) => dateKey(row.data || row.date || row.event_date)))].filter(Boolean).sort(); state.availableStart = availableDates[0] || ""; state.availableEnd = availableDates.at(-1) || ""; const fallback = defaultWindow(state.rows); state.start = growth?.window?.start || fallback.start; state.end = growth?.window?.end || fallback.end; state.compareMode = "previous"; applyComparison();
-    $("#period-preset").value = "custom"; $("#date-start").value = state.start; $("#date-end").value = state.end; $("#source-name").textContent = commercial.source || "SSOT"; $("#extracted-at").textContent = commercial.extracted_at || growth?.generatedAt || "Atualizacao nao informada"; $("#source-status").textContent = state.growthPayload ? "SSOT conectado" : "SSOT de canais conectado"; $("#source-pill").textContent = state.growthPayload ? "Fonte conectada" : "Canais conectados"; $("#source-pill").className = `status-pill ${state.growthPayload ? "ok" : "warn"}`; $("#validation-title").textContent = "Base carregada"; $("#validation-summary").textContent = `${state.rows.length.toLocaleString("pt-BR")} linhas de canais; ${state.growthViews.length} visoes growth; pedidos e receita continuam disponiveis mesmo com cobertura parcial.`; $("#validation-banner").className = "validation-banner valid"; renderAll();
+    const [commercial, growth, alternative] = await Promise.all([loadJson("data/ssot-commercial-channels.json"), loadGrowth(), loadAlternative()]);
+    state.commercial = commercial;
+    state.rows = normalizedRows(commercial.rows || []);
+    state.growthPayload = growth && growth.ok !== false && Array.isArray(growth.data) ? growth : null;
+    state.growthViews = state.growthPayload?.data || [];
+    state.alternativePayload = alternative && alternative.ok !== false ? alternative : null;
+    const liveRows = state.growthViews.flatMap((view) => Array.isArray(view.rows) ? view.rows : []).map((row) => normalizeRow(row));
+    const availableDates = [...state.rows.map((row) => row.data), ...liveRows.map((row) => row.data)].filter(Boolean).sort();
+    state.availableStart = availableDates[0] || "";
+    state.availableEnd = availableDates.at(-1) || "";
+    const fallback = defaultWindow(state.rows);
+    state.start = growth?.window?.start || fallback.start;
+    state.end = growth?.window?.end || fallback.end;
+    state.compareMode = "previous";
+    applyPeriodPreset("current-day");
+    $("#period-preset").value = "current-day";
+    $("#date-start").value = state.start;
+    $("#date-end").value = state.end;
+    const liveChannel = viewEntry("channel");
+    const liveChannelRows = normalizedRows(liveChannel?.rows || []);
+    const liveMaxDate = liveChannelRows.map((row) => row.data).filter(Boolean).sort().at(-1) || state.availableEnd;
+    const liveSource = liveChannel?.source || commercial.source || "SSOT";
+    const updatedAt = growth?.generatedAt || commercial.extracted_at || "Atualizacao nao informada";
+    $("#source-name").textContent = liveSource;
+    $("#extracted-at").textContent = `${updatedAt} · ultimo dado ${liveMaxDate ? dayLabel(liveMaxDate) : "nao informado"}`;
+    $("#source-status").textContent = state.growthPayload ? "SSOT ao vivo conectado" : "Snapshot de canais";
+    $("#source-pill").textContent = state.growthPayload ? "SSOT ao vivo" : "Snapshot";
+    $("#source-pill").className = `status-pill ${state.growthPayload ? "ok" : "warn"}`;
+    $("#validation-title").textContent = state.growthPayload ? "SSOT atualizado" : "SSOT ao vivo indisponivel";
+    $("#validation-summary").textContent = state.growthPayload
+      ? `${liveChannelRows.length.toLocaleString("pt-BR")} linhas de canais ao vivo; ultimo dado em ${liveMaxDate ? dayLabel(liveMaxDate) : "data nao informada"}. ${state.growthViews.length} visoes growth carregadas.`
+      : `A leitura ao vivo falhou. Exibindo o snapshot de ${commercial.extracted_at || "data nao informada"}; atualize novamente antes de decidir.`;
+    $("#validation-banner").className = `validation-banner ${state.growthPayload ? "valid" : "error"}`;
+    renderAll();
   } catch (error) { $("#source-status").textContent = "Fonte indisponivel"; $("#source-pill").textContent = "Erro de fonte"; $("#source-pill").className = "status-pill error"; $("#validation-title").textContent = "Falha na leitura"; $("#validation-summary").textContent = error.message; $("#validation-banner").className = "validation-banner error"; }
 }
 function setupEvents() {

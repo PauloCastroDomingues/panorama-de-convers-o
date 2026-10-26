@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Tinos:wght@400;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/styles.css?v=20261026-35">
+  <link rel="stylesheet" href="assets/styles.css?v=20261026-36">
 </head>
 <body>
   <main class="wrap">
@@ -27,10 +27,11 @@
     </header>
 
     <section class="controls" aria-label="Filtros do painel">
+      <div class="filter-row filter-primary">
       <div class="control-group control-wide">
         <label for="period-preset">Janela</label>
         <select id="period-preset">
-          <option value="current-day">Dia atual (ultimo dado)</option>
+          <option value="current-day">Ultimo dia disponivel</option>
           <option value="previous-day">Dia anterior</option>
           <option value="week">Semana atual</option>
           <option value="fortnight">Quinzena atual</option>
@@ -46,12 +47,15 @@
       <div class="control-group date-control"><label for="date-start">Inicio</label><input id="date-start" type="date"></div>
       <div class="control-group date-control"><label for="date-end">Fim</label><input id="date-end" type="date"></div>
       <div class="control-group comparison-control"><label for="compare-mode">Comparar com</label><select id="compare-mode"><option value="previous">Periodo anterior</option><option value="year-ago">Mesmo periodo do ano anterior</option><option value="custom">Periodo selecionado</option></select><div id="compare-custom-fields" class="compare-dates is-hidden"><input id="compare-start" type="date" aria-label="Inicio da comparacao"><input id="compare-end" type="date" aria-label="Fim da comparacao"></div><small id="comparison-window" class="muted-note">Comparacao automatica</small></div>
+      </div>
+      <div class="filter-row filter-products">
       <div class="control-group product-search-group"><label for="product-search">Pesquisar produto</label><input id="product-search" type="search" placeholder="Nome aproximado"></div>
       <div class="control-group"><label for="product-model-filter">Modelo</label><select id="product-model-filter"></select></div>
       <div class="control-group"><label for="product-color-filter">Cor</label><select id="product-color-filter"></select></div>
       <div class="control-group"><label for="product-size-filter">Tamanho</label><select id="product-size-filter"></select></div>
       <div class="control-group"><label for="global-channel-filter">Canal</label><select id="global-channel-filter"></select></div>
       <button id="clear-filters" class="outline-button" type="button">Limpar filtros</button>
+      </div>
     </section>
 
     <section id="validation-banner" class="callout validation-banner" aria-live="polite">
@@ -124,6 +128,6 @@
 
     <footer><strong>Regra SSOT:</strong> conversao = SUM(pedidos) / SUM(sessoes), somente quando o denominador esta completo. Pedidos, receita e sinais de cobertura continuam visiveis quando a conversao nao pode ser calculada.</footer>
   </main>
-  <script src="assets/app.js?v=20261026-35"></script>
+  <script src="assets/app.js?v=20261026-36"></script>
 </body>
 </html>

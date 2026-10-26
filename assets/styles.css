@@ -32,7 +32,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 h1, h2, h3, p { margin-top: 0; }
 h1 { max-width: 12ch; margin: 0 0 12px; font: 700 clamp(34px, 4vw, 54px)/.98 var(--sans); letter-spacing: -.02em; }
 h1 em { color: var(--orange); font: 400 1em var(--serif); font-style: italic; }
-.dek { max-width: 680px; margin: 0; color: var(--ink-soft); font: 18px/1.4 var(--serif); }
+.dek { max-width: 650px; margin: 0; color: var(--ink-soft); font: 14px/1.45 var(--sans); }
 .brand img { display: block; width: auto; height: 38px; }
 .only-light { display: none; }
 .only-dark { display: block; }
@@ -44,7 +44,10 @@ h1 em { color: var(--orange); font: 400 1em var(--serif); font-style: italic; }
 .status-pill.error { border-color: rgba(239, 154, 135, .55); color: var(--red); background: var(--red-soft); }
 .text-button, .outline-button { min-height: 36px; padding: 7px 12px; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--ink); background: transparent; }
 .text-button:hover, .outline-button:hover { border-color: var(--orange); color: var(--orange); }
-.controls { display: grid; grid-template-columns: minmax(210px, 1.2fr) repeat(2, minmax(125px, .75fr)) minmax(250px, 1.35fr) minmax(220px, 1.15fr) repeat(4, minmax(125px, 1fr)) auto; gap: 10px; align-items: end; margin: 20px 0 14px; padding: 13px; border: 1px solid var(--line); background: var(--panel); }
+.controls { display: grid; gap: 14px; margin: 20px 0 14px; padding: 15px; border: 1px solid var(--line); background: var(--panel); }
+.filter-row { display: grid; gap: 10px; align-items: end; }
+.filter-primary { grid-template-columns: minmax(220px, 1.2fr) minmax(135px, .75fr) minmax(135px, .75fr) minmax(270px, 1.45fr); }
+.filter-products { grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(135px, 1fr)) auto; padding-top: 13px; border-top: 1px solid var(--line); }
 .control-group { min-width: 0; }
 .comparison-control { min-width: 0; }
 .compare-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
@@ -140,17 +143,18 @@ footer strong { color: var(--ink); }
 @media (max-width: 1100px) {
   .top { grid-template-columns: minmax(0, 1fr) auto; }
   .top-meta { grid-column: 1 / -1; grid-template-columns: auto auto auto; justify-items: start; align-items: center; text-align: left; }
-  .controls { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .control-wide { grid-column: span 2; }
-  .controls .outline-button { width: 100%; }
+  .filter-primary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .filter-products { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .filter-products .product-search-group { grid-column: span 2; }
+  .filter-products .outline-button { width: 100%; }
 }
 @media (max-width: 800px) {
   .wrap { width: min(100% - 28px, 1440px); padding-top: 24px; }
   .top { display: block; }
   .brand { margin: 20px 0; }
   .top-meta { display: flex; flex-wrap: wrap; justify-items: start; text-align: left; }
-  .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .control-wide { grid-column: 1 / -1; }
+  .filter-primary, .filter-products { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filter-primary .control-wide, .filter-primary .comparison-control, .filter-products .product-search-group { grid-column: 1 / -1; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .rhythm-grid { grid-template-columns: 1fr; }
   .rhythm-side { grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr; }
