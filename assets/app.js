@@ -95,6 +95,11 @@ function platform(row) { const value = fold(row.canal || row.origem); if (value.
 
 const PRODUCT_COLORS = ["azul marinho", "off white", "azul", "amarelo", "bege", "branco", "branca", "caqui", "cinza", "dourado", "marrom", "marinho", "oliva", "preto", "preta", "rosa", "verde", "vermelho", "vermelha", "whisky"];
 const PRODUCT_SIZE_PATTERN = /(?:^|[\s/_-])(PP|P|M|G|GG|XG|XXG|U|UNICO|3[4-9]|4[0-9]|5[0-2])(?:$|[\s/_-])/i;
+const NON_PRODUCT_PATTERN = /(?:\(not set\)|not set|nao informado|não informado|cupom|coupon|cartao de presente|cartão de presente|gift card|frete|shipping|taxa de entrega|desconto aplicado)/i;
+function isMerchandiseProduct(row) {
+  const name = cleanText(row.productName || row.product || row.produto || row.product_name || row.produto_nome || "");
+  return Boolean(name && !NON_PRODUCT_PATTERN.test(name));
+}
 function productAttributes(row) {
   const name = cleanText(row.product || row.produto || row.product_name || row.produto_nome || "");
   const explicitModel = cleanText(row.model || row.modelo || row.product_model || "");
@@ -253,8 +258,8 @@ function filterText(record) { return [record.dimension, record.channel, record.c
 function coverageLabel(record) { if (record.source === "GA4 alternativa") return "GA4 / nao SSOT"; if (record.complete) return "Completa"; if (record.coverage > 0) return `${Math.round(record.coverage * 100)}% conhecida`; return "Ausente"; }
 
 function filtersForProducts() {
-  const officialRows = VIEWS.filter((view) => view.product).flatMap((view) => normalizedRows(viewEntry(view.key)?.rows || []));
-  const alternativeProductRows = VIEWS.filter((view) => view.product).flatMap((view) => alternativeRows(view.key)).map((row) => { const attrs = productAttributes(row); return { productModel: attrs.model, productColor: attrs.color, productSize: attrs.size }; });
+  const officialRows = VIEWS.filter((view) => view.product).flatMap((view) => normalizedRows(viewEntry(view.key)?.rows || [])).filter(isMerchandiseProduct);
+  const alternativeProductRows = VIEWS.filter((view) => view.product).flatMap((view) => alternativeRows(view.key)).filter(isMerchandiseProduct).map((row) => { const attrs = productAttributes(row); return { productModel: attrs.model, productColor: attrs.color, productSize: attrs.size }; });
   const rows = [...officialRows, ...alternativeProductRows];
   const configs = [["product-model-filter", "selectedModel", "Todos os modelos", "productModel"], ["product-color-filter", "selectedColor", "Todas as cores", "productColor"], ["product-size-filter", "selectedSize", "Todos os tamanhos", "productSize"]];
   configs.forEach(([id, key, empty, field]) => { const select = $(`#${id}`); const values = [...new Set(rows.map((row) => row[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR")); select.innerHTML = `<option value="">${empty}</option>${values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")}`; select.value = values.includes(state[key]) ? state[key] : ""; state[key] = select.value; select.onchange = () => { state[key] = select.value; renderExplorer(); }; });
