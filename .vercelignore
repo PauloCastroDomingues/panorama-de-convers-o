@@ -1,0 +1,9 @@
+.venv/
+_legacy/
+.local/
+.pytest_cache/
+__pycache__/
+output/
+scripts/
+*.pyc
+*.log

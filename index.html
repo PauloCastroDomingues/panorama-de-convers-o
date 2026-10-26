@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Painel de ritmo e performance comercial com dados SSOT.">
+  <title>Reise | Performance comercial</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tinos:wght@400;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css?v=20261026-33">
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div>
+        <p class="kicker">Reise &middot; Performance comercial</p>
+        <h1>Performance comercial<br><em>produto primeiro</em></h1>
+        <p class="dek">Comece pelo produto, entenda os canais e avance até campanha, grupo e criativo para decidir onde agir.</p>
+      </div>
+      <div class="brand"><img class="only-light" src="assets/wordmark-charcoal.png" alt="Reise"><img class="only-dark" src="assets/wordmark-offwhite.png" alt="Reise"></div>
+      <div class="top-meta">
+        <span id="source-pill" class="status-pill pending">Validando fonte</span>
+        <span id="source-status">Carregando SSOT</span>
+        <button id="reload-data" class="text-button" type="button">Atualizar leitura</button>
+      </div>
+    </header>
+
+    <section class="controls" aria-label="Filtros do painel">
+      <div class="control-group control-wide">
+        <label for="period-preset">Janela</label>
+        <select id="period-preset">
+          <option value="last-complete">Ultimos 12 meses completos</option>
+          <option value="custom">Periodo personalizado</option>
+          <option value="year-2026">Ano 2026</option>
+          <option value="year-2025">Ano 2025</option>
+          <option value="all">Toda a base</option>
+        </select>
+      </div>
+      <div class="control-group date-control"><label for="date-start">Inicio</label><input id="date-start" type="date"></div>
+      <div class="control-group date-control"><label for="date-end">Fim</label><input id="date-end" type="date"></div>
+      <div class="control-group"><label for="product-model-filter">Modelo</label><select id="product-model-filter"></select></div>
+      <div class="control-group"><label for="product-color-filter">Cor</label><select id="product-color-filter"></select></div>
+      <div class="control-group"><label for="product-size-filter">Tamanho</label><select id="product-size-filter"></select></div>
+      <div class="control-group"><label for="global-channel-filter">Canal</label><select id="global-channel-filter"></select></div>
+      <button id="clear-filters" class="outline-button" type="button">Limpar filtros</button>
+    </section>
+
+    <section id="validation-banner" class="callout validation-banner" aria-live="polite">
+      <span class="callout-mark">!</span>
+      <div><strong id="validation-title">Validando base</strong><span id="validation-summary">Aguardando resposta do SSOT.</span></div>
+    </section>
+
+    <section id="resumo" class="report-section first-section">
+      <div class="section-heading"><span class="section-number">01</span><div><p class="eyebrow">Pulso da operacao</p><h2>O que aconteceu no recorte</h2><p class="section-intro">Pedidos e receita continuam visiveis mesmo quando o denominador de sessoes nao esta completo.</p></div><span id="summary-window" class="section-meta">&mdash;</span></div>
+      <div class="kpis">
+        <article class="kpi"><span>Pedidos</span><strong id="metric-orders">&mdash;</strong><small>Pedidos atribuidos no recorte</small></article>
+        <article class="kpi"><span>Sessoes SSOT</span><strong id="metric-sessions">&mdash;</strong><small id="metric-sessions-note">Denominador oficial</small></article>
+        <article class="kpi"><span>Receita</span><strong id="metric-revenue">&mdash;</strong><small>Receita atribuida</small></article>
+        <article class="kpi kpi-accent"><span>Conversao</span><strong id="metric-rate">&mdash;</strong><small id="metric-rate-note">Sem denominador completo</small></article>
+      </div>
+      <div id="summary-status" class="summary-status"><span class="status-dot"></span><span>Validando cobertura do periodo.</span></div>
+    </section>
+
+    <section id="ritmo" class="report-section">
+      <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">Ritmo comercial</p><h2>Do dia ao ano</h2><p class="section-intro">Troque a granularidade para comparar o ritmo sem misturar medias de conversao.</p></div></div>
+      <div class="rhythm-toolbar">
+        <div class="segmented-control" role="group" aria-label="Granularidade do ritmo">
+          <button type="button" data-granularity="day">Dia</button>
+          <button type="button" data-granularity="day-over-day">Dia a dia</button>
+          <button type="button" data-granularity="week" class="active">Semanal</button>
+          <button type="button" data-granularity="month">Mes</button>
+          <button type="button" data-granularity="quarter">Trimestre</button>
+          <button type="button" data-granularity="semester">Semestre</button>
+          <button type="button" data-granularity="year">Ano</button>
+        </div>
+        <label class="metric-select"><span>Indicador</span><select id="rhythm-metric"><option value="pedidos">Pedidos</option><option value="receita">Receita</option><option value="sessoes">Sessoes</option><option value="rate">Conversao</option></select></label>
+        <span id="rhythm-window" class="muted-note">&mdash;</span>
+      </div>
+      <div class="rhythm-grid">
+        <div id="rhythm-chart" class="chart" aria-label="Grafico de ritmo comercial"><div class="empty-state">Carregando ritmo.</div></div>
+        <div class="rhythm-side">
+          <div class="mini-period"><span>Ultimo dia</span><strong id="last-day-label">&mdash;</strong><b id="last-day-value">&mdash;</b><small id="last-day-note">&mdash;</small></div>
+          <div class="mini-period"><span>Ultima semana</span><strong id="last-week-label">&mdash;</strong><b id="last-week-value">&mdash;</b><small id="last-week-note">&mdash;</small></div>
+          <div class="mini-period"><span>Ultimo mes</span><strong id="last-month-label">&mdash;</strong><b id="last-month-value">&mdash;</b><small id="last-month-note">&mdash;</small></div>
+        </div>
+      </div>
+      <div class="table-scroll rhythm-table-wrap"><table class="data-table rhythm-table"><thead><tr><th>Periodo</th><th>Pedidos</th><th>Sessoes</th><th>Receita</th><th>Conversao</th><th>Cobertura</th><th>Leitura</th></tr></thead><tbody id="rhythm-body"><tr><td colspan="7" class="table-empty">Carregando dados do ritmo.</td></tr></tbody></table></div>
+    </section>
+
+    <section id="canais" class="report-section">
+      <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">Comparacao de canais</p><h2>Quem trouxe resultado</h2><p class="section-intro">Cinco leituras de midia paga no recorte atual. Use o filtro para agrupar Meta Ads ou abrir cada leitura.</p></div><span id="channel-status" class="status-pill pending">&mdash;</span></div>
+      <div class="table-scroll"><table class="data-table channel-table"><thead><tr><th>Canal</th><th>Pedidos</th><th>Sessoes</th><th>Receita</th><th>Conversao</th><th>Cobertura</th><th>Vs. comparacao</th><th>Acao</th></tr></thead><tbody id="channel-body"><tr><td colspan="8" class="table-empty">Carregando canais.</td></tr></tbody></table></div>
+    </section>
+
+    <section id="evolucao" class="report-section">
+      <div class="section-heading"><span class="section-number">04</span><div><p class="eyebrow">Evolucao</p><h2>Como os canais se movem</h2><p class="section-intro">Escolha o indicador e os canais; a escala permanece comparavel entre os periodos.</p></div></div>
+      <div class="chart-tools"><label for="chart-channel-filter">Grupo de canais</label><select id="chart-channel-filter"></select><label for="chart-metric">Indicador</label><select id="chart-metric"><option value="pedidos">Pedidos</option><option value="receita">Receita</option><option value="sessoes">Sessoes</option><option value="rate">Conversao</option></select><span id="chart-window" class="muted-note">&mdash;</span></div>
+      <div id="line-chart" class="chart" aria-label="Grafico de evolucao por canal"><div class="empty-state">Carregando evolucao.</div></div>
+      <p id="chart-note" class="chart-note"></p>
+    </section>
+
+    <section id="growth-views" class="report-section">
+      <div class="section-heading"><span class="section-number">05</span><div><p class="eyebrow">Produto primeiro</p><h2>Produto, canal, campanha e criativo</h2><p class="section-intro">A investigação começa em Canal + produto e avança para campanha, grupo e anúncio quando a ponte de dados estiver disponível.</p></div><span id="explorer-status" class="status-pill pending">&mdash;</span></div>
+      <div class="explorer-toolbar"><label for="explorer-level">Visao</label><select id="explorer-level"></select><label for="explorer-sort">Ordenar por</label><select id="explorer-sort"><option value="pedidos">Pedidos</option><option value="receita">Receita</option><option value="sessoes">Sessoes</option><option value="rate">Conversao</option></select><label for="explorer-search">Buscar</label><input id="explorer-search" type="search" placeholder="Nome da campanha, criativo ou produto"><span id="explorer-count" class="muted-note">&mdash;</span></div>
+      <div id="explorer-summary" class="explorer-summary"></div>
+      <div class="table-scroll"><table class="data-table explorer-table"><thead id="explorer-head"></thead><tbody id="explorer-body"><tr><td colspan="8" class="table-empty">Carregando investigacao.</td></tr></tbody></table></div>
+    </section>
+
+    <section id="quality" class="report-section">
+      <div class="section-heading"><span class="section-number">06</span><div><p class="eyebrow">Confiabilidade</p><h2>O que esta liberado para decisao</h2><p class="section-intro">A cobertura fica explicita para evitar interpretar um resultado parcial como performance real.</p></div><span id="quality-count" class="status-pill warn">Avaliando</span></div>
+      <div id="quality-list" class="quality-list"><div class="empty-state">Validando cobertura.</div></div>
+      <div class="table-scroll"><table class="data-table catalog-table"><thead><tr><th>Visao</th><th>Fonte</th><th>Status</th><th>Uso recomendado</th></tr></thead><tbody id="catalog-body"></tbody></table></div>
+      <div class="source-foot"><span>Fonte</span><strong id="source-name">&mdash;</strong><span>Extraido em</span><strong id="extracted-at">&mdash;</strong></div>
+    </section>
+
+    <footer><strong>Regra SSOT:</strong> conversao = SUM(pedidos) / SUM(sessoes), somente quando o denominador esta completo. Pedidos, receita e sinais de cobertura continuam visiveis quando a conversao nao pode ser calculada.</footer>
+  </main>
+  <script src="assets/app.js?v=20261026-33"></script>
+</body>
+</html>
