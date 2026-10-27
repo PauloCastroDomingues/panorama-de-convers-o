@@ -2,7 +2,7 @@
 
 ## Escopo fechado
 
-Este projeto nao analisa CRM, WhatsApp, e-mail, direto, organico, social ou afiliados. O escopo e somente midia paga, apresentado nestas cinco linhas comerciais:
+O workspace Growth Performance nao analisa CRM, WhatsApp, e-mail, direto, organico, social ou afiliados. Seu escopo e somente midia paga, apresentado nestas cinco linhas comerciais:
 
 1. Meta Ads 1.
 2. Meta Ads 2.
@@ -11,6 +11,17 @@ Este projeto nao analisa CRM, WhatsApp, e-mail, direto, organico, social ou afil
 5. Total pago (Facebook + Google), agregado de Meta Ads 1, Meta Ads 2 e Google ADS.
 
 Os agregados sao calculados sobre as linhas brutas uma unica vez. Eles nao sao somados novamente ao total pago e nunca devem ser tratados como canais independentes na reconciliacao.
+
+## Aba CRM independente
+
+O painel tambem possui uma aba CRM separada da Growth Performance. Ela usa o racional de fechamento semanal enviado para o projeto e responde a quatro perguntas operacionais:
+
+1. Como cada canal CRM ficou contra a meta de sessoes, pedidos, receita e conversao?
+2. Em qual etapa do funil de ativacao ocorreu a perda de volume?
+3. Quais canais ou segmentos devem ser investigados primeiro?
+4. Qual ritmo diario de referencia precisa ser acompanhado durante a semana?
+
+A referencia atual e a semana de 19 a 25/10/2026, com E-mail, WhatsApp Organico e WhatsApp Oficial. A aba nao reutiliza os filtros, linhas, agregacoes ou regras de atribuicao de Growth. Etapas nao rastreadas permanecem como `Nao rastreado` e nao sao convertidas em zero. A fonte da referencia e exibida na propria aba; a integracao automatica do CRM com uma fonte diaria deve ser feita separadamente.
 
 ## Entrega atual: oito visoes de Growth Performance
 

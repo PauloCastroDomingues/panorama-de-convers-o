@@ -1,0 +1,144 @@
+{
+  "source": "relatorio-fechamento-19a25-10 racional.html e funis-metas-semanais-19a25-10 visão.html",
+  "status": "referencia_semanal",
+  "period": {
+    "start": "2026-10-19",
+    "end": "2026-10-25",
+    "label": "19 a 25/10/2026"
+  },
+  "channels": [
+    {
+      "id": "email",
+      "name": "E-mail",
+      "metrics": [
+        { "key": "sessions", "label": "Sessoes", "meta": 2121, "actual": 6796, "format": "int" },
+        { "key": "orders", "label": "Pedidos", "meta": 59, "actual": 60, "format": "int" },
+        { "key": "revenue", "label": "Receita", "meta": 42581.24, "actual": 34264.48, "format": "money" },
+        { "key": "rate", "label": "Conversao", "meta": 0.0278, "actual": 0.0088, "format": "percent" }
+      ],
+      "note": "O volume de sessoes ficou muito acima da meta, mas a conversao caiu de 2,78% para 0,88%. O primeiro ataque e entender a diluicao entre campanhas e automacoes e validar produto ou checkout.",
+      "segments": [
+        {
+          "name": "Geral",
+          "plannedShots": 7,
+          "actualShots": 6,
+          "planned": [
+            { "label": "Base selecionada", "value": 895216 },
+            { "label": "Entregues", "value": 795151, "rate": 0.8882 },
+            { "label": "Aberturas", "value": 120211, "rate": 0.1512 },
+            { "label": "Cliques", "value": 623, "rate": 0.0052 }
+          ],
+          "actual": [
+            { "label": "Base selecionada", "value": 701004 },
+            { "label": "Entregues", "value": 674622, "rate": 0.9624 },
+            { "label": "Aberturas", "value": 105236, "rate": 0.1560 },
+            { "label": "Cliques", "value": 485, "rate": 0.0046 }
+          ],
+          "diagnosis": "Faltou um disparo de sete. Entrega e abertura ficaram estaveis; o ponto de perda foi o CTOR."
+        },
+        {
+          "name": "Engajados",
+          "plannedShots": 21,
+          "actualShots": 18,
+          "planned": [
+            { "label": "Base selecionada", "value": 725991 },
+            { "label": "Entregues", "value": 718242, "rate": 0.9893 },
+            { "label": "Aberturas", "value": 260652, "rate": 0.3629 },
+            { "label": "Cliques", "value": 1470, "rate": 0.0056 }
+          ],
+          "actual": [
+            { "label": "Base selecionada", "value": 721124 },
+            { "label": "Entregues", "value": 715551, "rate": 0.9923 },
+            { "label": "Aberturas", "value": 294354, "rate": 0.4114 },
+            { "label": "Cliques", "value": 1175, "rate": 0.0040 }
+          ],
+          "diagnosis": "Faltaram tres disparos e o CTOR caiu 29%, apesar da abertura ter ficado acima do plano."
+        }
+      ],
+      "pacing": { "metric": "Sessoes", "metaDaily": [303, 303, 303, 303, 303, 303, 303] }
+    },
+    {
+      "id": "whatsapp-organico",
+      "name": "WhatsApp Organico",
+      "metrics": [
+        { "key": "sessions", "label": "Sessoes", "meta": 791, "actual": 1232, "format": "int" },
+        { "key": "orders", "label": "Pedidos", "meta": 7, "actual": 23, "format": "int" },
+        { "key": "revenue", "label": "Receita", "meta": 9147.91, "actual": 11440.72, "format": "money" },
+        { "key": "rate", "label": "Conversao", "meta": 0.0088, "actual": 0.0187, "format": "percent" }
+      ],
+      "note": "Foi o unico canal verde em todas as metricas. A conversao mais que dobrou e compensou o alcance menor por post.",
+      "segments": [
+        {
+          "name": "Club + Membership",
+          "plannedShots": 30,
+          "actualShots": 29,
+          "planned": [
+            { "label": "Membros", "value": 241710 },
+            { "label": "Entregues", "value": 106230, "rate": 0.4395 },
+            { "label": "Visualizacoes", "value": 122790, "rate": 1.1559 },
+            { "label": "Sessoes", "value": 810, "rate": 0.0066 }
+          ],
+          "actual": [
+            { "label": "Visualizacoes", "value": 84360 },
+            { "label": "Sessoes", "value": 1064, "rate": 0.0126 }
+          ],
+          "diagnosis": "O alcance ficou menor, mas quem viu converteu quase o dobro do previsto. Membros e entregues nao foram rastreados separadamente no fechamento."
+        }
+      ],
+      "pacing": { "metric": "Sessoes", "metaDaily": [113, 113, 113, 113, 113, 113, 113] }
+    },
+    {
+      "id": "whatsapp-oficial",
+      "name": "WhatsApp Oficial",
+      "metrics": [
+        { "key": "investment", "label": "Investimento", "meta": 12003.42, "actual": 12763.45, "format": "money", "invertGood": true },
+        { "key": "revenue", "label": "Receita", "meta": 71020.15, "actual": 43320.67, "format": "money" },
+        { "key": "roas", "label": "ROAS", "meta": 5.92, "actual": 3.39, "format": "multiple" },
+        { "key": "sessions", "label": "Sessoes", "meta": 3605, "actual": 2931, "format": "int" },
+        { "key": "orders", "label": "Pedidos", "meta": 119, "actual": 76, "format": "int" },
+        { "key": "rate", "label": "Conversao", "meta": 0.033, "actual": 0.0259, "format": "percent" },
+        { "key": "cps", "label": "CPS", "meta": 3.33, "actual": 4.35, "format": "money", "invertGood": true }
+      ],
+      "note": "O investimento ficou proximo da meta, mas receita, pedidos e ROAS ficaram abaixo do plano. Antes de otimizar criativo, separar Marketing, Utilidade e a terceira origem ainda nao coberta.",
+      "segments": [
+        {
+          "name": "Marketing",
+          "plannedShots": 7,
+          "actualShots": 6,
+          "planned": [
+            { "label": "Publico", "value": 31262 },
+            { "label": "Entregues", "value": 28910, "rate": 0.9248 },
+            { "label": "Leitura", "value": 12404, "rate": 0.4291 },
+            { "label": "Cliques", "value": 2674, "rate": 0.2156 }
+          ],
+          "actual": [
+            { "label": "Publico", "value": 10824 },
+            { "label": "Entregues", "value": 10169, "rate": 0.9395 },
+            { "label": "Leitura", "value": 3638, "rate": 0.3578 },
+            { "label": "Cliques", "value": 882, "rate": 0.2424 }
+          ],
+          "diagnosis": "O publico por disparo ficou abaixo do planejado. Entrega e clique resistiram; leitura foi o principal ponto de queda."
+        },
+        {
+          "name": "Utilidade",
+          "plannedShots": 7,
+          "actualShots": 2,
+          "planned": [
+            { "label": "Publico", "value": 10892 },
+            { "label": "Entregues", "value": 10073, "rate": 0.9248 },
+            { "label": "Leitura", "value": 4319, "rate": 0.4288 },
+            { "label": "Cliques", "value": 931, "rate": 0.2156 }
+          ],
+          "actual": [
+            { "label": "Publico", "value": 3564 },
+            { "label": "Entregues", "value": 3551, "rate": 0.9964 },
+            { "label": "Leitura", "value": 3221, "rate": 0.9071 },
+            { "label": "Cliques", "value": 899, "rate": 0.2791 }
+          ],
+          "diagnosis": "Rodaram dois de sete disparos. A qualidade dos disparos realizados foi boa; o problema foi frequencia."
+        }
+      ],
+      "pacing": { "metric": "Sessoes", "metaDaily": [515, 515, 515, 515, 515, 515, 515] }
+    }
+  ]
+}

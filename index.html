@@ -11,7 +11,11 @@
   <link rel="stylesheet" href="assets/styles.css?v=20261026-36">
 </head>
 <body>
-  <main class="wrap">
+  <nav class="workspace-tabs" aria-label="Área de análise">
+    <button class="workspace-tab active" type="button" data-workspace="growth">Growth Performance</button>
+    <button class="workspace-tab" type="button" data-workspace="crm">CRM</button>
+  </nav>
+  <main id="growth-workspace" class="wrap workspace-panel">
     <header class="top">
       <div>
         <p class="kicker">Reise &middot; Performance comercial</p>
@@ -128,6 +132,55 @@
 
     <footer><strong>Regra SSOT:</strong> conversao = SUM(pedidos) / SUM(sessoes), somente quando o denominador esta completo. Pedidos, receita e sinais de cobertura continuam visiveis quando a conversao nao pode ser calculada.</footer>
   </main>
+  <main id="crm-workspace" class="wrap workspace-panel is-hidden">
+    <header class="crm-header">
+      <div>
+        <p class="kicker">Reise · CRM</p>
+        <h1>Fechamento CRM</h1>
+        <p class="dek">Meta versus realizado, funil de ativação e ritmo semanal. Esta leitura não usa a atribuição de Growth Performance.</p>
+      </div>
+      <div class="crm-header-meta"><span class="status-pill ok">Aba independente</span><span id="crm-period-label">Semana de referência</span></div>
+    </header>
+
+    <section class="crm-controls" aria-label="Filtros da análise de CRM">
+      <div class="control-group"><label for="crm-channel-filter">Canal CRM</label><select id="crm-channel-filter"><option value="all">Todos os canais</option></select></div>
+      <div class="crm-period-note"><span>Período do fechamento</span><strong id="crm-period-note">19 a 25/10/2026</strong></div>
+      <div class="crm-source-note"><span>Fonte</span><strong>Racional CRM anexado</strong></div>
+    </section>
+
+    <section id="crm-validation-banner" class="callout validation-banner valid" aria-live="polite">
+      <span class="callout-mark">i</span>
+      <div><strong>Escopo CRM separado</strong><span>Os números abaixo são meta versus realizado do fechamento semanal. Eles não entram na base, nos filtros ou nas conversões de Growth.</span></div>
+    </section>
+
+    <section class="report-section first-section">
+      <div class="section-heading"><span class="section-number">01</span><div><p class="eyebrow">Resumo CRM</p><h2>O que aconteceu na semana</h2><p class="section-intro">Leitura consolidada dos canais de relacionamento selecionados.</p></div><span id="crm-summary-window" class="section-meta">19 a 25/10/2026</span></div>
+      <div id="crm-summary-kpis" class="kpis"></div>
+    </section>
+
+    <section class="report-section">
+      <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">Meta versus realizado</p><h2>Resultado por canal</h2><p class="section-intro">Use a variação para localizar rapidamente volume, eficiência e receita que precisam de investigação.</p></div></div>
+      <div id="crm-channel-cards" class="crm-channel-cards"></div>
+    </section>
+
+    <section class="report-section">
+      <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">Prioridade de atuação</p><h2>Onde atacar primeiro</h2><p class="section-intro">Prioridades calculadas a partir dos gaps do fechamento, sem misturar causalidade de mídia paga.</p></div></div>
+      <div id="crm-priority-list" class="crm-priority-list"></div>
+    </section>
+
+    <section class="report-section">
+      <div class="section-heading"><span class="section-number">04</span><div><p class="eyebrow">Funil de ativação</p><h2>Planejado versus realizado por etapa</h2><p class="section-intro">A comparação mostra em qual etapa cada canal perdeu volume. Etapas sem rastreamento continuam explícitas.</p></div></div>
+      <div id="crm-funnel" class="crm-funnel-grid"></div>
+    </section>
+
+    <section class="report-section">
+      <div class="section-heading"><span class="section-number">05</span><div><p class="eyebrow">Ritmo semanal</p><h2>Meta diária de referência</h2><p class="section-intro">Distribuição diária da meta do anexo. É uma referência de pace, não uma medição diária realizada.</p></div></div>
+      <div id="crm-pacing" class="table-scroll"></div>
+    </section>
+
+    <footer><strong>Regra CRM:</strong> esta aba usa o fechamento e as metas dos anexos como referência semanal. Ela permanece separada da camada Growth Performance e não transforma etapas não rastreadas em zero.</footer>
+  </main>
   <script src="assets/app.js?v=20261026-36"></script>
+  <script src="assets/crm.js?v=20261027-01"></script>
 </body>
 </html>
