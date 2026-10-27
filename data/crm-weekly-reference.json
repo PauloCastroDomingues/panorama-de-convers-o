@@ -55,7 +55,17 @@
           "diagnosis": "Faltaram tres disparos e o CTOR caiu 29%, apesar da abertura ter ficado acima do plano."
         }
       ],
-      "pacing": { "metric": "Sessoes", "metaDaily": [303, 303, 303, 303, 303, 303, 303] }
+      "pacing": { "metric": "Sessoes", "metaDaily": [303, 303, 303, 303, 303, 303, 303], "daily": { "Receita": [6083.03, 6083.04, 6083.03, 6083.04, 6083.03, 6083.04, 6083.03], "Pedidos": [8, 9, 8, 9, 8, 9, 8], "Sessoes": [303, 303, 303, 303, 303, 303, 303] } },
+      "activation": {
+        "resultLabel": "Cliques",
+        "metaResult": 2121,
+        "hint": "Base selecionada, entregues, aberturas e cliques por segmento de disparo.",
+        "segments": [
+          { "name": "Geral", "shots": 7, "resultPerShot": 89, "stages": [{ "label": "Base selecionada", "value": 127888 }, { "label": "Entregues", "value": 113593, "rate": 0.8882 }, { "label": "Aberturas", "value": 17173, "rate": 0.1512 }, { "label": "Cliques", "value": 89, "rate": 0.0052 }], "source": "Media de disparos de regime de 13 a 19/10." },
+          { "name": "Engajados", "shots": 21, "resultPerShot": 70, "stages": [{ "label": "Base selecionada", "value": 34571 }, { "label": "Entregues", "value": 34202, "rate": 0.9893 }, { "label": "Aberturas", "value": 12412, "rate": 0.3629 }, { "label": "Cliques", "value": 70, "rate": 0.0056 }], "source": "Media de disparos de regime de 13 a 19/10." }
+        ],
+        "tracking": { "slots": ["Geral", "Engajados #1", "Engajados #2", "Engajados #3"], "inputs": ["Leads", "Entregues", "Abertura", "Cliques"], "outputs": ["Entrega", "Abertura", "CTOR"], "result": "Cliques", "hint": "Preencha Leads, Entregues, Abertura e Cliques conforme cada disparo sair." }
+      }
     },
     {
       "id": "whatsapp-organico",
@@ -85,7 +95,18 @@
           "diagnosis": "O alcance ficou menor, mas quem viu converteu quase o dobro do previsto. Membros e entregues nao foram rastreados separadamente no fechamento."
         }
       ],
-      "pacing": { "metric": "Sessoes", "metaDaily": [113, 113, 113, 113, 113, 113, 113] }
+      "pacing": { "metric": "Sessoes", "metaDaily": [113, 113, 113, 113, 113, 113, 113], "daily": { "Receita": [1306.84, 1306.85, 1306.84, 1306.85, 1306.84, 1306.85, 1306.84], "Pedidos": [1, 1, 1, 1, 1, 1, 1], "Sessoes": [113, 113, 113, 113, 113, 113, 113] } },
+      "activation": {
+        "resultLabel": "Sessoes",
+        "metaResult": 791,
+        "hint": "Funil combinado de Reise Club e Reise Membership.",
+        "segments": [
+          { "name": "Reise Club", "shots": 15, "stages": [{ "label": "Membros", "value": 5360 }, { "label": "Entregues", "value": 2306, "rate": 0.4302 }, { "label": "Visualizacoes", "value": 2770, "rate": 0.5167 }] },
+          { "name": "Reise Membership", "shots": 15, "stages": [{ "label": "Membros", "value": 2697 }, { "label": "Entregues", "value": 1235, "rate": 0.4578 }, { "label": "Visualizacoes", "value": 1323, "rate": 0.4905 }] }
+        ],
+        "combined": { "label": "Visualizacoes combinadas", "value": 4093, "nextLabel": "Sessoes por disparo", "nextValue": 27, "rate": 0.0066 },
+        "tracking": { "slots": ["Disparo 1", "Disparo 2", "Disparo 3", "Disparo 4", "Disparo 5"], "inputs": ["Vis. Club", "Vis. Membership", "Sessoes"], "outputs": ["Vis. combinada", "Taxa sessoes/vis."], "result": "Sessoes", "hint": "Preencha as visualizacoes de cada grupo e as sessoes geradas em cada disparo." }
+      }
     },
     {
       "id": "whatsapp-oficial",
@@ -138,7 +159,17 @@
           "diagnosis": "Rodaram dois de sete disparos. A qualidade dos disparos realizados foi boa; o problema foi frequencia."
         }
       ],
-      "pacing": { "metric": "Sessoes", "metaDaily": [515, 515, 515, 515, 515, 515, 515] }
+      "pacing": { "metric": "Sessoes", "metaDaily": [515, 515, 515, 515, 515, 515, 515], "daily": { "Investimento": [1714.77, 1714.78, 1714.77, 1714.78, 1714.77, 1714.78, 1714.77], "Receita": [10145.74, 10145.73, 10145.74, 10145.73, 10145.74, 10145.73, 10145.74], "Pedidos": [17, 17, 17, 17, 17, 17, 17], "Sessoes": [515, 515, 515, 515, 515, 515, 515] } },
+      "activation": {
+        "resultLabel": "Sessoes",
+        "metaResult": 3605,
+        "hint": "Publico, entregues, leitura e cliques por tipo de template.",
+        "segments": [
+          { "name": "Marketing", "shots": 7, "resultPerShot": 382, "stages": [{ "label": "Publico", "value": 4466 }, { "label": "Entregues", "value": 4130, "rate": 0.9248 }, { "label": "Leitura", "value": 1772, "rate": 0.4291 }, { "label": "Cliques", "value": 382, "rate": 0.2156 }], "source": "Custo de referencia R$ 0,37 por contato." },
+          { "name": "Utilidade", "shots": 7, "resultPerShot": 133, "stages": [{ "label": "Publico", "value": 1556 }, { "label": "Entregues", "value": 1439, "rate": 0.9248 }, { "label": "Leitura", "value": 617, "rate": 0.4291 }, { "label": "Cliques", "value": 133, "rate": 0.2156 }], "source": "Custo de referencia R$ 0,04 por contato." }
+        ],
+        "tracking": { "slots": ["Marketing", "Utilidade"], "inputs": ["Publico", "Entregues", "Leitura", "Cliques"], "outputs": ["Entrega", "Leitura", "Clique"], "result": "Cliques", "hint": "Preencha Publico, Entregues, Leitura e Cliques de cada tipo de template." }
+      }
     }
   ]
 }

@@ -180,6 +180,60 @@ footer strong { color: var(--ink); }
 .crm-pacing-table { min-width: 850px; }
 .crm-pacing-table td, .crm-pacing-table th { text-align: right; }
 .crm-pacing-table td:first-child, .crm-pacing-table th:first-child, .crm-pacing-table td:nth-child(2), .crm-pacing-table th:nth-child(2) { text-align: left; }
+.crm-channel-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px; padding: 4px; border: 1px solid var(--line); background: var(--panel); }
+.crm-channel-tab { min-height: 36px; padding: 0 13px; border: 0; color: var(--muted); background: transparent; font-weight: 700; }
+.crm-channel-tab.active, .crm-channel-tab:hover { color: var(--ink); background: var(--orange); }
+.crm-detail { display: grid; gap: 14px; }
+.crm-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 1px; border: 1px solid var(--line); background: var(--line); }
+.crm-detail-card { min-width: 0; padding: 18px; background: var(--panel); }
+.crm-detail-card h3 { margin: 0 0 4px; font-size: 17px; }
+.crm-detail-hint { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.crm-funnel-visual { display: grid; gap: 4px; padding: 10px 0; }
+.crm-funnel-visual svg { width: 100%; height: 180px; }
+.crm-funnel-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+.crm-funnel-label strong { color: var(--ink); font-size: 16px; }
+.crm-side-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border: 1px solid var(--line); background: var(--line); }
+.crm-side-stats div { padding: 10px; background: var(--panel-soft); }
+.crm-side-stats span { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.crm-side-stats strong { display: block; margin-top: 5px; font: 700 16px var(--serif); }
+.crm-daily-table { min-width: 780px; }
+.crm-daily-table small { display: block; color: var(--muted); font-size: 10px; margin-top: 3px; }
+.crm-chart-box { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; overflow-x: auto; }
+.crm-chart-box svg { display: block; width: 100%; min-width: 620px; height: 190px; }
+.crm-chart-box text { fill: var(--muted); font: 10px var(--sans); }
+.crm-chart-legend { display: flex; gap: 18px; color: var(--muted); font-size: 11px; }
+.crm-legend-bar, .crm-legend-line { display: inline-block; width: 18px; height: 4px; margin-right: 5px; background: var(--orange); vertical-align: middle; }
+.crm-legend-line { height: 2px; }
+.crm-chain-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--line); background: var(--line); }
+.crm-chain-column { padding: 15px; background: var(--panel-soft); }
+.crm-chain-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.crm-chain-head span { color: var(--muted); font-size: 11px; }
+.crm-chain-stages { display: grid; gap: 1px; }
+.crm-chain-stages div { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.crm-chain-stages b { color: var(--ink); }
+.crm-chain-stages small { color: var(--orange); font-weight: 400; }
+.crm-chain-column svg { width: 100%; height: 180px; margin-top: 10px; }
+.crm-chain-result { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+.crm-combined-result { display: grid; grid-template-columns: 1fr auto 1fr auto auto; gap: 12px; align-items: center; margin-top: 14px; padding: 12px; border: 1px solid var(--line); background: var(--panel-soft); color: var(--muted); font-size: 12px; }
+.crm-combined-result strong { color: var(--ink); font-size: 16px; }
+.crm-activation-summary { margin-top: 14px; padding: 14px; border: 1px solid var(--line); background: var(--panel-soft); }
+.crm-activation-summary-row { display: flex; justify-content: space-between; gap: 14px; align-items: baseline; color: var(--muted); font-size: 12px; }
+.crm-activation-summary-row strong { color: var(--ink); font: 700 22px var(--serif); }
+.crm-activation-summary-row .good { color: var(--green); }
+.crm-activation-summary-row .bad { color: var(--red); }
+.crm-progress { height: 7px; margin: 10px 0; background: var(--line-strong); overflow: hidden; }
+.crm-progress span { display: block; height: 100%; background: var(--orange); }
+.crm-detail-overview { display: flex; gap: 12px; padding: 15px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 12px; }
+.crm-detail-overview strong { color: var(--ink); }
+.crm-tracking-head { display: flex; justify-content: space-between; gap: 16px; align-items: start; margin-bottom: 14px; }
+.crm-tracking-head h3 { margin: 0 0 4px; }
+.crm-tracking-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.crm-tracking-actions .outline-button { min-height: 32px; padding: 5px 9px; font-size: 11px; }
+.crm-tracking-summary { display: flex; gap: 10px; align-items: baseline; margin-bottom: 12px; color: var(--muted); }
+.crm-tracking-summary strong { color: var(--orange); font: 700 26px var(--serif); }
+.crm-tracking-table { min-width: 860px; }
+.crm-tracking-table input { width: 100px; min-height: 30px; padding: 5px; }
+.crm-track-output { color: var(--orange); }
 @media (max-width: 1100px) {
   .top { grid-template-columns: minmax(0, 1fr) auto; }
   .top-meta { grid-column: 1 / -1; grid-template-columns: auto auto auto; justify-items: start; align-items: center; text-align: left; }
@@ -213,6 +267,10 @@ footer strong { color: var(--ink); }
   .crm-controls { grid-template-columns: 1fr 1fr; }
   .crm-controls .control-group { grid-column: 1 / -1; }
   .crm-funnel-grid { grid-template-columns: 1fr; }
+  .crm-detail-grid { grid-template-columns: 1fr; }
+  .crm-chain-grid { grid-template-columns: 1fr; }
+  .crm-tracking-head { display: block; }
+  .crm-tracking-actions { margin-top: 10px; }
 }
 @media (max-width: 560px) {
   h2 { font-size: 23px; }
@@ -228,4 +286,6 @@ footer strong { color: var(--ink); }
   .rhythm-side { grid-template-columns: 1fr; grid-template-rows: repeat(3, 1fr); }
   .chart svg { min-width: 560px; }
   .crm-controls { grid-template-columns: 1fr; }
+  .crm-side-stats { grid-template-columns: 1fr; }
+  .crm-combined-result { grid-template-columns: 1fr 1fr; }
 }
