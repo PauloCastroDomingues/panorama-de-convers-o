@@ -1,0 +1,4 @@
+{
+  "endpoint": "",
+  "note": "Snapshot validado. Ativar /api/crm-sendflow somente depois de configurar e testar a ponte no servidor."
+}

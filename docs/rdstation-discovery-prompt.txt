@@ -1,0 +1,39 @@
+Use a conexao RD Station Marketing Advanced para preparar a integracao de CRM da Reise. Execute somente consultas de leitura. Nao crie, altere, exclua, envie ou agende nada na RD, no SSOT, no GA4 ou em planilhas nesta etapa.
+
+CONTEXTO
+O SSOT e a fonte prioritaria e, segundo o responsavel, ja contem dados de RD Station, Reise Club e grupos VIP. As fontes operacionais devem complementar ou reconciliar esses dados, nunca duplicar resultados. O GA4 fica reservado a necessidades identificadas e nao deve ser consultado nesta etapa.
+
+DIAGNOSTICO RD
+1. Inspecione as ferramentas disponiveis e suas descricoes. Identifique a conta apenas com os dados minimos necessarios, sem listar contatos ou dados pessoais.
+2. Descubra os recursos de estatisticas agregadas para campanhas de e-mail e, separadamente, e-mails de automacao. Nao presuma nomes de ferramentas ou campos.
+3. Consulte um piloto dos ultimos sete dias completos. Confirme a semantica do filtro de data antes da consulta e informe o fuso usado pela fonte. Nao assuma que campanhas enviadas no periodo equivalem a eventos de abertura/clique ocorridos no periodo.
+4. Retorne os campos efetivamente disponiveis e uma amostra agregada pequena: IDs e nomes de campanhas, tipo de envio, data de envio e contagens de destinatarios, entregas, aberturas, cliques, rejeicoes, descadastros e denuncias, quando retornados pela fonte.
+5. Para cada metrica, informe definicao, denominador, contagem unica ou total, acumulada por envio ou diaria por evento, ultima atualizacao e possibilidade de duplicacao. Se nao estiver documentado, indique que a definicao precisa ser confirmada.
+6. Registre paginacao, limites, erros, truncamento e cobertura real. Uma consulta sem resultados nao comprova inexistencia de dados: confira datas, conta e escopo antes de concluir.
+7. Identifique se existem IDs ou campos documentados que permitam relacionar campanhas a Reise Club ou grupos VIP. Nao consulte perfis de pessoas para tentar inferir essa relacao nem classifique publicos apenas pelo nome da campanha.
+
+DESCOBERTA SSOT, SOMENTE SE EXISTIR CONEXAO DISPONIVEL
+8. Consulte primeiro metadados autorizados para localizar fontes de RD Station, E-mail, Reise Club e grupos VIP. Traga projeto/dataset/tabela ou view, colunas, grao e candidatos a chaves de ligacao. Prefira catalogo a varredura de dados brutos e respeite os limites de custo existentes.
+9. Nao trate tabelas candidatas como atribuicao comprovada. Se o SSOT nao estiver acessivel neste chat, declare isso e liste os metadados que precisamos consultar por outra via. Nao invente resultados.
+
+REGRAS PARA O PROJETO
+- Sessoes, pedidos, receita e conversao comercial oficiais permanecem no SSOT.
+- Nao calcular conversao oficial com sessoes GA4, cliques ou destinatarios no denominador.
+- Reise Club e grupos VIP sao recortes a validar, nao novos canais presumidos. Nao somar publicos sobrepostos.
+- Nao distribuir vendas do canal entre campanhas, grupos ou mensagens sem atribuicao comprovada.
+- Preservar valores ausentes como ausentes; nao preencher zero artificial.
+- Nao criar planilha nem coletar todo o historico antes de validar este piloto.
+
+ENTREGA
+Retorne: fontes acessadas, periodo/fuso, ferramentas usadas, campos reais, amostra agregada, definicoes confirmadas, cobertura, chaves candidatas e impedimentos. Separe claramente fatos verificados de hipoteses e do que depende do SSOT. Nao inclua tokens, URLs privadas ou dados pessoais.
+
+DEFINICOES REISE PARA A CAMADA TRATADA
+A referencia metodologica e a planilha 1z_Aixkiton5AmlpIM8q0daWFgXNPKXjqo15wxD5C2oM. Ela e estritamente somente leitura e nao e destino da coleta.
+Entregabilidade = entregues / selecionados.
+Abertura = aberturas unicas / entregues.
+Clique por abertura (CTOR) = cliques unicos / aberturas unicas, nao cliques / entregues.
+Taxa de sessao = sessoes SSOT / cliques unicos, apenas com escopo e cobertura compativeis comprovados.
+Conversao oficial = pedidos SSOT / sessoes SSOT. Ticket = receita SSOT / pedidos SSOT.
+Consolidar contagens antes de dividir; nao somar subtotais ou observacoes repetidas. Medianas de taxas mensais sao referencias separadas, nao taxas consolidadas nem metas automaticas.
+Confirme se contacts_count, email_delivered_count, email_opened_count e email_clicked_count estao realmente acessiveis no MCP e quais equivalentes existem para automacoes. Preserve as contagens originais e recalcule as taxas Reise sem usar percentuais prontos com denominadores diferentes.
+Oferta, cupom, assunto, segmentacao e tipo repique exigem campo real ou de-para validado. Nao preencha esses atributos nem vendas a partir de inferencia pelo nome da campanha.

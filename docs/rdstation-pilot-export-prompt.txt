@@ -1,0 +1,35 @@
+Continue a partir do diagnostico RD Station de 28/10/2026. Nao repita o diagnostico inteiro e nao crie nem altere planilhas. Nesta etapa, consulte e exporte somente estatisticas agregadas, sem dados pessoais. Nao use GA4 e nao altere RD ou SSOT.
+
+OBJETIVO
+Entregar uma extracao verificavel do piloto de campanhas enviadas de 21 a 27/10/2026, pela data local America/Sao_Paulo. O diagnostico relatou 24 registros nesse recorte, mas mostrou apenas sete exemplos. Precisamos dos registros completos, nao de uma nova amostra.
+
+1. REGISTROS E DATAS
+Use emails_by_campaign_analytics e confira seus argumentos/contrato antes da chamada. Retenha a consulta e o intervalo efetivamente usados. Preserve send_at original com offset; converta cada envio para America/Sao_Paulo e aplique o filtro local inclusivo de 21 a 27/10. Liste separadamente os registros retornados fora desse periodo, sem inclui-los nos totais.
+Nao declare cobertura completa somente porque encontrou 24 campanhas. Verifique paginacao/limites documentados; se nao forem expostos, registre cobertura nao comprovada. Pode usar consultas menores para detectar diferencas de cobertura, sem considerar concordancia entre consultas prova definitiva de ausencia de truncamento.
+
+2. CONTEUDO DO ARQUIVO JSON
+Traga o envelope da consulta com a conta efetivamente retornada, ferramenta/endpoint, parametros, horario real de coleta, fuso, estado da paginacao e cobertura. Se a RD nao devolver carimbo de atualizacao, sourceUpdatedAt deve ser null; horario de coleta nao e horario de processamento da RD.
+Em cada registro, preserve os campos efetivamente retornados:
+campaign_id, campaign_name, send_at, contacts_count, email_delivered_count, email_opened_count, email_clicked_count, email_bounced_count, email_dropped_count, email_unsubscribed_count e email_spam_reported_count.
+Preserve account_id no nivel em que a origem o fornecer. Nao invente IDs por linha ou atributos nao retornados. Campos ausentes permanecem null, nao zero.
+Nao inclua perfis, destinatarios, e-mails pessoais, telefones, HTML, tokens ou URLs privadas.
+
+3. CONTAGENS UNICAS E CALCULOS REISE
+A documentacao oficial de GET /platform/analytics/emails define contacts_count como contatos selecionados, email_opened_count como aberturas unicas por lead e email_clicked_count como cliques unicos por lead:
+https://developers.rdstation.com/reference/get_platform-analytics-emails
+Verifique se o MCP encaminha esses mesmos campos desse endpoint, sem transformacao. Identifique a evidencia disponivel; nao marque a equivalencia como confirmada se nao conseguir verifica-la. Nao repita como fato que a API oficial nao define unicidade.
+Entregabilidade = entregues / selecionados.
+Abertura = aberturas unicas / entregues.
+CTOR = cliques unicos / aberturas unicas, diferente da taxa RD calculada sobre entregas.
+Nao reconstruir contagens a partir de percentuais prontos nem somar fotografias repetidas. Nao usar zero no denominador.
+
+4. CAMPANHA COM CONTADORES INCONSISTENTES
+Reconsulte 20441002 e uma campanha de controle do mesmo intervalo. Preserve todos os zeros recebidos. Se continuarem zero entregas com descadastros, denuncias ou atividade de abertura/clique positiva, registre uma ressalva de qualidade. Nao corrija com estimativas nem apresente zero por cento como performance homologada. Essa ressalva nao impede exportar os outros registros; tambem nao autoriza eliminar a campanha silenciosamente para apresentar um total como completo.
+Informe se existe carimbo de processamento/finalizacao ou explicacao documentada. Sem evidencia, nao afirme que e apenas atraso D-1.
+
+5. AUTOMACOES EM SEPARADO
+Compare os account_id retornados por emails_by_campaign_analytics e emails_by_workflow_analytics usando apenas metadados autorizados. Nao una os dois recursos antes de confirmar que pertencem a mesma conta logica. IDs diferentes podem ter explicacao de arquitetura, mas isso precisa de evidencia.
+Se a resposta continuar vazia, registre collection_empty e a conta/periodo consultados, sem concluir que nao existem fluxos. Nao exporte pessoas para investigar. Nao altere nem ative os fluxos desativados. Preserve essa etapa separada da carga de campanhas.
+
+ENTREGA
+Anexe ou retorne um JSON completo do piloto com os campos reais e um resumo curto: numero de registros recebidos, dentro/fora do periodo, duplicados, inconsistentes, cobertura e estado da verificacao de contas/contagens. A planilha de referencia e o SSOT permanecem intactos. Nao crie base historica, gatilhos ou agendamentos ainda.

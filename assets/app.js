@@ -1,32 +1,37 @@
 const $ = (selector) => document.querySelector(selector);
 
 const API_URL = "https://script.google.com/macros/s/AKfycby7GYHJIvpKE1hwh3hCq9atS_zKQXaz4oYQ6nzzzGFdvCr-h2sfMATeTst9qgdzghKE8w/exec";
-const COLORS = ["#ff762b", "#86b8dc", "#b69dd7", "#75b99b", "#d6c87e", "#d39ca8", "#9cb8cc", "#aa92b8"];
+const COLORS = ["#fb5d06", "#f4f4f4", "#a8c7a1", "#d6c87e", "#b7afa7", "#86b8dc", "#d39ca8", "#8e8178"];
 const PAID_CHANNELS = [
   { key: "Meta Ads 1", label: "Meta Ads 1", raw: ["Meta Ads 1"] },
   { key: "Meta Ads 2", label: "Meta Ads 2", raw: ["Meta Ads 2"] },
   { key: "Google ADS", label: "Google Ads", raw: ["Google ADS"] },
 ];
-const PAID_RAW_CHANNELS = new Set(PAID_CHANNELS.flatMap((item) => item.raw));
+const PAID_SOURCE_CHANNELS = [
+  ...PAID_CHANNELS,
+  { key: "Facebook (1 + 2)", label: "Facebook (1 + 2)", raw: ["Facebook (1 + 2)"] },
+];
+const PAID_RAW_CHANNELS = new Set(PAID_SOURCE_CHANNELS.flatMap((item) => item.raw));
 const PAID_CHANNEL_VIEWS = [
   ...PAID_CHANNELS.filter((item) => item.key !== "Google ADS"),
-  { key: "Facebook (1 + 2)", label: "Facebook (1 + 2)", raw: ["Meta Ads 1", "Meta Ads 2"] },
+  { key: "Facebook (1 + 2)", label: "Facebook (1 + 2)", raw: ["Meta Ads 1", "Meta Ads 2", "Facebook (1 + 2)"] },
   PAID_CHANNELS.find((item) => item.key === "Google ADS"),
-  { key: "Total pago (Facebook + Google)", label: "Total pago (Facebook + Google)", raw: ["Meta Ads 1", "Meta Ads 2", "Google ADS"] },
+  { key: "Total pago (Facebook + Google)", label: "Total pago (Facebook + Google)", raw: ["Meta Ads 1", "Meta Ads 2", "Facebook (1 + 2)", "Google ADS"] },
 ];
 const CHANNEL_FILTERS = [
   { key: "", label: "Todos os canais pagos", raw: PAID_RAW_CHANNELS ? [...PAID_RAW_CHANNELS] : [] },
-  { key: "group-meta", label: "Meta Ads (1 + 2)", raw: ["Meta Ads 1", "Meta Ads 2"] },
+  { key: "group-meta", label: "Meta Ads (1 + 2)", raw: ["Meta Ads 1", "Meta Ads 2", "Facebook (1 + 2)"] },
   { key: "group-google", label: "Google Ads", raw: ["Google ADS"] },
   { key: "group-paid", label: "Total pago (Facebook + Google)", raw: [...PAID_RAW_CHANNELS] },
   ...PAID_CHANNELS,
 ];
 const VIEWS = [
+  { number: "00", key: "product", title: "Performance dos produtos", short: "Produtos", question: "Quais produtos avancaram ou perderam desempenho?", grain: "periodo + produto", product: true },
   { number: "01", key: "channel", title: "Taxa geral do canal", short: "Canal", question: "Qual canal trouxe resultado?", grain: "periodo + canal", product: false },
-  { number: "02", key: "campaign", title: "Taxa das campanhas", short: "Campanha", question: "Quais campanhas geraram pedidos?", grain: "periodo + campanha", product: false },
-  { number: "03", key: "ad_group", title: "Taxa dos grupos de anuncios", short: "Grupo", question: "Quais grupos sustentam a campanha?", grain: "periodo + grupo", product: false },
-  { number: "04", key: "ad", title: "Taxa dos anuncios", short: "Criativo", question: "Quais criativos geraram resultado?", grain: "periodo + anuncio", product: false },
-  { number: "05", key: "channel_product", title: "Canal + produto", short: "Canal + produto", question: "Quais produtos performam em cada canal?", grain: "periodo + canal + produto", product: true },
+  { number: "02", key: "channel_product", title: "Canal + produto", short: "Canal + produto", question: "Quais produtos performam em cada canal?", grain: "periodo + canal + produto", product: true },
+  { number: "03", key: "campaign", title: "Taxa das campanhas", short: "Campanha", question: "Quais campanhas geraram pedidos?", grain: "periodo + campanha", product: false },
+  { number: "04", key: "ad_group", title: "Taxa dos grupos de anuncios", short: "Grupo", question: "Quais grupos sustentam a campanha?", grain: "periodo + grupo", product: false },
+  { number: "05", key: "ad", title: "Taxa dos anuncios", short: "Criativo", question: "Quais criativos geraram resultado?", grain: "periodo + anuncio", product: false },
   { number: "06", key: "campaign_product", title: "Campanha + produto", short: "Campanha + produto", question: "Quais produtos cada campanha gera?", grain: "periodo + campanha + produto", product: true },
   { number: "07", key: "ad_group_product", title: "Grupo + produto", short: "Grupo + produto", question: "Quais grupos contribuem para cada produto?", grain: "periodo + grupo + produto", product: true },
   { number: "08", key: "ad_product", title: "Criativo + produto", short: "Criativo + produto", question: "Quais criativos geram cada produto?", grain: "periodo + anuncio + produto", product: true },
@@ -36,6 +41,9 @@ const state = {
   commercial: null,
   growthPayload: null,
   growthViews: [],
+  growthViewMap: new Map(),
+  normalizedViewRows: new Map(),
+  channelRowsCache: new Map(),
   alternativePayload: null,
   start: "",
   end: "",
@@ -47,16 +55,23 @@ const state = {
   selectedChannel: "",
   productSearch: "",
   selectedModel: "",
+  selectedProduct: "",
   selectedColor: "",
   selectedSize: "",
-  selectedView: "channel_product",
+  selectedView: "product",
   selectedGranularity: "week",
+  hourlyAvailable: false,
   rhythmMetric: "pedidos",
   chartMetric: "pedidos",
   chartChannels: [],
   chartFilter: "",
   explorerSort: "pedidos",
+  explorerSortDirection: "desc",
   explorerSearch: "",
+  channelSort: "pedidos",
+  channelSortDirection: "desc",
+  rhythmSort: "pedidos",
+  rhythmSortDirection: "desc",
 };
 
 function cleanText(value) {
@@ -71,13 +86,20 @@ function sum(values) { const available = values.filter((value) => value !== null
 function fmtNumber(value) { return value === null || value === undefined || Number.isNaN(value) ? "Sem dado SSOT" : new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(value); }
 function fmtMoney(value) { return value === null || value === undefined || Number.isNaN(value) ? "Sem dado SSOT" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 }).format(value); }
 function fmtPercent(value) { return value === null || value === undefined || Number.isNaN(value) ? "Sem base de sessoes" : new Intl.NumberFormat("pt-BR", { style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }
-function dateKey(value) { return /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? String(value) : null; }
+function fmtPoints(value) { return value === null || value === undefined || Number.isNaN(value) ? "Sem base de sessoes" : `${value >= 0 ? "+" : ""}${new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value * 100)} p.p.`; }
+function dateKey(value) { const match = String(value ?? "").match(/^(\d{4}-\d{2}-\d{2})/); return match ? match[1] : null; }
 function monthKey(value) { return String(value).slice(0, 7); }
 function monthLabel(value) { const names = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]; const [year, month] = value.split("-").map(Number); return `${names[month - 1]}/${String(year).slice(2)}`; }
 function dayLabel(value) { const [year, month, day] = value.split("-"); return `${day}/${month}/${year.slice(2)}`; }
 function toDate(value) { return new Date(`${value}T12:00:00`); }
 function isoDate(date) { return date.toISOString().slice(0, 10); }
 function monthRange(start, end) { if (!start || !end) return []; const result = []; const cursor = toDate(start); const last = toDate(end); cursor.setDate(1); while (cursor <= last) { result.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`); cursor.setMonth(cursor.getMonth() + 1); } return result; }
+function hourKey(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 23) return String(Math.floor(Number(value)).padStart(2, "0"));
+  const match = String(value).match(/(?:T|\s)(\d{1,2})(?::|$)/);
+  return match && Number(match[1]) >= 0 && Number(match[1]) <= 23 ? String(Number(match[1]).toString().padStart(2, "0")) : null;
+}
 function fold(value) { return cleanText(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
 function searchKey(value) { return fold(value).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim(); }
 function editDistance(left, right) {
@@ -106,9 +128,9 @@ function matchesSelectedChannel(row) {
   return scope.raw.includes(row.canal) || (scope.key === "group-meta" && value === "meta ads") || (scope.key === "group-google" && value === "google ads");
 }
 function canonicalChannel(row) {
-  const raw = cleanText(row.canal_detalhe || row.canal || "");
+  const raw = cleanText(row.canal_detalhe || row.canal || row.origem || "");
   const key = fold(raw);
-  const aliases = { "google ads": "Google ADS", "whatsapp nao oficial": "WhatsApp Organico", "whatsapp organico": "WhatsApp Organico", "organico": "Organico" };
+  const aliases = { "google": "Google ADS", "google ads": "Google ADS", "meta ads": "Facebook (1 + 2)", facebook: "Facebook (1 + 2)", "facebook (1 + 2)": "Facebook (1 + 2)", "whatsapp nao oficial": "WhatsApp Organico", "whatsapp organico": "WhatsApp Organico", "organico": "Organico" };
   return aliases[key] || raw;
 }
 function platform(row) { const value = fold(row.canal || row.origem); if (value.includes("google")) return "Google Ads"; if (value.includes("meta") || value.includes("facebook")) return "Meta Ads"; return displayChannel(row.canal || row.origem || "Nao identificada"); }
@@ -134,7 +156,8 @@ function productAttributes(row) {
   return { model: productFilterLabel(model), color: productFilterLabel(color), size: productFilterLabel(size) };
 }
 function normalizeRow(row) {
-  const attrs = productAttributes(row);
+  const productValue = row.product || row.produto || row.product_name || row.produto_nome || row.product_id || row.produto_id || row.sku || "";
+  const attrs = productValue ? productAttributes(row) : { model: "", color: "", size: "" };
   const campaignId = cleanText(row.campaign_id || row.campanha_id || "");
   const campaignName = cleanText(row.campaign || row.campanha || row.campaign_name || row.campanha_nome || row.nome_campanha || row.utm_campaign || "");
   const groupId = cleanText(row.ad_group_id || row.grupo_anuncio_id || row.adgroup_id || "");
@@ -143,7 +166,9 @@ function normalizeRow(row) {
   const adName = cleanText(row.ad || row.anuncio || row.ad_name || row.anuncio_nome || row.criativo_nome || "");
   const productId = cleanText(row.product_id || row.produto_id || row.sku || "");
   const productName = cleanText(row.product || row.produto || row.product_name || row.produto_nome || "");
-  return { data: dateKey(row.data || row.date || row.event_date), period: row.period || "current", canal: canonicalChannel(row), origem: cleanText(row.origem || "Sem origem").trim() || "Sem origem", sessoes: number(row.sessoes ?? row.sessions), pedidos: number(row.pedidos ?? row.orders ?? row.conversoes), receita: number(row.receita ?? row.revenue), campaignId, campaignName, campaignKey: campaignId || campaignName, groupId, groupName, groupKey: groupId || groupName, adId, adName, adKey: adId || adName, productId, productName, productKey: productId || productName, productModel: attrs.model, productColor: attrs.color, productSize: attrs.size };
+  const rawDate = row.data || row.date || row.event_date;
+  const rawTime = row.data_hora || row.datetime || row.timestamp || row.session_ts || row.hora || row.hour;
+  return { data: dateKey(rawDate), hora: hourKey(rawTime), period: row.period || "current", canal: canonicalChannel(row), origem: cleanText(row.origem || "Sem origem").trim() || "Sem origem", sessoes: number(row.sessoes ?? row.sessions), pedidos: number(row.pedidos ?? row.orders ?? row.conversoes), receita: number(row.receita ?? row.revenue), campaignId, campaignName, campaignKey: campaignId || campaignName, groupId, groupName, groupKey: groupId || groupName, adId, adName, adKey: adId || adName, productId, productName, productKey: productId || productName, productModel: attrs.model, productColor: attrs.color, productSize: attrs.size };
 }
 function normalizedRows(rows) { return (Array.isArray(rows) ? rows : []).map(normalizeRow).filter((row) => row.data); }
 function summarize(rows) {
@@ -155,7 +180,7 @@ function summarize(rows) {
   const sessions = knownSessions.length ? sum(knownSessions) : null;
   const coverage = cleanRows.length ? knownSessions.length / cleanRows.length : null;
   const complete = cleanRows.length > 0 && knownSessions.length === cleanRows.length;
-  const rate = sessions !== null && sessions > 0 && orders !== null ? orders / sessions : null;
+  const rate = complete && cleanRows.every((row) => row.pedidos !== null) && sessions > 0 && orders !== null ? orders / sessions : null;
   return { rows: cleanRows.length, pedidos: orders, sessoes: sessions, receita: revenue, rate, coverage, complete, status: complete ? "Completa" : coverage > 0 ? "Parcial" : "Ausente" };
 }
 function periodBounds(period) { return period === "compare" ? { start: state.compareStart, end: state.compareEnd } : { start: state.start, end: state.end }; }
@@ -177,12 +202,19 @@ function consolidatedChannelRows(rows) {
   return [...groups.values()].map((row) => { delete row._knownSessions; return row; });
 }
 function channelSourceRows(period) {
-  const entryRows = normalizedRows(viewEntry("channel")?.rows || []).filter((row) => isPaidRawChannel(row.canal) && (row.period === period || (period === "current" && (!row.period || row.period === "current"))) && inPeriod(row, period));
-  const consolidated = consolidatedChannelRows(entryRows);
-  if (consolidated.length && consolidated.some((row) => row.sessoes !== null)) return consolidated;
-  return consolidatedChannelRows(state.rows.filter((row) => isPaidRawChannel(row.canal) && inPeriod(row, period)));
+  const bounds = periodBounds(period); const cacheKey = `${period}|${bounds.start}|${bounds.end}`;
+  if (state.channelRowsCache.has(cacheKey)) return state.channelRowsCache.get(cacheKey);
+  const entryRows = normalizedViewRows("channel").filter((row) => isPaidRawChannel(row.canal));
+  const dateRows = entryRows.filter((row) => inPeriod(row, period));
+  const labeledRows = dateRows.filter((row) => row.period === period || (period === "current" && (!row.period || row.period === "current")));
+  const rowsForPeriod = dateRows.length ? dateRows : labeledRows;
+  const consolidated = consolidatedChannelRows(rowsForPeriod);
+  const result = consolidated.length && consolidated.some((row) => row.sessoes !== null)
+    ? consolidated
+    : consolidatedChannelRows(state.rows.filter((row) => isPaidRawChannel(row.canal) && inPeriod(row, period)));
+  state.channelRowsCache.set(cacheKey, result); return result;
 }
-function scopeRows(scope, period) { return channelSourceRows(period).filter((row) => scope.raw.includes(row.canal)); }
+function scopeRows(scope, period) { return analysisSourceRows(period).filter((row) => scope.raw.includes(row.canal)); }
 function displayScopesForFilter(filterKey) {
   if (filterKey === "group-meta") return PAID_CHANNEL_VIEWS.filter((scope) => ["Meta Ads 1", "Meta Ads 2", "Facebook (1 + 2)"].includes(scope.key));
   if (filterKey === "group-google") return PAID_CHANNEL_VIEWS.filter((scope) => scope.key === "Google ADS");
@@ -193,34 +225,35 @@ function displayScopesForFilter(filterKey) {
 function selectedScopes() { return displayScopesForFilter(state.selectedChannel); }
 function selectedMetricScopes() {
   const filter = CHANNEL_FILTERS.find((scope) => scope.key === state.selectedChannel);
-  if (filter) return PAID_CHANNELS.filter((scope) => filter.raw.some((raw) => scope.raw.includes(raw)));
+  if (filter) return PAID_SOURCE_CHANNELS.filter((scope) => filter.raw.some((raw) => scope.raw.includes(raw)));
   const exact = PAID_CHANNEL_VIEWS.find((scope) => scope.key === state.selectedChannel);
-  return exact ? PAID_CHANNELS.filter((scope) => exact.raw.some((raw) => scope.raw.includes(raw))) : PAID_CHANNELS;
+  return exact ? PAID_SOURCE_CHANNELS.filter((scope) => exact.raw.some((raw) => scope.raw.includes(raw))) : PAID_SOURCE_CHANNELS;
 }
 function selectedPaidRows(period) { return selectedMetricScopes().flatMap((scope) => scopeRows(scope, period)); }
 function channelGroups(period) { return selectedScopes().map((scope) => ({ key: scope.key, dimension: scope.label, channel: scope.label, campaign: "", group: "", ad: "", product: "", ...summarize(scopeRows(scope, period)) })); }
 function allChannelGroups(period) { return channelGroups(period); }
 
-function viewEntry(viewKey) { return state.growthViews.find((entry) => entry.view === viewKey) || null; }
+function viewEntry(viewKey) { return state.growthViewMap.get(viewKey) || null; }
+function normalizedViewRows(viewKey) {
+  if (state.normalizedViewRows.has(viewKey)) return state.normalizedViewRows.get(viewKey);
+  const rows = normalizedRows(viewEntry(viewKey)?.rows || []);
+  state.normalizedViewRows.set(viewKey, rows); return rows;
+}
 function readiness(viewKey) {
+  if (viewKey === "product") return readiness("channel_product");
   if (viewKey === "channel" && viewEntry("channel")) return state.growthPayload?.readiness?.find((item) => item.view === viewKey) || { view: "channel", status: "Disponivel", source: viewEntry("channel").source || "SSOT" };
   if (viewKey === "channel" && state.rows.length) return { view: "channel", status: "Disponivel", source: state.commercial?.source || "SSOT comercial de canais" };
   return state.growthPayload?.readiness?.find((item) => item.view === viewKey) || null;
 }
 function viewRows(view, period) {
-  const entry = viewEntry(view.key);
+  const sourceKey = productFilterActive() ? ({ channel: "channel_product", campaign: "campaign_product", ad_group: "ad_group_product", ad: "ad_product" }[view.key] || view.key) : view.key;
+  const entry = viewEntry(sourceKey === "product" ? "channel_product" : sourceKey);
   if (!Array.isArray(entry?.rows)) return [];
-  const raw = entry.rows;
-  const hasPeriod = raw.some((row) => row.period === "current" || row.period === "compare");
-  return normalizedRows(raw).filter((row) => {
+  return normalizedViewRows(sourceKey === "product" ? "channel_product" : sourceKey).filter((row) => {
     if (!isAnalysisRow(row)) return false;
-    if (hasPeriod && row.period !== period) return false;
-    if (!hasPeriod && period === "compare") return false;
     if (row.data && !inPeriod(row, period)) return false;
     if (!matchesSelectedChannel(row)) return false;
-    if (view.product && state.selectedModel && row.productModel !== state.selectedModel) return false;
-    if (view.product && state.selectedColor && row.productColor !== state.selectedColor) return false;
-    if (view.product && state.selectedSize && row.productSize !== state.selectedSize) return false;
+    if ((view.product || productFilterActive()) && !matchesProductFilter(row)) return false;
     return true;
   });
 }
@@ -230,17 +263,10 @@ function dimensionKey(view, row) {
   const ad = row.adKey || row.adName || "(criativo nao informado)";
   const product = row.productKey || row.productName || "(produto nao informado)";
   const channel = row.canal || "(canal nao informado)";
-  const keys = { channel: [channel], campaign: [platform(row), campaign], ad_group: [platform(row), campaign, group], ad: [platform(row), campaign, group, ad], channel_product: [channel, product], campaign_product: [platform(row), campaign, product], ad_group_product: [platform(row), campaign, group, product], ad_product: [platform(row), campaign, group, ad, product] };
+  const keys = { product: [product], channel: [channel], campaign: [platform(row), campaign], ad_group: [platform(row), campaign, group], ad: [platform(row), campaign, group, ad], channel_product: [channel, product], campaign_product: [platform(row), campaign, product], ad_group_product: [platform(row), campaign, group, product], ad_product: [platform(row), campaign, group, ad, product] };
   return keys[view.key].join("|");
 }
-function dimensions(view, row) {
-  const product = row.productName || row.productKey || "";
-  const campaign = row.campaignName || row.campaignKey || "";
-  const group = row.groupName || row.groupKey || "";
-  const ad = row.adName || row.adKey || "";
-  const dimension = view.key === "channel" ? displayChannel(row.canal) : view.key === "campaign" ? `${platform(row)} · ${campaign || "Campanha nao informada"}` : view.key === "ad_group" ? group || "Grupo nao informado" : view.key === "ad" ? ad || "Criativo nao informado" : view.key === "channel_product" ? `${displayChannel(row.canal)} · ${product || "Produto nao informado"}` : view.key === "campaign_product" ? `${platform(row)} · ${campaign || "Campanha nao informada"} · ${product || "Produto nao informado"}` : view.key === "ad_group_product" ? `${group || "Grupo nao informado"} · ${product || "Produto nao informado"}` : `${ad || "Criativo nao informado"} · ${product || "Produto nao informado"}`;
-  return { dimension, channel: displayChannel(row.canal), campaign, group, ad, product };
-}
+
 function groups(view, period) {
   if (view.key === "channel") return allChannelGroups(period);
   const grouped = new Map();
@@ -274,18 +300,12 @@ function alternativeRecords(view) {
   }));
 }
 
-function sortRecords(records, sort) { return [...records].sort((a, b) => { const av = a[sort] === null || a[sort] === undefined ? -1 : a[sort]; const bv = b[sort] === null || b[sort] === undefined ? -1 : b[sort]; return bv - av || a.dimension.localeCompare(b.dimension, "pt-BR"); }); }
+function sortRecords(records, sort, direction = state.explorerSortDirection) { const factor = direction === "asc" ? 1 : -1; return [...records].sort((a, b) => { const av = a[sort] === null || a[sort] === undefined ? null : a[sort]; const bv = b[sort] === null || b[sort] === undefined ? null : b[sort]; if (av === null && bv !== null) return 1; if (av !== null && bv === null) return -1; if (av !== null && bv !== null && av !== bv) return typeof av === "string" || typeof bv === "string" ? String(av).localeCompare(String(bv), "pt-BR") * factor : (av - bv) * factor; return a.dimension.localeCompare(b.dimension, "pt-BR"); }); }
 function filterText(record) { return [record.dimension, record.channel, record.campaign, record.group, record.ad, record.product].join(" "); }
 function coverageLabel(record) { if (record.source === "GA4 alternativa") return "GA4 / nao SSOT"; if (record.complete) return "Completa"; if (record.coverage > 0) return `${Math.round(record.coverage * 100)}% conhecida`; return "Ausente"; }
+function comparisonValue(record, key) { return record?.compare ? record.compare[key] ?? null : null; }
+function relativeComparison(current, previous) { return current !== null && current !== undefined && previous !== null && previous !== undefined && previous !== 0 ? current / previous - 1 : null; }
 
-function filtersForProducts() {
-  const officialRows = VIEWS.filter((view) => view.product).flatMap((view) => normalizedRows(viewEntry(view.key)?.rows || [])).filter(isMerchandiseProduct);
-  const alternativeProductRows = VIEWS.filter((view) => view.product).flatMap((view) => alternativeRows(view.key)).filter(isMerchandiseProduct).map((row) => { const attrs = productAttributes(row); return { productModel: attrs.model, productColor: attrs.color, productSize: attrs.size }; });
-  const rows = [...officialRows, ...alternativeProductRows];
-  const configs = [["product-model-filter", "selectedModel", "Todos os modelos", "productModel"], ["product-color-filter", "selectedColor", "Todas as cores", "productColor"], ["product-size-filter", "selectedSize", "Todos os tamanhos", "productSize"]];
-  configs.forEach(([id, key, empty, field]) => { const select = $(`#${id}`); const values = [...new Set(rows.map((row) => row[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR")); const visibleValues = state.productSearch ? values.filter((value) => fuzzyMatch(value, state.productSearch)) : values; select.innerHTML = `<option value="">${empty}</option>${visibleValues.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")}`; select.value = visibleValues.includes(state[key]) ? state[key] : ""; state[key] = select.value; select.onchange = () => { state[key] = select.value; renderExplorer(); }; });
-  const productSearch = $("#product-search"); if (productSearch) productSearch.value = state.productSearch;
-}
 function shiftDate(value, days) { const date = toDate(value); date.setDate(date.getDate() + days); return isoDate(date); }
 function shiftYear(value, years) { const date = toDate(value); date.setFullYear(date.getFullYear() + years); return isoDate(date); }
 function dateSpan(start, end) { return start && end ? Math.round((toDate(end) - toDate(start)) / 86400000) + 1 : 0; }
@@ -308,8 +328,28 @@ function applyPeriodPreset(preset) {
   if (preset === "last-complete") { const last = new Date(date.getFullYear(), date.getMonth(), 0, 12); finish = isoDate(last); start = isoDate(new Date(last.getFullYear(), last.getMonth() - 11, 1, 12)); }
   if (preset === "all") { start = state.availableStart || start; finish = availableEnd(); }
   state.start = start; state.end = finish; applyComparison();
+  suggestGranularityForWindow();
 }
 function comparisonWindowLabel() { return state.compareStart && state.compareEnd ? `Comparacao: ${dayLabel(state.compareStart)} a ${dayLabel(state.compareEnd)}` : "Comparacao nao definida"; }
+function suggestedGranularity() {
+  const days = dateSpan(state.start, state.end);
+  if (days <= 1) return state.hourlyAvailable ? "hour" : "day";
+  if (days <= 14) return "day";
+  if (days <= 90) return "week";
+  if (days <= 366) return "month";
+  if (days <= 730) return "quarter";
+  return "year";
+}
+function suggestGranularityForWindow() {
+  const next = suggestedGranularity();
+  if (next && (state.start || state.end)) state.selectedGranularity = next;
+}
+function renderTemporalControls() {
+  const hourButton = document.querySelector('[data-granularity="hour"]');
+  if (!hourButton) return;
+  hourButton.hidden = !state.hourlyAvailable;
+  if (!state.hourlyAvailable && state.selectedGranularity === "hour") state.selectedGranularity = suggestedGranularity();
+}
 function setupFilters() {
   const channelSelect = $("#global-channel-filter"); const grouped = CHANNEL_FILTERS.filter((item) => item.key.startsWith("group-")); const individual = PAID_CHANNEL_VIEWS; channelSelect.innerHTML = `<option value="">Todos os canais pagos</option><optgroup label="Grupos de canal">${grouped.map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("")}</optgroup><optgroup label="Leituras declaradas">${individual.map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("")}</optgroup>`; channelSelect.value = state.selectedChannel; channelSelect.onchange = () => { state.selectedChannel = channelSelect.value; state.chartFilter = state.selectedChannel; state.chartChannels = selectedScopes().map((scope) => scope.key); renderAll(); };
   const compareMode = $("#compare-mode"); if (compareMode) { compareMode.value = state.compareMode; $("#compare-custom-fields")?.classList.toggle("is-hidden", state.compareMode !== "custom"); $("#compare-start").value = state.compareStart; $("#compare-end").value = state.compareEnd; $("#comparison-window").textContent = comparisonWindowLabel(); }
@@ -321,17 +361,9 @@ function metricText(value, metric) { return metric === "rate" ? fmtPercent(value
 function metricLabel(metric) { return { pedidos: "pedidos", receita: "receita", sessoes: "sessoes", rate: "conversao" }[metric] || metric; }
 function formatWindow() { return state.start ? `${dayLabel(state.start)} a ${dayLabel(state.end)}` : "Periodo nao definido"; }
 
-function renderSummary() {
-  const total = summarize(selectedPaidRows("current"));
-  $("#metric-orders").textContent = fmtNumber(total.pedidos); $("#metric-sessions").textContent = fmtNumber(total.sessoes); $("#metric-revenue").textContent = fmtMoney(total.receita); $("#metric-rate").textContent = fmtPercent(total.rate); $("#summary-window").textContent = formatWindow();
-  $("#metric-sessions-note").textContent = total.complete ? "Denominador completo" : total.coverage > 0 ? `${Math.round(total.coverage * 100)}% das linhas com sessoes` : "Denominador ausente";
-  $("#metric-rate-note").textContent = total.complete ? "Pedidos / sessoes SSOT" : total.coverage > 0 ? "Pedidos / sessoes conhecidas" : "Sem sessoes no recorte";
-  const status = total.complete ? "Sessoes completas no recorte." : total.coverage > 0 ? "Conversao calculada com as sessoes conhecidas; dias sem sessao ficam fora do denominador." : "Sem sessoes conhecidas no recorte.";
-  $("#summary-status").innerHTML = `<span class="status-dot ${total.complete ? "ok" : "warn"}"></span><span>${status}</span>`;
-}
-
-function periodBucket(date, granularity) {
+function periodBucket(date, granularity, row) {
   const value = toDate(date);
+  if (granularity === "hour" && row?.hora) return { key: `${date}T${row.hora}`, label: `${dayLabel(date)} ${row.hora}h` };
   if (granularity === "day" || granularity === "day-over-day") return { key: date, label: dayLabel(date) };
   if (granularity === "month") return { key: monthKey(date), label: monthLabel(monthKey(date)) };
   if (granularity === "quarter") { const quarter = Math.floor(value.getMonth() / 3) + 1; return { key: `${value.getFullYear()}-Q${quarter}`, label: `T${quarter}/${value.getFullYear()}` }; }
@@ -340,81 +372,45 @@ function periodBucket(date, granularity) {
   const monday = new Date(value); const day = monday.getDay() || 7; monday.setDate(monday.getDate() - day + 1); const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6); const start = isoDate(monday); const end = isoDate(sunday); return { key: start, label: `${dayLabel(start)} - ${dayLabel(end)}` };
 }
 function aggregatePeriods(rows, granularity) {
-  const map = new Map(); rows.forEach((row) => { const bucket = periodBucket(row.data, granularity); if (!map.has(bucket.key)) map.set(bucket.key, { key: bucket.key, label: bucket.label, rows: [] }); map.get(bucket.key).rows.push(row); });
+  const map = new Map(); rows.forEach((row) => { const bucket = periodBucket(row.data, granularity, row); if (!map.has(bucket.key)) map.set(bucket.key, { key: bucket.key, label: bucket.label, rows: [] }); map.get(bucket.key).rows.push(row); });
   return [...map.values()].sort((a, b) => a.key.localeCompare(b.key)).map((item) => ({ ...item, ...summarize(item.rows) }));
 }
 function periodReading(item) { if (!item) return "Sem dados"; if (!item.complete) return item.coverage > 0 ? "Cobertura parcial" : "Sessoes ausentes"; if (item.rate === null) return "Sem denominador valido"; return item.rate >= 0.02 ? "Acima de 2%" : "Acompanhar conversao"; }
-function periodLimit(granularity) { return { day: 31, "day-over-day": 31, week: 12, month: 12, quarter: 8, semester: 6, year: 5 }[granularity] || 12; }
-function granularityLabel(granularity) { return { day: "dia", "day-over-day": "dia a dia", week: "semana", month: "mes", quarter: "trimestre", semester: "semestre", year: "ano" }[granularity] || granularity; }
+function periodLimit(granularity) { return { hour: 48, day: 31, "day-over-day": 31, week: 12, month: 12, quarter: 8, semester: 6, year: 5 }[granularity] || 12; }
+function granularityLabel(granularity) { return { hour: "hora", day: "dia", "day-over-day": "dia a dia", week: "semana", month: "mes", quarter: "trimestre", semester: "semestre", year: "ano" }[granularity] || granularity; }
 function chartMax(metric, known) { const observedMax = Math.max(...known, 0); if (metric === "rate") return Math.max(0.01, observedMax + 0.01); return Math.max(1, observedMax * 1.15); }
-function renderRhythmChart(periods) {
-  const box = $("#rhythm-chart"); const metric = state.rhythmMetric; const visible = periods.slice(-12); const values = visible.map((item) => metricValue(item, metric));
-  if (!visible.length || !values.some((value) => value !== null)) { box.innerHTML = `<div class="empty-state">${metric === "rate" ? "Conversao indisponivel por cobertura de sessoes." : "Sem dados para este indicador."}</div>`; return; }
-  const width = Math.max(box.clientWidth - 18, 620); const height = 280; const margin = { top: 18, right: 18, bottom: 48, left: 58 }; const plotWidth = width - margin.left - margin.right; const plotHeight = height - margin.top - margin.bottom; const known = values.filter((value) => value !== null); const max = chartMax(metric, known); const x = (index) => margin.left + (visible.length === 1 ? plotWidth / 2 : index / (visible.length - 1) * plotWidth); const y = (value) => margin.top + plotHeight - value / max * plotHeight; const svg = [`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${metricLabel(metric)} por periodo">`];
-  for (let tick = 0; tick <= 4; tick += 1) { const value = max / 4 * tick; const yy = y(value); svg.push(`<line x1="${margin.left}" y1="${yy}" x2="${width - margin.right}" y2="${yy}" stroke="#303843"/><text x="${margin.left - 9}" y="${yy + 4}" text-anchor="end" fill="#8d98a6" font-size="9">${escapeHtml(metricText(value, metric))}</text>`); }
-  visible.forEach((item, index) => svg.push(`<text x="${x(index)}" y="${height - 15}" text-anchor="middle" fill="#8d98a6" font-size="9">${escapeHtml(item.label)}</text>`));
-  const points = visible.map((item, index) => metricValue(item, metric) === null ? null : { x: x(index), y: y(metricValue(item, metric)), value: metricValue(item, metric), label: item.label }).filter(Boolean); svg.push(`<path d="${points.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ")}" fill="none" stroke="#ff762b" stroke-width="2.6" stroke-linecap="round"/>`); points.forEach((point) => svg.push(`<circle cx="${point.x}" cy="${point.y}" r="3.5" fill="#ff762b" stroke="#191e25" stroke-width="1.4"><title>${escapeHtml(point.label)} · ${escapeHtml(metricText(point.value, metric))}</title></circle>`)); svg.push("</svg>"); box.innerHTML = svg.join("");
-}
-function renderMiniPeriod(id, item, metric) { $(`#${id}-label`).textContent = item?.label || "Periodo nao definido"; $(`#${id}-value`).textContent = item ? metricText(metricValue(item, metric), metric) : "Sem dado SSOT"; $(`#${id}-note`).textContent = item ? `${fmtNumber(item.pedidos)} pedidos · ${coverageLabel(item)}` : "Sem observacao"; }
-function renderRhythm() {
-  const rows = selectedPaidRows("current"); const periods = aggregatePeriods(rows, state.selectedGranularity); const visible = periods.slice(-periodLimit(state.selectedGranularity)); $("#rhythm-window").textContent = `${visible.length} ${granularityLabel(state.selectedGranularity)}(s) · ${metricLabel(state.rhythmMetric)}`; renderRhythmChart(visible);
-  $("#rhythm-body").innerHTML = visible.length ? [...visible].reverse().map((item) => `<tr><td><strong>${escapeHtml(item.label)}</strong></td><td>${fmtNumber(item.pedidos)}</td><td>${fmtNumber(item.sessoes)}</td><td>${fmtMoney(item.receita)}</td><td class="${item.rate === null ? "rate-pending" : "coverage"}">${fmtPercent(item.rate)}</td><td>${coverageLabel(item)}</td><td>${escapeHtml(periodReading(item))}</td></tr>`).join("") : `<tr><td colspan="7" class="table-empty">Nenhum dado no periodo selecionado.</td></tr>`;
-  const lastDay = aggregatePeriods(rows, "day").at(-1); const lastWeek = aggregatePeriods(rows, "week").at(-1); const lastMonth = aggregatePeriods(rows, "month").at(-1); renderMiniPeriod("last-day", lastDay, state.rhythmMetric); renderMiniPeriod("last-week", lastWeek, state.rhythmMetric); renderMiniPeriod("last-month", lastMonth, state.rhythmMetric);
-  document.querySelectorAll("[data-granularity]").forEach((button) => button.classList.toggle("active", button.dataset.granularity === state.selectedGranularity));
-}
 
-function compareText(current, previous) { const change = relativeDelta(current?.pedidos, previous?.pedidos); if (change === null) return "Sem comparacao"; return `${change >= 0 ? "+" : ""}${fmtPercent(change)} pedidos`; }
-function renderChannelTable() {
-  const current = allChannelGroups("current"); const previous = new Map(allChannelGroups("compare").map((item) => [item.key, item])); const total = summarize(selectedPaidRows("current")); const available = current.filter((item) => item.pedidos !== null).length; $("#channel-status").textContent = `${available} canais com pedidos`; $("#channel-status").className = `status-pill ${available ? "ok" : "pending"}`;
-  $("#channel-body").innerHTML = current.map((item) => { const compare = previous.get(item.key); const action = item.status === "Ausente" ? "Sem dados" : item.complete && total.rate !== null && item.rate > total.rate ? "Acima do total" : item.status === "Parcial" ? "Corrigir cobertura" : "Acompanhar"; return `<tr><td><button type="button" class="channel-link channel-open" data-channel="${escapeHtml(item.key)}">${escapeHtml(item.label || item.dimension)}</button></td><td>${fmtNumber(item.pedidos)}</td><td>${fmtNumber(item.sessoes)}</td><td>${fmtMoney(item.receita)}</td><td class="${item.rate === null ? "rate-pending" : "coverage"}">${fmtPercent(item.rate)}</td><td>${coverageLabel(item)}</td><td>${escapeHtml(compareText(item, compare))}</td><td><span class="table-status ${item.status === "Completa" ? "ok" : "warn"}">${escapeHtml(action)}</span></td></tr>`; }).join("");
-  document.querySelectorAll(".channel-open").forEach((button) => { button.onclick = () => { state.selectedChannel = button.dataset.channel; state.chartFilter = state.selectedChannel; state.chartChannels = selectedScopes().map((scope) => scope.key); $("#global-channel-filter").value = state.selectedChannel; renderAll(); document.querySelector("#growth-views")?.scrollIntoView({ behavior: "smooth", block: "start" }); }; });
+function compareText(current, previous) {
+  if (!previous) return "Sem comparacao";
+  const parts = [];
+  const orderChange = relativeDelta(current?.pedidos, previous?.pedidos);
+  if (orderChange !== null) parts.push(`${orderChange >= 0 ? "+" : ""}${fmtPercent(orderChange)} pedidos`);
+  const revenueChange = relativeDelta(current?.receita, previous?.receita);
+  if (revenueChange !== null) parts.push(`${revenueChange >= 0 ? "+" : ""}${fmtPercent(revenueChange)} receita`);
+  if (current?.rate !== null && current?.rate !== undefined && previous?.rate !== null && previous?.rate !== undefined) parts.push(`${fmtPoints(current.rate - previous.rate)} conversao`);
+  return parts.length ? parts.join(" · ") : "Sem comparacao";
 }
 
 function chartRows(scope, granularity) { return aggregatePeriods(scopeRows(scope, "current"), granularity); }
-function renderChart() {
-  const select = $("#chart-channel-filter"); const chartFilters = CHANNEL_FILTERS.slice(0, 4); const chartFilter = state.chartFilter || state.selectedChannel || ""; const defaultChannels = displayScopesForFilter(chartFilter).map((scope) => scope.key); const selected = state.chartChannels.length ? state.chartChannels : defaultChannels; select.innerHTML = chartFilters.map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join(""); select.value = chartFilter; select.onchange = () => { state.chartFilter = select.value; state.chartChannels = displayScopesForFilter(select.value).map((scope) => scope.key); renderChart(); };
-  const metric = state.chartMetric; const months = monthRange(state.start, state.end); const series = selected.map((key, index) => { const scope = PAID_CHANNEL_VIEWS.find((item) => item.key === key); if (!scope) return null; const values = new Map(chartRows(scope, "month").map((item) => [item.key, metricValue(item, metric)])); return { key, label: scope.label, color: COLORS[index % COLORS.length], values }; }).filter((item) => item && [...item.values.values()].some((value) => value !== null)); $("#chart-window").textContent = `${monthLabel(months[0] || "2025-01")} a ${monthLabel(months.at(-1) || "2026-10")}`;
-  const box = $("#line-chart"); if (!series.length) { box.innerHTML = `<div class="empty-state">${metric === "rate" ? "Conversao sem sessoes conhecidas no recorte." : "Sem dados para os canais selecionados."}</div>`; return; }
-  const width = Math.max(box.clientWidth - 18, 720); const height = 310; const margin = { top: 15, right: 20, bottom: 48, left: 62 }; const plotWidth = width - margin.left - margin.right; const plotHeight = height - margin.top - margin.bottom; const known = series.flatMap((item) => [...item.values.values()].filter((value) => value !== null)); const max = chartMax(metric, known); const x = (index) => margin.left + (months.length === 1 ? plotWidth / 2 : index / (months.length - 1) * plotWidth); const y = (value) => margin.top + plotHeight - value / max * plotHeight; const svg = [`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${metricLabel(metric)} por canal e mes">`]; for (let tick = 0; tick <= 4; tick += 1) { const value = max / 4 * tick; const yy = y(value); svg.push(`<line x1="${margin.left}" y1="${yy}" x2="${width - margin.right}" y2="${yy}" stroke="#303843"/><text x="${margin.left - 9}" y="${yy + 4}" text-anchor="end" fill="#8d98a6" font-size="9">${escapeHtml(metricText(value, metric))}</text>`); } months.forEach((month, index) => svg.push(`<text x="${x(index)}" y="${height - 15}" text-anchor="middle" fill="#8d98a6" font-size="9">${monthLabel(month)}</text>`)); series.forEach((item) => { const points = months.map((month, index) => item.values.get(month) === null ? null : { x: x(index), y: y(item.values.get(month)), value: item.values.get(month), month }).filter(Boolean); if (!points.length) return; svg.push(`<path d="${points.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ")}" fill="none" stroke="${item.color}" stroke-width="2.2" stroke-linecap="round"/>`); points.forEach((point) => svg.push(`<circle cx="${point.x}" cy="${point.y}" r="3" fill="${item.color}" stroke="#191e25" stroke-width="1.3"><title>${escapeHtml(item.label)} · ${monthLabel(point.month)} · ${escapeHtml(metricText(point.value, metric))}</title></circle>`)); }); svg.push("</svg>"); box.innerHTML = svg.join(""); const unavailable = selected.filter((key) => !series.some((item) => item.key === key)); $("#chart-note").textContent = unavailable.length ? "Alguns canais nao possuem sessoes conhecidas para este indicador." : "";
-}
 
-function renderExplorerLegacy() {
-  const view = VIEWS.find((item) => item.key === state.selectedView) || VIEWS[0]; const info = readiness(view.key); const official = view.key === "channel" || String(info?.status || "").toLowerCase().includes("dispon"); let records = official ? groups(view, "current") : alternativeRecords(view); const query = state.explorerSearch.trim().toLowerCase(); if (query) records = records.filter((record) => filterText(record).includes(query)); records = sortRecords(records, state.explorerSort); const total = records.length; const visible = records.slice(0, 25); const sourceLabel = official ? "SSOT" : "GA4 alternativa"; $("#explorer-status").textContent = official ? "SSOT" : "Diagnostico GA4"; $("#explorer-status").className = `status-pill ${official ? "ok" : "warn"}`; $("#explorer-count").textContent = `${total} resultado(s) · Top ${Math.min(25, total)}`; $("#explorer-summary").innerHTML = `<span><strong>${escapeHtml(view.title)}</strong> · ${escapeHtml(view.question)}</span><span>Fonte: <b>${sourceLabel}</b> · ${escapeHtml(view.grain)}</span>`;
-  $("#explorer-body").innerHTML = visible.length ? visible.map((record) => `<tr><td><strong>${escapeHtml(record.dimension)}</strong></td><td>${escapeHtml(record.channel || "Sem identificacao")}</td><td>${escapeHtml(record.campaign || "Sem identificacao")}</td><td>${escapeHtml(record.group || "Sem identificacao")}</td><td>${escapeHtml(record.ad || "Sem identificacao")}</td><td>${escapeHtml(record.product || "Sem identificacao")}</td><td>${fmtNumber(record.pedidos)}</td><td>${fmtNumber(record.sessoes)}</td><td>${fmtMoney(record.receita)}</td><td class="${record.rate === null ? "rate-pending" : "coverage"}">${fmtPercent(record.rate)}</td><td>${escapeHtml(coverageLabel(record))}</td><td><span class="table-status ${official ? "ok" : "warn"}">${sourceLabel}</span></td></tr>`).join("") : `<tr><td colspan="12" class="table-empty">${escapeHtml(info?.reason || "Nenhuma linha encontrada para os filtros selecionados.")}</td></tr>`;
-}
-
-function explorerColumns(view) {
-  const dimensions = {
-    channel: [["Canal", "channel"]],
-    campaign: [["Campanha", "dimension"], ["Canal", "channel"]],
-    ad_group: [["Grupo", "dimension"], ["Campanha", "campaign"], ["Canal", "channel"]],
-    ad: [["Criativo", "dimension"], ["Grupo", "group"], ["Campanha", "campaign"], ["Canal", "channel"]],
-    channel_product: [["Produto", "product"], ["Canal", "channel"]],
-    campaign_product: [["Produto", "product"], ["Campanha", "campaign"], ["Canal", "channel"]],
-    ad_group_product: [["Produto", "product"], ["Grupo", "group"], ["Canal", "channel"]],
-    ad_product: [["Produto", "product"], ["Criativo", "ad"], ["Campanha", "campaign"], ["Canal", "channel"]],
-  };
-  return [...(dimensions[view.key] || dimensions.channel), ["Pedidos", "pedidos"], [view.product ? "Itens vistos" : "Sessoes", "sessoes"], ["Receita", "receita"], ["Conversao", "rate"], ["Cobertura", "coverage"], ["Fonte", "source"]];
-}
 function explorerCell(record, key) {
   if (key === "pedidos") return fmtNumber(record.pedidos);
+  if (key === "comparisonPedidos") return fmtNumber(record.comparisonPedidos);
+  if (key === "deltaPedidos") return escapeHtml(comparisonLabel(record.pedidos, record.comparisonPedidos));
   if (key === "sessoes") return fmtNumber(record.sessoes);
+  if (key === "comparisonSessoes") return fmtNumber(record.comparisonSessoes);
+  if (key === "deltaSessoes") return escapeHtml(comparisonLabel(record.sessoes, record.comparisonSessoes));
   if (key === "receita") return fmtMoney(record.receita);
+  if (key === "comparisonReceita") return fmtMoney(record.comparisonReceita);
+  if (key === "deltaReceita") return escapeHtml(comparisonLabel(record.receita, record.comparisonReceita));
   if (key === "rate") return `<span class="${record.rate === null ? "rate-pending" : "coverage"}">${fmtPercent(record.rate)}</span>`;
+  if (key === "comparisonRate") return `<span class="${record.comparisonRate === null ? "rate-pending" : "coverage"}">${fmtPercent(record.comparisonRate)}</span>`;
+  if (key === "deltaRate") return `<span class="${record.deltaRate === null ? "rate-pending" : record.deltaRate >= 0 ? "coverage" : "missing"}">${record.deltaRate === null ? "Sem comparacao" : fmtPoints(record.deltaRate)}</span>`;
+  if (key === "semaphore") { const semaphore = recordSemaphore(record); return `<span class="semaphore ${semaphore.tone}" title="${escapeHtml(semaphore.title)}"><i></i>${escapeHtml(semaphore.label)}</span>`; }
+  if (key === "nextIndicator") return escapeHtml(nextIndicator(record));
   if (key === "coverage") return escapeHtml(coverageLabel(record));
   if (key === "source") return `<span class="table-status ${record.source === "GA4 alternativa" ? "warn" : "ok"}">${escapeHtml(record.source || "SSOT")}</span>`;
   return escapeHtml(record[key] || "Sem identificacao");
-}
-function recordsForDisplay(view) {
-  const officialRecords = view.key === "channel" ? groups(view, "current") : groups(view, "current");
-  const complementaryRecords = view.key === "channel" ? [] : alternativeRecords(view);
-  const officialHasCompleteMetrics = officialRecords.length > 0 && officialRecords.every((record) => record.pedidos !== null && record.sessoes !== null && record.receita !== null);
-  if (complementaryRecords.length && !officialHasCompleteMetrics) return { records: complementaryRecords, official: false, sourceLabel: "Camada complementar" };
-  return { records: officialRecords, official: true, sourceLabel: "SSOT" };
-}
-function renderExplorer() {
-  const view = VIEWS.find((item) => item.key === state.selectedView) || VIEWS[0]; const info = readiness(view.key); const selection = recordsForDisplay(view); let records = selection.records; const query = state.explorerSearch.trim(); if (query) records = records.filter((record) => fuzzyMatch(filterText(record), query)); if (view.product && state.productSearch) records = records.filter((record) => fuzzyMatch(record.product || record.dimension, state.productSearch)); records = sortRecords(records, state.explorerSort); const total = records.length; const visible = records.slice(0, 25); const columns = explorerColumns(view); $("#explorer-head").innerHTML = `<tr>${columns.map(([label]) => `<th>${label}</th>`).join("")}</tr>`; $("#explorer-status").textContent = selection.sourceLabel; $("#explorer-status").className = `status-pill ${selection.official ? "ok" : "warn"}`; $("#explorer-count").textContent = `${total} resultado(s) · Top ${Math.min(25, total)}`; $("#explorer-summary").innerHTML = `<span><strong>${escapeHtml(view.title)}</strong> · ${escapeHtml(view.question)}</span><span>Fonte: <b>${selection.sourceLabel}</b> · ${escapeHtml(view.grain)}</span>`;
-  $("#explorer-body").innerHTML = visible.length ? visible.map((record) => `<tr>${columns.map(([, key]) => `<td>${key === "dimension" ? `<strong>${escapeHtml(record.dimension)}</strong>` : explorerCell(record, key)}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${columns.length}" class="table-empty">${escapeHtml(info?.reason || "Nenhuma linha encontrada para os filtros selecionados.")}</td></tr>`;
 }
 
 function renderQuality() {
@@ -424,65 +420,154 @@ function renderQuality() {
   $("#catalog-body").innerHTML = VIEWS.map((view) => { const official = view.key === "channel" || String(readiness(view.key)?.status || "").toLowerCase().includes("dispon"); const alternative = Boolean(state.alternativePayload?.views?.[view.key]); const status = official ? "SSOT disponivel" : alternative ? "Diagnostico GA4" : "Pendente"; return `<tr><td><strong>${view.number} · ${escapeHtml(view.short)}</strong></td><td>${official ? escapeHtml(readiness(view.key)?.source || "SSOT") : alternative ? "ga4-growth-alternative.json" : "Fonte nao encontrada"}</td><td class="${official ? "ok" : alternative ? "warn" : "pending"}">${status}</td><td>${escapeHtml(decisions[view.key])}</td></tr>`; }).join("");
 }
 
-function renderAll() { setupFilters(); renderSummary(); renderRhythm(); renderChannelTable(); renderChart(); renderExplorer(); renderQuality(); }
-async function loadJson(url, timeout = 18000) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeout); try { const response = await fetch(url, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); } finally { clearTimeout(timer); } }
+function reorderGrowthSections() {
+  const summary = $("#resumo"); const product = $("#growth-views");
+  if (summary && product && summary.nextElementSibling !== product) summary.after(product);
+  const numbers = { resumo: "01", "growth-views": "02", ritmo: "03", canais: "04", evolucao: "05", quality: "06" };
+  Object.entries(numbers).forEach(([id, number]) => { const node = document.querySelector(`#${id} .section-number`); if (node) node.textContent = number; });
+}
+
+let loadingHideTimer = null;
+function setLoadingStep(stage, message, progress) {
+  const stageNode = $("#data-loader-stage"); const messageNode = $("#data-loader-message"); const progressNode = $("#data-loader-progress");
+  if (stageNode) stageNode.textContent = stage;
+  if (messageNode) messageNode.textContent = message;
+  if (progressNode) progressNode.style.width = `${progress}%`;
+}
+function showLoadingScreen() {
+  const loader = $("#data-loader"); if (!loader) return;
+  if (loadingHideTimer) clearTimeout(loadingHideTimer);
+  loader.classList.remove("is-complete"); loader.setAttribute("aria-hidden", "false"); document.body.classList.add("is-loading");
+  setLoadingStep("01", "Conectando ao SSOT", 18);
+}
+function hideLoadingScreen() {
+  const loader = $("#data-loader"); if (!loader) return;
+  setLoadingStep("03", "Leitura pronta", 100);
+  loadingHideTimer = setTimeout(() => { loader.classList.add("is-complete"); loader.setAttribute("aria-hidden", "true"); document.body.classList.remove("is-loading"); }, 260);
+}
+async function loadJson(url, timeout = 18000) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeout); try { const response = await fetch(url, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return await response.json(); } finally { clearTimeout(timer); } }
 async function loadGrowth() { try { return await loadJson(`${API_URL}?view=growth_views&_ts=${Date.now()}`, 120000); } catch (remoteError) { return { ok: false, error: `Ponte growth_views indisponivel: ${remoteError.message}` }; } }
 async function loadAlternative() { try { return await loadJson("data/ga4-growth-alternative.json"); } catch (error) { return { ok: false, error: error.message }; } }
 function defaultWindow(rows) { const dates = rows.map((row) => row.data).filter(Boolean).sort(); const end = dates.at(-1) || ""; if (!end) return { start: "", end: "" }; const last = toDate(end); const first = new Date(last.getFullYear(), last.getMonth() - 11, 1, 12); return { start: isoDate(first), end }; }
-async function loadData() {
-  $("#source-status").textContent = "Carregando SSOT"; $("#source-pill").textContent = "Validando fonte"; $("#source-pill").className = "status-pill pending";
-  try {
-    const [commercial, growth, alternative] = await Promise.all([loadJson("data/ssot-commercial-channels.json"), loadGrowth(), loadAlternative()]);
-    state.commercial = commercial;
-    state.rows = normalizedRows(commercial.rows || []);
-    state.growthPayload = growth && growth.ok !== false && Array.isArray(growth.data) ? growth : null;
-    state.growthViews = state.growthPayload?.data || [];
-    state.alternativePayload = alternative && alternative.ok !== false ? alternative : null;
-    const liveRows = state.growthViews.flatMap((view) => Array.isArray(view.rows) ? view.rows : []).map((row) => normalizeRow(row));
-    const availableDates = [...state.rows.map((row) => row.data), ...liveRows.map((row) => row.data)].filter(Boolean).sort();
-    state.availableStart = availableDates[0] || "";
-    state.availableEnd = availableDates.at(-1) || "";
-    const fallback = defaultWindow(state.rows);
-    state.start = growth?.window?.start || fallback.start;
-    state.end = growth?.window?.end || fallback.end;
-    state.compareMode = "previous";
-    applyPeriodPreset("current-day");
-    $("#period-preset").value = "current-day";
-    $("#date-start").value = state.start;
-    $("#date-end").value = state.end;
-    const liveChannel = viewEntry("channel");
-    const liveChannelRows = normalizedRows(liveChannel?.rows || []);
-    const liveMaxDate = liveChannelRows.map((row) => row.data).filter(Boolean).sort().at(-1) || state.availableEnd;
-    const liveSource = liveChannel?.source || commercial.source || "SSOT";
-    const updatedAt = growth?.generatedAt || commercial.extracted_at || "Atualizacao nao informada";
-    $("#source-name").textContent = liveSource;
-    $("#extracted-at").textContent = `${updatedAt} · ultimo dado ${liveMaxDate ? dayLabel(liveMaxDate) : "nao informado"}`;
-    $("#source-status").textContent = state.growthPayload ? "SSOT ao vivo conectado" : "Snapshot de canais";
-    $("#source-pill").textContent = state.growthPayload ? "SSOT ao vivo" : "Snapshot";
-    $("#source-pill").className = `status-pill ${state.growthPayload ? "ok" : "warn"}`;
-    $("#validation-title").textContent = state.growthPayload ? "SSOT atualizado" : "SSOT ao vivo indisponivel";
-    $("#validation-summary").textContent = state.growthPayload
-      ? `${liveChannelRows.length.toLocaleString("pt-BR")} linhas de canais ao vivo; ultimo dado em ${liveMaxDate ? dayLabel(liveMaxDate) : "data nao informada"}. ${state.growthViews.length} visoes growth carregadas.`
-      : `A leitura ao vivo falhou. Exibindo o snapshot de ${commercial.extracted_at || "data nao informada"}; atualize novamente antes de decidir.`;
-    $("#validation-banner").className = `validation-banner ${state.growthPayload ? "valid" : "error"}`;
-    renderAll();
-  } catch (error) { $("#source-status").textContent = "Fonte indisponivel"; $("#source-pill").textContent = "Erro de fonte"; $("#source-pill").className = "status-pill error"; $("#validation-title").textContent = "Falha na leitura"; $("#validation-summary").textContent = error.message; $("#validation-banner").className = "validation-banner error"; }
+
+const GROWTH_CACHE_NAME = "panorama-growth-v2";
+function localDateKey() { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
+function growthCacheUrl() { return `${API_URL}?view=growth_views&day=${localDateKey()}`; }
+async function readGrowthCache() {
+  if (typeof caches === "undefined") return null;
+  try { const cache = await caches.open(GROWTH_CACHE_NAME); const response = await cache.match(growthCacheUrl()); return response ? response.json() : null; } catch (error) { return null; }
 }
+async function loadGrowthNetwork() {
+  const url = growthCacheUrl(); const payload = await loadJson(url, 15000);
+  const response = new Response(JSON.stringify(payload), { headers: { "content-type": "application/json" } });
+  const copy = response.clone();
+  if (typeof caches !== "undefined") { try { const cache = await caches.open(GROWTH_CACHE_NAME); await cache.put(url, copy); } catch (error) { /* Cache is optional. */ } }
+  return payload;
+}
+function hydrateData(commercial, growth, alternative, cached = false) {
+  state.commercial = commercial || null;
+  state.rows = normalizedRows(commercial?.rows || []);
+  state.growthPayload = growth && growth.ok !== false && Array.isArray(growth.data) ? growth : null;
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("panorama:ssot", { detail: state.growthPayload || commercial }));
+  state.growthViews = state.growthPayload?.data || [];
+  state.growthViewMap = new Map(state.growthViews.map((view) => [view.view, view]));
+  state.normalizedViewRows.clear();
+  state.channelRowsCache.clear();
+  state.alternativePayload = alternative && alternative.ok !== false ? alternative : null;
+  const liveRawRows = state.growthViews.flatMap((view) => Array.isArray(view.rows) ? view.rows : []);
+  const liveDates = liveRawRows.map((row) => dateKey(row.data || row.date || row.event_date)).filter(Boolean);
+  state.hourlyAvailable = state.rows.some((row) => row.hora !== null && row.hora !== undefined) || liveRawRows.some((row) => hourKey(row.data_hora || row.datetime || row.timestamp || row.session_ts || row.hora || row.hour) !== null);
+  const availableDates = [...state.rows.map((row) => row.data), ...liveDates].filter(Boolean).sort();
+  state.availableStart = availableDates[0] || "";
+  state.availableEnd = availableDates.at(-1) || "";
+  const fallback = state.rows.length ? defaultWindow(state.rows) : { start: state.availableStart, end: state.availableEnd };
+  state.start = growth?.window?.start || fallback.start;
+  state.end = growth?.window?.end || fallback.end;
+  state.compareMode = "previous";
+  applyPeriodPreset("current-day");
+  $("#period-preset").value = "current-day";
+  $("#date-start").value = state.start;
+  $("#date-end").value = state.end;
+  const liveChannel = viewEntry("channel");
+  const liveChannelRows = normalizedViewRows("channel");
+  const liveMaxDate = liveChannelRows.map((row) => row.data).filter(Boolean).sort().at(-1) || state.availableEnd;
+  const liveSource = liveChannel?.source || commercial?.source || "SSOT";
+  const updatedAt = growth?.generatedAt || commercial?.extracted_at || "Atualizacao nao informada";
+  $("#source-name").textContent = liveSource;
+  $("#extracted-at").textContent = `${updatedAt} · ultimo dado ${liveMaxDate ? dayLabel(liveMaxDate) : "nao informado"}`;
+  $("#source-status").textContent = cached ? "SSOT em cache; validando atualizacao" : state.growthPayload ? "SSOT ao vivo conectado" : "Snapshot de canais";
+  $("#source-pill").textContent = cached ? "Cache local" : state.growthPayload ? "SSOT ao vivo" : "Snapshot";
+  $("#source-pill").className = `status-pill ${cached ? "warn" : state.growthPayload ? "ok" : "warn"}`;
+  $("#validation-title").textContent = cached ? "Ultima leitura carregada" : state.growthPayload ? "SSOT atualizado" : "SSOT ao vivo indisponivel";
+  $("#validation-summary").textContent = state.growthPayload
+    ? `${liveChannelRows.length.toLocaleString("pt-BR")} linhas de canais ${cached ? "em cache" : "ao vivo"}; ultimo dado em ${liveMaxDate ? dayLabel(liveMaxDate) : "data nao informada"}. ${state.growthViews.length} visoes growth carregadas.`
+    : `A leitura ao vivo falhou. Exibindo o snapshot de ${commercial?.extracted_at || "data nao informada"}; atualize novamente antes de decidir.`;
+  $("#validation-banner").className = `validation-banner ${state.growthPayload ? cached ? "warn" : "valid" : "error"}`;
+  renderAll();
+}
+
 function setupEvents() {
   $("#reload-data").onclick = loadData;
   $("#clear-filters").onclick = () => { state.selectedChannel = ""; state.selectedModel = ""; state.selectedColor = ""; state.selectedSize = ""; state.productSearch = ""; state.chartChannels = []; state.chartFilter = ""; state.explorerSearch = ""; $("#explorer-search").value = ""; renderAll(); };
   $("#period-preset").onchange = (event) => { applyPeriodPreset(event.target.value); $("#date-start").value = state.start; $("#date-end").value = state.end; renderAll(); };
-  $("#date-start").onchange = (event) => { state.start = event.target.value; $("#period-preset").value = "custom"; applyComparison(); renderAll(); };
-  $("#date-end").onchange = (event) => { state.end = event.target.value; $("#period-preset").value = "custom"; applyComparison(); renderAll(); };
+  $("#date-start").onchange = (event) => { state.start = event.target.value; $("#period-preset").value = "custom"; applyComparison(); suggestGranularityForWindow(); renderAll(); };
+  $("#date-end").onchange = (event) => { state.end = event.target.value; $("#period-preset").value = "custom"; applyComparison(); suggestGranularityForWindow(); renderAll(); };
   $("#compare-mode").onchange = (event) => { state.compareMode = event.target.value; applyComparison(); renderAll(); };
   $("#compare-start").onchange = (event) => { state.compareMode = "custom"; state.compareStart = event.target.value; renderAll(); };
   $("#compare-end").onchange = (event) => { state.compareMode = "custom"; state.compareEnd = event.target.value; renderAll(); };
   $("#product-search").oninput = (event) => { state.productSearch = event.target.value; filtersForProducts(); renderExplorer(); };
-  document.querySelectorAll("[data-granularity]").forEach((button) => { button.onclick = () => { state.selectedGranularity = button.dataset.granularity; renderRhythm(); }; });
+  document.querySelectorAll("[data-granularity]").forEach((button) => { button.onclick = () => { if (button.dataset.granularity === "hour" && !state.hourlyAvailable) return; state.selectedGranularity = button.dataset.granularity; renderAll(); }; });
   $("#rhythm-metric").onchange = (event) => { state.rhythmMetric = event.target.value; renderRhythm(); };
   $("#chart-metric").onchange = (event) => { state.chartMetric = event.target.value; renderChart(); };
-  $("#explorer-sort").onchange = (event) => { state.explorerSort = event.target.value; renderExplorer(); };
+  $("#explorer-sort").onchange = (event) => { state.explorerSort = event.target.value; state.explorerSortDirection = "desc"; renderExplorer(); };
   $("#explorer-search").oninput = (event) => { state.explorerSearch = event.target.value; renderExplorer(); };
 }
-setupEvents();
-loadData();
+async function loadData() {
+  showLoadingScreen();
+  $("#source-status").textContent = "Carregando SSOT";
+  $("#source-pill").textContent = "Validando fonte";
+  $("#source-pill").className = "status-pill pending";
+  let cachedGrowth = null;
+  try {
+    setLoadingStep("01", "Verificando a ultima leitura", 22);
+    cachedGrowth = await readGrowthCache();
+    const cacheIsAlreadyDisplayed = cachedGrowth?.generatedAt && cachedGrowth.generatedAt === state.growthPayload?.generatedAt;
+    if (cachedGrowth?.ok && Array.isArray(cachedGrowth.data) && !cacheIsAlreadyDisplayed) {
+      setLoadingStep("02", "Atualizando dados do periodo", 48);
+      hydrateData(null, cachedGrowth, null, true);
+    }
+    setLoadingStep("02", "Atualizando dados do periodo", cachedGrowth ? 58 : 42);
+    const growth = await loadGrowthNetwork();
+    if (growth?.ok && Array.isArray(growth.data)) {
+      setLoadingStep("03", "Organizando indicadores", 84);
+      hydrateData(null, growth, null, false);
+      return;
+    }
+    const commercial = await loadJson("data/ssot-commercial-channels.json");
+    setLoadingStep("03", "Aplicando leitura de contingencia", 84);
+    hydrateData(commercial, null, null, false);
+  } catch (error) {
+    if (cachedGrowth?.ok && Array.isArray(cachedGrowth.data)) {
+      $("#source-status").textContent = "SSOT em cache";
+      $("#source-pill").textContent = "Cache local";
+      $("#source-pill").className = "status-pill warn";
+      $("#validation-title").textContent = "Atualizacao pendente";
+      $("#validation-summary").textContent = `A leitura ao vivo falhou: ${error.message}. Exibindo a ultima leitura validada.`;
+    } else {
+      try {
+        const commercial = await loadJson("data/ssot-commercial-channels.json");
+        setLoadingStep("03", "Aplicando leitura de contingencia", 84);
+        hydrateData(commercial, null, null, false);
+      } catch (fallbackError) {
+        $("#source-status").textContent = "Fonte indisponivel";
+        $("#source-pill").textContent = "Erro de fonte";
+        $("#source-pill").className = "status-pill error";
+        $("#validation-title").textContent = "Falha na leitura";
+        $("#validation-summary").textContent = fallbackError.message;
+        $("#validation-banner").className = "validation-banner error";
+      }
+    }
+  } finally {
+    hideLoadingScreen();
+  }
+}

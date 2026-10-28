@@ -9,3 +9,7 @@ __pycache__/
 config.local.json
 
 .vercel
+output/
+node_modules/
+.env.*
+!.env.example

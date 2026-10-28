@@ -5,13 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Painel de ritmo e performance comercial com dados SSOT.">
   <title>Reise | Performance comercial</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Tinos:wght@400;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/styles.css?v=20261026-36">
+  <link rel="stylesheet" href="assets/styles.css?v=20261028-01">
+  <link rel="stylesheet" href="assets/reise-theme.css?v=20261027-13">
+  <link rel="stylesheet" href="assets/crm-sendflow.css?v=20261028-04">
 </head>
 <body>
+  <div id="data-loader" class="data-loader" role="status" aria-live="polite" aria-label="Atualizando dados do painel">
+    <div class="data-loader-panel">
+      <img class="data-loader-logo" src="assets/reise-cult-logo-orange.png" alt="Reise Cult">
+      <p id="data-loader-message" class="data-loader-message">Atualizando dados<span class="data-loader-dots" aria-hidden="true">...</span></p>
+      <div class="data-loader-track" aria-hidden="true"><span id="data-loader-progress"></span></div>
+    </div>
+  </div>
   <nav class="workspace-tabs" aria-label="Área de análise">
+    <a class="workspace-brand" href="#growth" aria-label="Reise Performance"><img src="assets/reise-cult-logo-orange.png" alt="Reise Cult"></a>
     <button class="workspace-tab active" type="button" data-workspace="growth">Growth Performance</button>
     <button class="workspace-tab" type="button" data-workspace="crm">CRM</button>
   </nav>
@@ -19,10 +26,9 @@
     <header class="top">
       <div>
         <p class="kicker">Reise &middot; Performance comercial</p>
-        <h1>Performance comercial<br><em>produto primeiro</em></h1>
-        <p class="dek">Comece pelo produto, entenda os canais e avance até campanha, grupo e criativo para decidir onde agir.</p>
+        <h1>Growth Performance</h1>
+        <p class="dek">Produto / Canal / Campanha / Criativo</p>
       </div>
-      <div class="brand"><img class="only-dark" src="assets/reise-logo.png" alt="Reise"></div>
       <div class="top-meta">
         <span id="source-pill" class="status-pill pending">Validando fonte</span>
         <span id="source-status">Carregando SSOT</span>
@@ -30,7 +36,16 @@
       </div>
     </header>
 
+    <section class="unified-filterbar" aria-label="Recorte da analise">
+      <div><strong id="filter-summary-period">Carregando recorte</strong><span id="filter-summary-scope">Todos os produtos / canais pagos</span><small id="filter-summary-comparison"></small></div>
+      <button id="open-filters" class="filter-primary-button" type="button" aria-haspopup="dialog">Filtros <span id="filter-count">0</span></button>
+    </section>
+    <dialog id="growth-filter-dialog" aria-labelledby="filter-dialog-title">
+    <form id="growth-filter-form">
+      <header class="filter-dialog-header"><div><p class="eyebrow">Growth Performance</p><h2 id="filter-dialog-title">Configurar analise</h2></div><button id="close-filters" class="filter-close" type="button" aria-label="Fechar filtros" title="Fechar">&times;</button></header>
+      <div class="filter-dialog-content">
     <section class="controls" aria-label="Filtros do painel">
+      <h3>Periodo e comparacao</h3>
       <div class="filter-row filter-primary">
       <div class="control-group control-wide">
         <label for="period-preset">Janela</label>
@@ -52,16 +67,28 @@
       <div class="control-group date-control"><label for="date-end">Fim</label><input id="date-end" type="date"></div>
       <div class="control-group comparison-control"><label for="compare-mode">Comparar com</label><select id="compare-mode"><option value="previous">Periodo anterior</option><option value="year-ago">Mesmo periodo do ano anterior</option><option value="custom">Periodo selecionado</option></select><div id="compare-custom-fields" class="compare-dates is-hidden"><input id="compare-start" type="date" aria-label="Inicio da comparacao"><input id="compare-end" type="date" aria-label="Fim da comparacao"></div><small id="comparison-window" class="muted-note">Comparacao automatica</small></div>
       </div>
-      <div class="filter-row filter-products">
-      <div class="control-group product-search-group"><label for="product-search">Pesquisar produto</label><input id="product-search" type="search" placeholder="Nome aproximado"></div>
-      <div class="control-group"><label for="product-model-filter">Modelo</label><select id="product-model-filter"></select></div>
-      <div class="control-group"><label for="product-color-filter">Cor</label><select id="product-color-filter"></select></div>
-      <div class="control-group"><label for="product-size-filter">Tamanho</label><select id="product-size-filter"></select></div>
-      <div class="control-group"><label for="global-channel-filter">Canal</label><select id="global-channel-filter"></select></div>
-      <button id="clear-filters" class="outline-button" type="button">Limpar filtros</button>
-      </div>
     </section>
 
+    <section id="product-filters" class="product-filter-band" aria-label="Filtros de produto">
+      <div class="filter-band-heading"><h3>Produto e canal</h3><span id="active-product-filter"></span></div>
+      <div class="filter-row product-filter-primary">
+        <div class="control-group"><label for="product-search">Pesquisar produto</label><input id="product-search" type="search" placeholder="Ex.: RS8 Avant cinza" autocomplete="off"></div>
+        <div class="control-group"><label for="product-filter">Produto</label><select id="product-filter"><option value="">Todos os produtos</option></select></div>
+        <div class="control-group"><label for="global-channel-filter">Canal</label><select id="global-channel-filter"></select></div>
+      </div>
+      <div class="filter-row product-filter-secondary">
+        <div class="control-group"><label for="product-model-filter">Modelo</label><select id="product-model-filter"></select></div>
+        <div class="control-group"><label for="product-color-filter">Cor</label><select id="product-color-filter"></select></div>
+        <div class="control-group"><label for="product-size-filter">Tamanho</label><select id="product-size-filter"></select></div>
+      </div>
+    </section>
+      <section class="filter-view-section"><h3>Visao e indicador</h3><div class="filter-row"><div class="control-group"><label for="filter-view">Visao</label><select id="filter-view"></select></div><div class="control-group"><label for="filter-metric">Indicador dos graficos</label><select id="filter-metric"><option value="pedidos">Pedidos</option><option value="sessoes">Visitas</option><option value="receita">Receita</option><option value="rate">Conversao</option></select></div></div></section>
+      <section class="filter-view-section"><div class="control-group"><label for="filter-granularity">Agrupar por</label><select id="filter-granularity"><option value="hour">Hora</option><option value="day">Dia</option><option value="day-over-day">Dia a dia</option><option value="week">Semana</option><option value="month">Mes</option><option value="quarter">Trimestre</option><option value="semester">Semestre</option><option value="year">Ano</option></select></div></section>
+      <section id="filter-entities-section"></section>
+      </div>
+      <footer class="filter-dialog-footer"><button id="clear-filters" class="text-button" type="button">Limpar</button><div><button id="cancel-filters" class="outline-button" type="button">Cancelar</button><button id="apply-filters" class="filter-primary-button" type="submit">Aplicar filtros</button></div></footer>
+    </form>
+    </dialog>
     <section id="validation-banner" class="callout validation-banner" aria-live="polite">
       <span class="callout-mark">!</span>
       <div><strong id="validation-title">Validando base</strong><span id="validation-summary">Aguardando resposta do SSOT.</span></div>
@@ -82,6 +109,7 @@
       <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">Ritmo comercial</p><h2>Do dia ao ano</h2><p class="section-intro">Troque a granularidade para comparar o ritmo sem misturar medias de conversao.</p></div></div>
       <div class="rhythm-toolbar">
         <div class="segmented-control" role="group" aria-label="Granularidade do ritmo">
+          <button type="button" data-granularity="hour" hidden>Hora</button>
           <button type="button" data-granularity="day">Dia</button>
           <button type="button" data-granularity="day-over-day">Dia a dia</button>
           <button type="button" data-granularity="week" class="active">Semanal</button>
@@ -105,7 +133,7 @@
     </section>
 
     <section id="canais" class="report-section">
-      <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">Comparacao de canais</p><h2>Quem trouxe resultado</h2><p class="section-intro">Cinco leituras de midia paga no recorte atual. Use o filtro para agrupar Meta Ads ou abrir cada leitura.</p></div><span id="channel-status" class="status-pill pending">&mdash;</span></div>
+      <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">Comparacao de canais</p><h2>Quem trouxe resultado</h2><p class="section-intro">Cinco leituras de midia paga no recorte atual. Use o filtro para agrupar Meta Ads ou abrir cada leitura.</p></div><span id="channel-window" class="section-meta">&mdash;</span><span id="channel-status" class="status-pill pending">&mdash;</span></div>
       <div class="table-scroll"><table class="data-table channel-table"><thead><tr><th>Canal</th><th>Pedidos</th><th>Sessoes</th><th>Receita</th><th>Conversao</th><th>Cobertura</th><th>Vs. comparacao</th><th>Acao</th></tr></thead><tbody id="channel-body"><tr><td colspan="8" class="table-empty">Carregando canais.</td></tr></tbody></table></div>
     </section>
 
@@ -120,6 +148,15 @@
       <div class="section-heading"><span class="section-number">05</span><div><p class="eyebrow">Produto primeiro</p><h2>Produto, canal, campanha e criativo</h2><p class="section-intro">A investigação começa em Canal + produto e avança para campanha, grupo e anúncio quando a ponte de dados estiver disponível.</p></div><span id="explorer-status" class="status-pill pending">&mdash;</span></div>
       <div class="explorer-toolbar"><label for="explorer-level">Visao</label><select id="explorer-level"></select><label for="explorer-sort">Ordenar por</label><select id="explorer-sort"><option value="pedidos">Pedidos</option><option value="receita">Receita</option><option value="sessoes">Sessoes</option><option value="rate">Conversao</option></select><label for="explorer-search">Buscar</label><input id="explorer-search" type="search" placeholder="Nome da campanha, criativo ou produto"><span id="explorer-count" class="muted-note">&mdash;</span></div>
       <div id="explorer-summary" class="explorer-summary"></div>
+      <a class="product-filter-shortcut" href="#product-filters">Filtrar produto</a>
+      <details id="entity-comparison" class="entity-comparison">
+        <summary>Comparar canais, produtos e combinacoes</summary>
+        <div class="comparison-pickers">
+          <fieldset><legend>Selecao A</legend><div class="control-group"><label for="entity-a-view">Visao</label><select id="entity-a-view"></select></div><div class="control-group"><label for="entity-a-search">Pesquisar</label><input id="entity-a-search" type="search" placeholder="Produto, canal ou campanha"></div><div class="control-group"><label for="entity-a-key">Selecao</label><select id="entity-a-key"></select></div></fieldset>
+          <fieldset><legend>Selecao B</legend><div class="control-group"><label for="entity-b-view">Visao</label><select id="entity-b-view"></select></div><div class="control-group"><label for="entity-b-search">Pesquisar</label><input id="entity-b-search" type="search" placeholder="Produto, canal ou campanha"></div><div class="control-group"><label for="entity-b-key">Selecao</label><select id="entity-b-key"></select></div></fieldset>
+        </div>
+        <div id="entity-results" aria-live="polite"></div>
+      </details>
       <div class="table-scroll"><table class="data-table explorer-table"><thead id="explorer-head"></thead><tbody id="explorer-body"><tr><td colspan="8" class="table-empty">Carregando investigacao.</td></tr></tbody></table></div>
     </section>
 
@@ -136,57 +173,85 @@
     <header class="crm-header">
       <div>
         <p class="kicker">Reise · CRM</p>
-        <h1>Fechamento CRM</h1>
-        <p class="dek">Meta versus realizado, funil de ativação e ritmo semanal. Esta leitura não usa a atribuição de Growth Performance.</p>
+        <h1>CRM</h1>
+        <p class="dek">WhatsApp Oficial / WhatsApp Organico / E-mail</p>
       </div>
       <div class="crm-header-meta"><span class="status-pill ok">Aba independente</span><span id="crm-period-label">Semana de referência</span></div>
     </header>
 
+    <section class="unified-filterbar" aria-label="Recorte CRM">
+      <div><strong id="crm-filter-summary-period">Carregando recorte CRM</strong><span id="crm-filter-summary-channel">WhatsApp Oficial</span><small id="crm-filter-summary-comparison"></small></div>
+      <button id="crm-open-filters" class="filter-primary-button" type="button" aria-haspopup="dialog" disabled>Filtros <span id="crm-filter-count" class="filter-count">0</span></button>
+    </section>
+    <dialog id="crm-filter-dialog" aria-labelledby="crm-filter-dialog-title">
+    <form id="crm-filter-form">
+      <header class="filter-dialog-header"><div><p class="eyebrow">CRM</p><h2 id="crm-filter-dialog-title">Configurar analise</h2></div><button id="crm-close-filters" class="filter-close" type="button" aria-label="Fechar filtros CRM" title="Fechar">&times;</button></header>
+      <div class="filter-dialog-content">
     <section class="crm-controls" aria-label="Filtros da análise de CRM">
+      <h3>Periodo e comparacao</h3>
+      <div class="control-group"><label for="crm-period-preset">Janela</label><select id="crm-period-preset"><option value="current-day">Último dia disponível</option><option value="previous-day">Dia anterior</option><option value="week">Semana atual</option><option value="fortnight">Quinzena atual</option><option value="month">Mês atual</option><option value="quarter">Trimestre atual</option><option value="semester">Semestre atual</option><option value="year">Ano atual</option><option value="last-complete">Últimos 12 meses completos</option><option value="custom">Data específica</option><option value="all">Toda a base</option></select></div>
+      <div class="control-group date-control"><label for="crm-date-start">Início</label><input id="crm-date-start" type="date"></div>
+      <div class="control-group date-control"><label for="crm-date-end">Fim</label><input id="crm-date-end" type="date"></div>
+      <div class="control-group comparison-control"><label for="crm-compare-mode">Comparar com</label><select id="crm-compare-mode"><option value="previous">Período anterior</option><option value="year-ago">Mesmo período do ano anterior</option><option value="custom">Período selecionado</option></select><div id="crm-compare-custom-fields" class="compare-dates is-hidden"><input id="crm-compare-start" type="date" aria-label="Início da comparação"><input id="crm-compare-end" type="date" aria-label="Fim da comparação"></div><small id="crm-comparison-window" class="muted-note">Comparação automática</small></div>
       <div class="control-group"><label for="crm-channel-filter">Canal CRM</label><select id="crm-channel-filter"><option value="all">Todos os canais</option></select></div>
-      <div class="crm-period-note"><span>Período do fechamento</span><strong id="crm-period-note">19 a 25/10/2026</strong></div>
-      <div class="crm-source-note"><span>Fonte</span><strong>Racional CRM anexado</strong></div>
+      <div class="crm-period-note"><span>Período da leitura</span><strong id="crm-period-note">19 a 25/10/2026</strong></div>
+      <div class="crm-source-note"><span>Fonte</span><strong id="crm-source-label">Base CRM: WhatsApp Oficial</strong></div>
     </section>
 
+      </div>
+      <footer class="filter-dialog-footer"><button id="crm-clear-filters" class="text-button" type="button">Limpar</button><div><button id="crm-cancel-filters" class="outline-button" type="button">Cancelar</button><button id="crm-apply-filters" class="filter-primary-button" type="submit">Aplicar filtros</button></div></footer>
+    </form>
+    </dialog>
     <section id="crm-validation-banner" class="callout validation-banner valid" aria-live="polite">
       <span class="callout-mark">i</span>
       <div><strong>Escopo CRM separado</strong><span>Os números abaixo são meta versus realizado do fechamento semanal. Eles não entram na base, nos filtros ou nas conversões de Growth.</span></div>
     </section>
 
+    <section id="crm-ssot-reconciliation" class="crm-reconciliation" hidden aria-live="polite"></section>
+
+    <section class="crm-channel-switcher" aria-label="Canais CRM">
+      <div class="section-heading"><span class="section-number">01</span><div><p class="eyebrow">Canal</p><h2>Escolha a leitura</h2><p class="section-intro">Abra um canal para ver o resultado semanal, o ritmo e o funil completo.</p></div></div>
+      <div id="crm-channel-tabs" class="crm-channel-tabs" role="tablist"></div>
+    </section>
+
     <section class="report-section first-section">
-      <div class="section-heading"><span class="section-number">01</span><div><p class="eyebrow">Resumo CRM</p><h2>O que aconteceu na semana</h2><p class="section-intro">Leitura consolidada dos canais de relacionamento selecionados.</p></div><span id="crm-summary-window" class="section-meta">19 a 25/10/2026</span></div>
+      <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">Resumo CRM</p><h2>O que aconteceu no recorte</h2><p class="section-intro">Leitura do canal selecionado no período escolhido.</p></div><span id="crm-summary-window" class="section-meta">19 a 25/10/2026</span></div>
       <div id="crm-summary-kpis" class="kpis"></div>
     </section>
 
     <section class="report-section">
-      <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">Meta versus realizado</p><h2>Resultado por canal</h2><p class="section-intro">Use a variação para localizar rapidamente volume, eficiência e receita que precisam de investigação.</p></div></div>
+      <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">Meta versus realizado</p><h2>Resultado do canal</h2><p class="section-intro">Compare o realizado com a meta e localize o primeiro ponto de ataque.</p></div></div>
       <div id="crm-channel-cards" class="crm-channel-cards"></div>
     </section>
 
     <section class="report-section">
-      <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">Visoes completas</p><h2>Detalhe por canal CRM</h2><p class="section-intro">A mesma estrutura do racional: funil de conversao, ritmo diario, grafico de meta, funil completo de ativacao e acompanhamento.</p></div></div>
-      <div id="crm-channel-tabs" class="crm-channel-tabs" role="tablist"></div>
+      <div class="section-heading"><span class="section-number">04</span><div><p class="eyebrow">Visoes completas</p><h2>Funil e ritmo do canal</h2><p class="section-intro">A mesma ordem do racional: conversao, ritmo diario, ativacao e acompanhamento.</p></div></div>
       <div id="crm-detail" class="crm-detail"></div>
     </section>
 
     <section class="report-section">
-      <div class="section-heading"><span class="section-number">04</span><div><p class="eyebrow">Prioridade de atuação</p><h2>Onde atacar primeiro</h2><p class="section-intro">Prioridades calculadas a partir dos gaps do fechamento, sem misturar causalidade de mídia paga.</p></div></div>
+      <div class="section-heading"><span class="section-number">05</span><div><p class="eyebrow">Prioridade de atuação</p><h2>Onde atacar primeiro</h2><p class="section-intro">Prioridades calculadas a partir dos gaps do fechamento, sem misturar causalidade de mídia paga.</p></div></div>
       <div id="crm-priority-list" class="crm-priority-list"></div>
     </section>
 
     <section class="report-section">
-      <div class="section-heading"><span class="section-number">05</span><div><p class="eyebrow">Funil de ativação</p><h2>Planejado versus realizado por etapa</h2><p class="section-intro">A comparação mostra em qual etapa cada canal perdeu volume. Etapas sem rastreamento continuam explícitas.</p></div></div>
+      <div class="section-heading"><span class="section-number">06</span><div><p class="eyebrow">Funil de ativação</p><h2>Planejado versus realizado por etapa</h2><p class="section-intro">A comparação mostra em qual etapa o canal perdeu volume. Etapas sem rastreamento continuam explícitas.</p></div></div>
       <div id="crm-funnel" class="crm-funnel-grid"></div>
     </section>
 
     <section class="report-section">
-      <div class="section-heading"><span class="section-number">06</span><div><p class="eyebrow">Ritmo semanal</p><h2>Meta diária de referência</h2><p class="section-intro">Distribuição diária da meta do anexo. É uma referência de pace, não uma medição diária realizada.</p></div></div>
+      <div class="section-heading"><span class="section-number">07</span><div><p class="eyebrow">Ritmo do recorte</p><h2>Meta diária de referência</h2><p class="section-intro">Distribuição diária da meta do anexo. É uma referência de pace, não uma medição diária realizada.</p></div></div>
       <div id="crm-pacing" class="table-scroll"></div>
     </section>
 
-    <footer><strong>Regra CRM:</strong> esta aba usa o fechamento e as metas dos anexos como referência semanal. Ela permanece separada da camada Growth Performance e não transforma etapas não rastreadas em zero.</footer>
+    <footer><strong>Regra CRM:</strong> esta aba usa a planilha oficial e as metas dos anexos como referência. Ela permanece separada da camada Growth Performance e não transforma etapas não rastreadas em zero.</footer>
   </main>
-  <script src="assets/app.js?v=20261026-36"></script>
-  <script src="assets/crm.js?v=20261027-01"></script>
+  <script src="assets/app.js?v=20261028-01"></script>
+  <script src="assets/growth-analysis.js?v=20261027-11"></script>
+  <script src="assets/growth-filters.js?v=20261027-11"></script>
+  <script src="assets/crm-sendflow.js?v=20261028-02"></script>
+  <script src="assets/crm-email.js?v=20261028-01"></script>
+  <script src="assets/crm-rd.js?v=20261028-03"></script>
+  <script src="assets/crm.js?v=20261028-06"></script>
 </body>
 </html>

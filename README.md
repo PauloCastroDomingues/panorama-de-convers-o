@@ -14,6 +14,18 @@ Os agregados sao calculados sobre as linhas brutas uma unica vez. Eles nao sao s
 
 ## Aba CRM independente
 
+A extracao validada do SendFlow de setembro/2026 ja pode ser consultada no CRM local em `?crmChannel=whatsapp-organico#crm`. O fluxo preparado para leitura da planilha, os limites de cobertura e a ativacao posterior da ponte estao em [docs/sendflow-integration.md](docs/sendflow-integration.md). A coleta diaria ainda nao foi ativada.
+
+Em todos os canais CRM, sessoes, pedidos, receita e conversao comercial usam o canal equivalente no SSOT. SendFlow, RD e a planilha de WhatsApp Oficial complementam a ativacao e a conferencia; a ausencia de lancamentos nessas fontes nao remove o resultado SSOT. O cruzamento usa canal + periodo e nao replica vendas do canal por mensagem. A cobertura de cada indicador e avaliada separadamente.
+
+As formulas de E-mail verificadas na referencia imutavel estao em [docs/crm-email-calculations.md](docs/crm-email-calculations.md). `assets/crm-email.js` aplica entregabilidade, abertura e clique por abertura (CTOR), taxas consolidadas e medianas separadas. Validar com `node scripts/test_crm_email.cjs`. A referencia nao e usada como resultado atual.
+
+O JSON integral da consulta piloto RD foi importado localmente: 26 recebidos, 25 no periodo e cinco com ressalvas. Disponivel em `?crmChannel=email#crm`, sem alegar cobertura integral da conta ou taxas homologadas. [Carga do piloto e verificacao SSOT](docs/rdstation-pilot-load.md) registra o diagnostico real executado pelo usuario; [avaliacao inicial](docs/rdstation-pilot-assessment.md) preserva a etapa anterior. A reconciliacao das fontes comerciais SSOT fica por ultimo, conforme solicitado, sem substituir sua leitura atual.
+
+A base auxiliar RD foi criada no Sheets e recebeu os 26 registros do piloto. Apos o preenchimento do usuario, foi conferida uma nova coleta de 72 campanhas de 28/09 a 27/10/2026; somente esse lote mais recente alimenta o snapshot local, sem somar fotografias. O piloto original foi preservado como fixture de regressao. [Integracao auxiliar RD](docs/rdstation-auxiliary-integration.md) contem o endereco real, o contrato, o arquivo Apps Script completo e os passos de ativacao. [Prompt completo de preenchimento](docs/rdstation-daily-fill-prompt.txt) ja aponta para a base criada. O leitor local tem ponte opcional e cache validado, mas o endpoint continua desativado: nao ha coleta diaria automatica, Web App remoto configurado ou publicacao Vercel nesta etapa.
+
+Validar com `node scripts/test_crm_rd.cjs`, `node scripts/test_rd_auxiliary.cjs`, `node scripts/check_crm_rd_ui.cjs` e `node scripts/check_rd_bridge_ui.cjs`. Os testes da ponte usam transporte simulado, nao uma conexao remota implantada.
+
 O painel tambem possui uma aba CRM separada da Growth Performance. Ela usa o racional de fechamento semanal enviado para o projeto e responde a quatro perguntas operacionais:
 
 1. Como cada canal CRM ficou contra a meta de sessoes, pedidos, receita e conversao?
@@ -21,7 +33,31 @@ O painel tambem possui uma aba CRM separada da Growth Performance. Ela usa o rac
 3. Quais canais ou segmentos devem ser investigados primeiro?
 4. Qual ritmo diario de referencia precisa ser acompanhado durante a semana?
 
-A referencia atual e a semana de 19 a 25/10/2026, com E-mail, WhatsApp Organico e WhatsApp Oficial. A aba nao reutiliza os filtros, linhas, agregacoes ou regras de atribuicao de Growth. Etapas nao rastreadas permanecem como `Nao rastreado` e nao sao convertidas em zero. A fonte da referencia e exibida na propria aba; a integracao automatica do CRM com uma fonte diaria deve ser feita separadamente.
+A referencia atual e a semana de 19 a 25/10/2026, com E-mail, WhatsApp Organico e WhatsApp Oficial. A planilha informada e a fonte operacional somente leitura do WhatsApp Oficial. Para esse canal, a aba cruza a planilha com o canal equivalente do SSOT usando a mesma janela e exibe uma conciliacao lado a lado; as fontes nao sao somadas nem uma substitui a outra. Etapas nao rastreadas permanecem como `Nao rastreado` e nao sao convertidas em zero. A fonte da referencia e exibida na propria aba.
+
+### Ordem das visoes CRM
+
+Antes da integracao da base diaria, a aba CRM deve preservar a ordem do racional visual:
+
+1. Resumo da semana: receita, pedidos e sessoes.
+2. Meta versus realizado por canal.
+3. Funil de conversao: sessoes, pedidos e taxa.
+4. Ritmo diario: meta do dia, acumulado e grafico de receita.
+5. Funil completo de ativacao por segmento.
+6. Resultado combinado quando o canal tiver grupos que so podem ser medidos em conjunto.
+7. Resultado esperado versus meta.
+8. Acompanhamento operacional preenchivel, com exportacao e importacao local.
+9. Prioridade de atuacao e diagnostico.
+
+Essa camada e uma estrutura de decisao. Os dados de fechamento devem ser conectados depois, sem alterar a ordem, a semantica ou a separacao entre resultado oficial do canal e funil de ativacao rastreado.
+
+### Identidade visual Reise
+
+O projeto usa a referencia local oficial da identidade Reise Cult recuperada do second brain. A aplicacao digital parte de Pneu Dark `#1D1D1B`, Cinza Asfalto `#3F3A38`, Branco `#F4F4F4` e Laranja Apex `#FB5D06`. O laranja e reservado para conversao, destaque, alerta e acao; nao deve virar preenchimento decorativo dominante.
+
+Titulos usam Formula1 e textos usam Aalto, com os arquivos preservados localmente em `assets/fonts/`. O logotipo oficial laranja fica em `assets/reise-cult-logo-orange.png`. A identidade visual nao pode alterar metricas, comparacoes, regras de negocio ou estados de cobertura.
+
+`assets/reise-theme.css` aplica a identidade nas duas abas: cabecalhos, hierarquia tipografica, tabelas, indicadores, graficos e paineis de filtros. Formula1 fica nos titulos; dados e texto usam Aalto com numerais tabulares. Verde, amarelo e vermelho preservam o significado dos sinais de desempenho e cobertura. A referencia e o acervo local do Second Brain, especialmente `reise-cult-identidade-cultura-guias.md` e `reise-cult-leitura-visual-detalhada.md`.
 
 ## Entrega atual: oito visoes de Growth Performance
 
