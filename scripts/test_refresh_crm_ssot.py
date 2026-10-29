@@ -178,13 +178,14 @@ class RefreshTests(unittest.TestCase):
             return job
         client.query.side_effect = query
         with patch("google.cloud.bigquery.Client", return_value=client), patch.object(refresh, "inspect_source", return_value={}):
-            _, _, metadata, jobs, estimates = refresh.fetch_sources(date(2026, 10, 27))
-        self.assertEqual([bool(config.dry_run) for config in calls], [True, True, False, False])
-        self.assertEqual(calls[2].maximum_bytes_billed, refresh.MAX_BYTES)
-        self.assertEqual(calls[3].maximum_bytes_billed, refresh.MAX_BYTES - 200)
-        self.assertEqual(metadata["refresh"]["total_bytes_billed"], 400)
-        self.assertEqual(len(jobs), 2)
-        self.assertEqual(sum(estimates.values()), 200)
+            _, _, metadata, jobs, estimates, _ = refresh.fetch_sources(date(2026, 10, 27))
+        self.assertEqual([bool(config.dry_run) for config in calls], [True, True, True, False, False, False])
+        self.assertEqual(calls[3].maximum_bytes_billed, refresh.MAX_BYTES)
+        self.assertEqual(calls[4].maximum_bytes_billed, refresh.MAX_BYTES - 200)
+        self.assertEqual(calls[5].maximum_bytes_billed, refresh.MAX_BYTES - 400)
+        self.assertEqual(metadata["refresh"]["total_bytes_billed"], 600)
+        self.assertEqual(len(jobs), 3)
+        self.assertEqual(sum(estimates.values()), 300)
         client.close.assert_called_once()
 
     def test_excessive_estimates_never_execute_a_paid_query(self):
@@ -193,7 +194,7 @@ class RefreshTests(unittest.TestCase):
         with patch("google.cloud.bigquery.Client", return_value=client), patch.object(refresh, "inspect_source", return_value={}):
             with self.assertRaisesRegex(refresh.RefreshError, "dry_run_budget_exceeded"):
                 refresh.fetch_sources(date(2026, 10, 27))
-        self.assertEqual(client.query.call_count, 2)
+        self.assertEqual(client.query.call_count, 3)
         self.assertTrue(all(call.kwargs["job_config"].dry_run for call in client.query.call_args_list))
 
     def test_duplicate_google_day_is_rejected_not_added(self):
@@ -216,6 +217,76 @@ class RefreshTests(unittest.TestCase):
             repaired = json.loads(output.read_bytes())['rows'][0]
             self.assertEqual(repaired['sessoes'], 3423)
             self.assertEqual((repaired['pedidos'], repaired['receita']), (1, '10'))
+
+    def test_paid_totals_preserve_grain_nulls_and_observed_zeros(self):
+        rows = [row(label='Meta ADS', sessions=100, orders=2),
+                row(label='Google ADS', sessions=0, orders=0),
+                row('2025-01-02', label='Meta ADS', sessions=None)]
+        result = refresh.paid_channel_snapshot(rows, date(2025, 1, 2))
+        self.assertEqual(result['source'], refresh.BRIDGE)
+        self.assertEqual(len(result['rows']), 3)
+        self.assertIsNone(result['rows'][-1]['sessoes'])
+        self.assertNotIn('sessoes_ga4', refresh.QUERIES['paid_channel_totals'])
+        with self.assertRaisesRegex(refresh.RefreshError, 'paid_channel_coverage_regression'):
+            refresh.paid_channel_snapshot(rows[1:], date(2025, 1, 2), result)
+        with self.assertRaisesRegex(refresh.RefreshError, 'duplicate_paid_channel_day'):
+            refresh.paid_channel_snapshot([rows[0], dict(rows[0], origem='another')], date(2025, 1, 2))
+        with self.assertRaisesRegex(refresh.RefreshError, 'invalid_paid_channel'):
+            refresh.paid_channel_snapshot([row(label='Meta Ads 1')], date(2025, 1, 2))
+
+    def test_full_paid_history_is_refreshed_without_replacing_origin_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output, status_path = Path(directory) / 'snapshot.json', Path(directory) / 'status.json'
+            old = snapshot([row('2025-01-01'), row('2026-10-28')])
+            refresh.atomic_json(output, old)
+            def fetch(end):
+                return ([row('2026-10-28')], [{'data': '2026-10-28', 'sessoes': 50}],
+                        {'session_bridge': {'source': refresh.BRIDGE, 'filter': refresh.BRIDGE_FILTER}}, [], {},
+                        [row('2026-01-01', label='Meta ADS', sessions=100, orders=2),
+                         row('2026-10-28', label='Google ADS', sessions=50, orders=1)])
+            status = refresh.run(date(2026, 10, 28), output, status_path, fetch)
+            self.assertIsNone(status['error'])
+            result = json.loads(output.read_bytes())
+            self.assertEqual(result['rows'][0], old['rows'][0])
+            self.assertEqual(len(result['paid_channel_totals']['rows']), 2)
+            before = output.read_bytes()
+            status = refresh.run(date(2026, 10, 28), output, status_path, lambda end: fetch(end)[:5])
+            self.assertEqual(status['error'], 'missing_paid_channel_refresh')
+            self.assertEqual(output.read_bytes(), before)
+
+    def test_live_origin_metrics_win_over_materialized_commercial_totals(self):
+        origins = [row('2026-09-02', label='Meta Ads 1', sessions=100, orders=8, revenue='80'),
+                   row('2026-09-02', label='Meta Ads 2', sessions=20, orders=2, revenue='20'),
+                   row('2026-09-02', label='Google ADS', sessions=None, orders=7, revenue='70'),
+                   row('2026-01-01', label='Meta Ads 1', sessions=None, orders=3, revenue='30')]
+        history = [row('2026-09-02', label='Meta ADS', sessions=122, orders=11, revenue='110'),
+                   row('2026-09-02', label='Google ADS', sessions=50, orders=8, revenue='80'),
+                   row('2026-01-01', label='Meta ADS', sessions=300, orders=4, revenue='40'),
+                   row('2026-01-02', label='Meta ADS', sessions=200, orders=5, revenue='50')]
+        result = refresh.daily_totals(refresh.reconcile_paid_totals(origins, history, date(2026, 9, 30)))
+        self.assertEqual(result[('2026-09-02', 'Meta ADS')], {'pedidos': 10, 'sessoes': 120, 'receita': '100'})
+        self.assertEqual(result[('2026-09-02', 'Google ADS')], {'pedidos': 7, 'sessoes': 50, 'receita': '70'})
+        self.assertEqual(result[('2026-01-01', 'Meta ADS')], {'pedidos': 3, 'sessoes': 300, 'receita': '30'})
+        self.assertIsNone(result[('2026-01-02', 'Meta ADS')]['pedidos'], 'Missing live numerator never inherits materialized orders')
+
+    def test_origin_history_replaces_old_paid_rows_but_not_historical_crm(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output, status_path = Path(directory) / 'snapshot.json', Path(directory) / 'status.json'
+            crm = row('2026-09-01')
+            refresh.atomic_json(output, snapshot([crm, row('2026-09-01', label='Meta Ads 1', orders=831), row('2026-10-28')]))
+            def fetch(end):
+                return ([row('2026-09-01', label='Meta Ads 1', orders=830), row('2026-10-28')],
+                        [{'data': '2026-10-28', 'sessoes': 50}],
+                        {'session_bridge': {}, 'refresh': {'paid_history_start': refresh.START.isoformat()}}, [], {},
+                        [row('2026-09-01', label='Meta ADS', orders=831)])
+            status = refresh.run(date(2026, 10, 28), output, status_path, fetch)
+            self.assertIsNone(status['error'])
+            result = json.loads(output.read_bytes())
+            self.assertIn(crm, result['rows'])
+            meta = next(item for item in result['rows'] if item['canal'] == 'Meta Ads 1')
+            self.assertEqual(meta['pedidos'], 830)
+            self.assertEqual(result['paid_channel_totals']['source'], refresh.SOURCE)
+            self.assertEqual(result['paid_channel_totals']['rows'][0]['pedidos'], 830)
 
 
 if __name__ == "__main__":

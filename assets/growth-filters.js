@@ -40,8 +40,6 @@ function renderFilterDraft() {
     $("#filter-view").innerHTML = VIEWS.map((view) => `<option value="${view.key}">${view.short}</option>`).join("");
     $("#filter-view").value = state.selectedView;
     $("#filter-metric").value = state.chartMetric;
-    $("#filter-granularity").value = state.selectedGranularity;
-    $("#filter-granularity option[value='hour']").disabled = !state.hourlyAvailable;
     renderEntityComparison(true);
     for (const side of ['a','b']) $(`#entity-${side}-search`).value = entityState[side].query;
   });
@@ -79,8 +77,6 @@ function handleFilterEdit(event) {
     if (key === 'selectedChannel') { filterDraft.values.chartFilter = node.value; filterDraft.values.chartChannels = []; }
   } else if (node.id === 'filter-metric') {
     filterDraft.values.chartMetric = node.value; filterDraft.values.rhythmMetric = node.value;
-  } else if (node.id === 'filter-granularity') {
-    filterDraft.values.selectedGranularity = node.value;
   } else if (node.id.startsWith('entity-')) {
     const [,side,field] = node.id.split('-');
     filterDraft.entities[side][field === 'search' ? 'query' : field] = node.value;

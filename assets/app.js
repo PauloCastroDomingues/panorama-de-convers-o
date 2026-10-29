@@ -180,9 +180,20 @@ function summarize(rows) {
   const knownSessions = sessionValues.filter((value) => value !== null && value !== undefined && Number.isFinite(value));
   const sessions = knownSessions.length ? sum(knownSessions) : null;
   const coverage = cleanRows.length ? knownSessions.length / cleanRows.length : null;
-  const complete = cleanRows.length > 0 && knownSessions.length === cleanRows.length;
-  const rate = complete && cleanRows.every((row) => row.pedidos !== null) && sessions > 0 && orders !== null ? orders / sessions : null;
-  return { rows: cleanRows.length, pedidos: orders, sessoes: sessions, receita: revenue, rate, coverage, complete, status: complete ? "Completa" : coverage > 0 ? "Parcial" : "Ausente" };
+  const complete = cleanRows.length > 0 && knownSessions.length === cleanRows.length && cleanRows.every((row) => Number.isFinite(row.pedidos));
+  const rate = complete && sessions > 0 && orders !== null ? orders / sessions : null;
+  const observed = cleanRows.filter(row => Number.isFinite(row.pedidos) && Number.isFinite(row.sessoes));
+  // A partial rate is descriptive only: never discard a known unpaired numerator.
+  const onlyCalendarGaps = cleanRows.every(row => (Number.isFinite(row.pedidos) && Number.isFinite(row.sessoes))
+    || (row.pedidos == null && row.sessoes == null && row.receita == null));
+  const observedSessions = sum(observed.map(row => row.sessoes));
+  const expectedDays = new Set(cleanRows.map(row => row.data).filter(Boolean)).size;
+  const incompleteDays = new Set(cleanRows.filter(row => !Number.isFinite(row.pedidos) || !Number.isFinite(row.sessoes)).map(row => row.data).filter(Boolean));
+  const observedDays = expectedDays - incompleteDays.size;
+  const observedRate = !complete && onlyCalendarGaps && observedSessions > 0
+    && observed.every(row => !incompleteDays.has(row.data))
+    ? sum(observed.map(row => row.pedidos)) / observedSessions : null;
+  return { rows: cleanRows.length, pedidos: orders, sessoes: sessions, receita: revenue, rate, observedRate, expectedDays, observedDays, coverage, complete, status: complete ? "Completa" : coverage > 0 ? "Parcial" : "Ausente" };
 }
 function periodBounds(period) { return period === "compare" ? { start: state.compareStart, end: state.compareEnd } : { start: state.start, end: state.end }; }
 function inPeriod(row, period) { if (period === "compare" && state.compareEnabled === false) return false; const bounds = periodBounds(period); return Boolean(row.data && bounds.start && bounds.end && row.data >= bounds.start && row.data <= bounds.end); }
@@ -206,17 +217,55 @@ function channelSourceRows(period) {
   if (period === "compare" && state.compareEnabled === false) return [];
   const bounds = periodBounds(period); const cacheKey = `${period}|${bounds.start}|${bounds.end}`;
   if (state.channelRowsCache.has(cacheKey)) return state.channelRowsCache.get(cacheKey);
-  const entryRows = normalizedViewRows("channel").filter((row) => isPaidRawChannel(row.canal));
-  const dateRows = entryRows.filter((row) => inPeriod(row, period));
-  const labeledRows = dateRows.filter((row) => row.period === period || (period === "current" && (!row.period || row.period === "current")));
-  const rowsForPeriod = dateRows.length ? dateRows : labeledRows;
-  const consolidated = consolidatedChannelRows(rowsForPeriod);
-  const result = consolidated.length && consolidated.some((row) => row.sessoes !== null)
-    ? consolidated
-    : consolidatedChannelRows(state.rows.filter((row) => isPaidRawChannel(row.canal) && inPeriod(row, period)));
+  const select = (rows) => consolidatedChannelRows(rows.filter((row) => isPaidRawChannel(row.canal) && inPeriod(row, period)));
+  const growthRows = select(normalizedViewRows("channel"));
+  const snapshotRows = select(state.rows);
+  const growthTime = Date.parse(viewEntry("channel")?.generatedAt || state.growthPayload?.generatedAt) || 0;
+  const snapshotTime = Date.parse(state.commercial?.extracted_at) || 0;
+  // Keep one whole observation per channel/day. Never add two extracts of the same SSOT.
+  const ordered = snapshotTime > growthTime ? [growthRows, snapshotRows] : [snapshotRows, growthRows];
+  const observations = new Map();
+  ordered.flat().forEach((row) => observations.set(`${row.data}|${row.canal}`, row));
+  const channels = new Set([...normalizedViewRows('channel'), ...state.rows].filter((row) => isPaidRawChannel(row.canal)).map((row) => row.canal));
+  // A missing calendar day is unknown, not a zero or a complete denominator.
+  for (let date = bounds.start; date && date <= bounds.end; date = shiftDate(date, 1)) {
+    channels.forEach((canal) => {
+      const key = `${date}|${canal}`;
+      if (!observations.has(key)) observations.set(key, { data: date, canal, sessoes: null, pedidos: null, receita: null });
+    });
+  }
+  const result = [...observations.values()];
   state.channelRowsCache.set(cacheKey, result); return result;
 }
-function scopeRows(scope, period) { return analysisSourceRows(period).filter((row) => scope.raw.includes(row.canal)); }
+function consolidatedPaidHistory(period) {
+  if (period === 'compare' && state.compareEnabled === false) return [];
+  const entry = state.commercial?.paid_channel_totals;
+  if (!['reise-ssot.mart_growth_us.aquisicao_por_canal8_daily', 'reise-ssot.mart_growth_us.aquisicao_por_canal_origem_daily_v'].includes(entry?.source) || !Array.isArray(entry.rows)) return null;
+  const bounds = periodBounds(period);
+  const key = `paid-totals|${bounds.start}|${bounds.end}`;
+  if (state.channelRowsCache.has(key)) return state.channelRowsCache.get(key);
+  const observations = new Map(normalizedRows(entry.rows).filter(row => inPeriod(row, period))
+    .map(row => [`${row.data}|${row.canal}`, row]));
+  // Consolidated Meta is an alternative grain, never an extra account to sum.
+  for (let date = bounds.start; date && date <= bounds.end; date = shiftDate(date, 1)) {
+    ['Facebook (1 + 2)', 'Google ADS'].forEach(canal => {
+      const key = `${date}|${canal}`;
+      if (!observations.has(key)) observations.set(key, { data: date, canal, sessoes: null, pedidos: null, receita: null });
+    });
+  }
+  const rows = [...observations.values()];
+  state.channelRowsCache.set(key, rows); return rows;
+}
+function scopeRows(scope, period) {
+  const rows = analysisSourceRows(period).filter((row) => scope.raw.includes(row.canal));
+  if (productFilterActive()) return rows;
+  const totals = consolidatedPaidHistory(period);
+  if (totals === null) return rows;
+  const meta = scope.raw.includes('Meta Ads 1') && scope.raw.includes('Meta Ads 2');
+  const google = scope.raw.includes('Google ADS');
+  if (!meta && !google) return rows;
+  return totals.filter(row => (meta && row.canal === 'Facebook (1 + 2)') || (google && row.canal === 'Google ADS'));
+}
 function displayScopesForFilter(filterKey) {
   if (filterKey === "group-meta") return PAID_CHANNEL_VIEWS.filter((scope) => ["Meta Ads 1", "Meta Ads 2", "Facebook (1 + 2)"].includes(scope.key));
   if (filterKey === "group-google") return PAID_CHANNEL_VIEWS.filter((scope) => scope.key === "Google ADS");
@@ -231,7 +280,10 @@ function selectedMetricScopes() {
   const exact = PAID_CHANNEL_VIEWS.find((scope) => scope.key === state.selectedChannel);
   return exact ? PAID_SOURCE_CHANNELS.filter((scope) => exact.raw.some((raw) => scope.raw.includes(raw))) : PAID_SOURCE_CHANNELS;
 }
-function selectedPaidRows(period) { return selectedMetricScopes().flatMap((scope) => scopeRows(scope, period)); }
+function selectedPaidRows(period) {
+  const raw = [...new Set(selectedMetricScopes().flatMap(scope => scope.raw))];
+  return scopeRows({ raw }, period);
+}
 function channelGroups(period) { return selectedScopes().map((scope) => ({ key: scope.key, dimension: scope.label, channel: scope.label, campaign: "", group: "", ad: "", product: "", ...summarize(scopeRows(scope, period)) })); }
 function allChannelGroups(period) { return channelGroups(period); }
 
@@ -336,8 +388,8 @@ function comparisonWindowLabel() { return state.compareEnabled === false ? "Sem 
 function suggestedGranularity() {
   const days = dateSpan(state.start, state.end);
   if (days <= 1) return state.hourlyAvailable ? "hour" : "day";
-  if (days <= 14) return "day";
-  if (days <= 90) return "week";
+  if (days <= 31) return "day";
+  if (days <= 92) return "week";
   if (days <= 366) return "month";
   if (days <= 730) return "quarter";
   return "year";
@@ -347,10 +399,7 @@ function suggestGranularityForWindow() {
   if (next && (state.start || state.end)) state.selectedGranularity = next;
 }
 function renderTemporalControls() {
-  const hourButton = document.querySelector('[data-granularity="hour"]');
-  if (!hourButton) return;
-  hourButton.hidden = !state.hourlyAvailable;
-  if (!state.hourlyAvailable && state.selectedGranularity === "hour") state.selectedGranularity = suggestedGranularity();
+  suggestGranularityForWindow();
 }
 function setupFilters() {
   const channelSelect = $("#global-channel-filter"); const grouped = CHANNEL_FILTERS.filter((item) => item.key.startsWith("group-")); const individual = PAID_CHANNEL_VIEWS; channelSelect.innerHTML = `<option value="">Todos os canais pagos</option><optgroup label="Grupos de canal">${grouped.map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("")}</optgroup><optgroup label="Leituras declaradas">${individual.map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("")}</optgroup>`; channelSelect.value = state.selectedChannel; channelSelect.onchange = () => { state.selectedChannel = channelSelect.value; state.chartFilter = state.selectedChannel; state.chartChannels = selectedScopes().map((scope) => scope.key); renderAll(); };
@@ -373,9 +422,28 @@ function periodBucket(date, granularity, row) {
   if (granularity === "year") return { key: String(value.getFullYear()), label: String(value.getFullYear()) };
   const monday = new Date(value); const day = monday.getDay() || 7; monday.setDate(monday.getDate() - day + 1); const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6); const start = isoDate(monday); const end = isoDate(sunday); return { key: start, label: `${dayLabel(start)} - ${dayLabel(end)}` };
 }
-function aggregatePeriods(rows, granularity) {
+function clippedPeriodLabel(item, granularity, bounds) {
+  if (!bounds || ['hour', 'day', 'day-over-day'].includes(granularity)) return item;
+  const date = toDate(item.rows[0].data);
+  let start, end;
+  if (granularity === 'week') {
+    start = item.key; end = shiftDate(start, 6);
+  } else {
+    const span = { month: 1, quarter: 3, semester: 6, year: 12 }[granularity];
+    if (!span) return item;
+    const month = Math.floor(date.getMonth() / span) * span;
+    start = isoDate(new Date(date.getFullYear(), month, 1, 12));
+    end = isoDate(new Date(date.getFullYear(), month + span, 0, 12));
+  }
+  const clippedStart = start < bounds.start ? bounds.start : start;
+  const clippedEnd = end > bounds.end ? bounds.end : end;
+  const partial = start !== clippedStart || end !== clippedEnd;
+  const rangeLabel = clippedStart === clippedEnd ? dayLabel(clippedStart) : `${dayLabel(clippedStart)} a ${dayLabel(clippedEnd)}`;
+  return { ...item, partial, rangeLabel, label: partial ? `${rangeLabel} (parcial)` : item.label };
+}
+function aggregatePeriods(rows, granularity, bounds = null) {
   const map = new Map(); rows.forEach((row) => { const bucket = periodBucket(row.data, granularity, row); if (!map.has(bucket.key)) map.set(bucket.key, { key: bucket.key, label: bucket.label, rows: [] }); map.get(bucket.key).rows.push(row); });
-  return [...map.values()].sort((a, b) => a.key.localeCompare(b.key)).map((item) => ({ ...item, ...summarize(item.rows) }));
+  return [...map.values()].sort((a, b) => a.key.localeCompare(b.key)).map((item) => ({ ...clippedPeriodLabel(item, granularity, bounds), ...summarize(item.rows) }));
 }
 function periodReading(item) { if (!item) return "Sem dados"; if (!item.complete) return item.coverage > 0 ? "Cobertura parcial" : "Sessoes ausentes"; if (item.rate === null) return "Sem denominador valido"; return item.rate >= 0.02 ? "Acima de 2%" : "Acompanhar conversao"; }
 function periodLimit(granularity) { return { hour: 48, day: 31, "day-over-day": 31, week: 12, month: 12, quarter: 8, semester: 6, year: 5 }[granularity] || 12; }
@@ -465,7 +533,7 @@ async function loadGrowthNetwork() {
 }
 function hydrateData(commercial, growth, alternative, cached = false) {
   const previousPeriod = state.start ? { preset: $("#period-preset").value, start: state.start, end: state.end,
-    compareEnabled: state.compareEnabled, compareMode: state.compareMode, compareStart: state.compareStart, compareEnd: state.compareEnd, selectedGranularity: state.selectedGranularity } : null;
+    compareEnabled: state.compareEnabled, compareMode: state.compareMode, compareStart: state.compareStart, compareEnd: state.compareEnd } : null;
   state.commercial = commercial || null;
   state.rows = normalizedRows(commercial?.rows || []);
   state.growthPayload = growth && growth.ok !== false && Array.isArray(growth.data) ? growth : null;
@@ -492,7 +560,6 @@ function hydrateData(commercial, growth, alternative, cached = false) {
   if (previousPeriod) {
     Object.assign(state, previousPeriod);
     if (previousPeriod.preset !== 'custom') applyPeriodPreset(previousPeriod.preset);
-    state.selectedGranularity = previousPeriod.selectedGranularity;
     $("#period-preset").value = previousPeriod.preset;
     $("#date-start").value = state.start; $("#date-end").value = state.end;
   }
@@ -527,30 +594,38 @@ function setupEvents() {
   $("#compare-start").onchange = (event) => { state.compareMode = "custom"; state.compareStart = event.target.value; renderAll(); };
   $("#compare-end").onchange = (event) => { state.compareMode = "custom"; state.compareEnd = event.target.value; renderAll(); };
   $("#product-search").oninput = (event) => { state.productSearch = event.target.value; filtersForProducts(); renderExplorer(); };
-  document.querySelectorAll("[data-granularity]").forEach((button) => { button.onclick = () => { if (button.dataset.granularity === "hour" && !state.hourlyAvailable) return; state.selectedGranularity = button.dataset.granularity; renderAll(); }; });
   $("#rhythm-metric").onchange = (event) => { state.rhythmMetric = event.target.value; renderRhythm(); };
   $("#chart-metric").onchange = (event) => { state.chartMetric = event.target.value; renderChart(); };
   $("#explorer-sort").onchange = (event) => { state.explorerSort = event.target.value; state.explorerSortDirection = "desc"; renderExplorer(); };
   $("#explorer-search").oninput = (event) => { state.explorerSearch = event.target.value; renderExplorer(); };
 }
-async function loadData({ background = false } = {}) {
+let growthLoadPromise = null;
+function loadData(options = {}) {
+  if (!growthLoadPromise) growthLoadPromise = performLoadData(options).finally(() => { growthLoadPromise = null; });
+  return growthLoadPromise;
+}
+async function performLoadData({ background = false } = {}) {
   if (!background) showLoadingScreen();
   $("#source-status").textContent = "Carregando SSOT";
   $("#source-pill").textContent = "Validando fonte";
   $("#source-pill").className = "status-pill pending";
   let cachedGrowth = null;
+  let commercial = state.commercial;
   try {
-    const [localGrowth, commercial] = await Promise.all([
+    const [localGrowth, loadedCommercial] = await Promise.all([
       loadJson('data/ssot-growth-views.json', 5000).catch(() => null),
       loadJson('data/ssot-commercial-channels.json', 10000).catch(() => null),
     ]);
+    commercial = loadedCommercial || commercial;
     if (localGrowth?.ok && Array.isArray(localGrowth.data)) {
       hydrateData(commercial, localGrowth, null, false);
       return;
     }
     setLoadingStep("01", "Verificando a ultima leitura");
     cachedGrowth = await readGrowthCache();
-    const cacheIsAlreadyDisplayed = cachedGrowth?.generatedAt && cachedGrowth.generatedAt === state.growthPayload?.generatedAt;
+    if (state.growthPayload && (!cachedGrowth || Date.parse(state.growthPayload.generatedAt) >= Date.parse(cachedGrowth.generatedAt))) cachedGrowth = state.growthPayload;
+    const cacheIsAlreadyDisplayed = cachedGrowth?.generatedAt && cachedGrowth.generatedAt === state.growthPayload?.generatedAt
+      && commercial?.extracted_at === state.commercial?.extracted_at;
     if (cachedGrowth?.ok && Array.isArray(cachedGrowth.data) && !cacheIsAlreadyDisplayed) {
       setLoadingStep("02", "Atualizando dados do periodo");
       hydrateData(commercial, cachedGrowth, null, true);
@@ -564,7 +639,7 @@ async function loadData({ background = false } = {}) {
     }
     if (!commercial) throw new Error('Snapshot comercial indisponivel');
     setLoadingStep("03", "Aplicando leitura de contingencia");
-    hydrateData(commercial, null, null, false);
+    hydrateData(commercial, cachedGrowth, null, Boolean(cachedGrowth));
   } catch (error) {
     if (cachedGrowth?.ok && Array.isArray(cachedGrowth.data)) {
       $("#source-status").textContent = "SSOT em cache";
@@ -574,9 +649,9 @@ async function loadData({ background = false } = {}) {
       $("#validation-summary").textContent = `A leitura ao vivo falhou: ${error.message}. Exibindo a ultima leitura validada.`;
     } else {
       try {
-        const commercial = await loadJson("data/ssot-commercial-channels.json");
+        commercial = commercial || await loadJson("data/ssot-commercial-channels.json");
         setLoadingStep("03", "Aplicando leitura de contingencia");
-        hydrateData(commercial, null, null, false);
+        hydrateData(commercial, state.growthPayload, null, Boolean(state.growthPayload));
       } catch (fallbackError) {
         $("#source-status").textContent = "Fonte indisponivel";
         $("#source-pill").textContent = "Erro de fonte";
@@ -593,10 +668,11 @@ async function loadData({ background = false } = {}) {
 if (typeof window !== 'undefined') {
   let pendingGrowthRefresh = false;
   const flushGrowthRefresh = () => {
-    if (!pendingGrowthRefresh || document.activeElement?.closest('#growth-workspace input, #growth-workspace select, #growth-workspace textarea')) return;
+    if (!pendingGrowthRefresh || document.querySelector('#growth-filter-dialog')?.open || document.activeElement?.closest('#growth-workspace input, #growth-workspace select, #growth-workspace textarea')) return;
     pendingGrowthRefresh = false;
     loadData({ background: true });
   };
   window.addEventListener('panorama:data-refreshed', () => { pendingGrowthRefresh = true; flushGrowthRefresh(); });
   document.addEventListener('focusout', () => setTimeout(flushGrowthRefresh, 0));
+  document.querySelector('#growth-filter-dialog')?.addEventListener('close', flushGrowthRefresh);
 }

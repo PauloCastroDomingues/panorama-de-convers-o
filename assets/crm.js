@@ -398,7 +398,44 @@
     });
     bindTable();
   };
-  const renderDetailTabs = () => { const tabs = [{ id: "all", name: "Visao geral" }, ...(crmState.data?.channels || [])]; $crm("#crm-channel-tabs").innerHTML = tabs.map((tab) => `<button type="button" role="tab" aria-selected="${crmState.channel === tab.id}" class="crm-channel-tab ${crmState.channel === tab.id ? "active" : ""}" data-crm-tab="${esc(tab.id)}">${CrmIcons(tab.id === 'all' ? 'LayoutDashboard' : tab.id === 'email' ? 'Mail' : 'MessageCircle')}<span>${esc(tab.name)}</span></button>`).join(""); $crm("#crm-channel-tabs").querySelectorAll("[data-crm-tab]").forEach((button) => button.addEventListener("click", () => { crmState.channel = button.dataset.crmTab; $crm("#crm-channel-filter").value = crmState.channel; crmApplyPeriodPreset(crmState.periodPreset); syncCrmPeriodControls(); artifactOptions.pacingPage = artifactOptions.trackingPage = 0; rebuildCrmData(); })); };
+  const crmBar = $crm('#crm-analysis-bar');
+  const growthBar = $crm('#growth-workspace > .unified-filterbar');
+  const stickySizes = new ResizeObserver(() => {
+    const height = crmBar.getBoundingClientRect().height + growthBar.getBoundingClientRect().height;
+    document.documentElement.style.setProperty('--analysis-bar-height', `${height}px`);
+  });
+  stickySizes.observe(growthBar);
+  stickySizes.observe(crmBar);
+  const renderDetailTabs = () => {
+    const tabs = [{ id: "all", name: "Visao geral" }, ...(crmState.data?.channels || [])];
+    const root = $crm("#crm-channel-tabs");
+    root.innerHTML = tabs.map(tab => `<button type="button" role="tab" aria-controls="crm-detail" tabindex="${crmState.channel === tab.id ? 0 : -1}" aria-selected="${crmState.channel === tab.id}" class="crm-channel-tab ${crmState.channel === tab.id ? 'active' : ''}" data-crm-tab="${esc(tab.id)}">${CrmIcons(tab.id === 'all' ? 'LayoutDashboard' : tab.id === 'email' ? 'Mail' : 'MessageCircle')}<span>${esc(tab.name)}</span></button>`).join("");
+    const revealSelected = () => {
+      const selected = root.querySelector('[aria-selected="true"]');
+      if (!selected) return;
+      const box = selected.getBoundingClientRect(), viewport = root.getBoundingClientRect();
+      if (box.left < viewport.left) root.scrollLeft += box.left - viewport.left;
+      else if (box.right > viewport.right) root.scrollLeft += box.right - viewport.right;
+    };
+    revealSelected();
+    const activate = id => {
+      crmState.channel = id;
+      $crm("#crm-channel-filter").value = id;
+      crmApplyPeriodPreset(crmState.periodPreset);
+      syncCrmPeriodControls();
+      artifactOptions.pacingPage = artifactOptions.trackingPage = 0;
+      rebuildCrmData();
+      root.querySelector('[aria-selected="true"]').focus({ preventScroll: true });
+    };
+    root.querySelectorAll('[data-crm-tab]').forEach(button => { button.onclick = () => activate(button.dataset.crmTab); });
+    root.onkeydown = event => {
+      if (!event.target.matches('[data-crm-tab]') || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const index = tabs.findIndex(tab => tab.id === crmState.channel);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      activate(tabs[next].id);
+    };
+  };
   const bindTracking = (channel) => { const root = $crm("#crm-detail"); root.querySelectorAll("[data-track-field]").forEach((input) => input.addEventListener("input", (event) => { const values = readTracking(channel); const row = Number(event.target.dataset.trackRow); values[row] = values[row] || {}; values[row][event.target.dataset.trackField] = event.target.value === "" ? "" : Number(event.target.value); localStorage.setItem(trackingKey(channel), JSON.stringify(values)); renderDetail(); })); root.querySelector('[data-track-action="reset"]')?.addEventListener("click", () => { localStorage.removeItem(trackingKey(channel)); renderDetail(); }); root.querySelector('[data-track-action="export"]')?.addEventListener("click", () => { const blob = new Blob([JSON.stringify(readTracking(channel), null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `crm-${channel.id}-acompanhamento.json`; link.click(); URL.revokeObjectURL(link.href); }); root.querySelector("#crm-track-import")?.addEventListener("change", (event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { try { const parsed = JSON.parse(reader.result); const imported = parsed?.data || parsed; if (!imported || typeof imported !== "object" || Array.isArray(imported)) throw new Error("Formato invalido"); localStorage.setItem(trackingKey(channel), JSON.stringify(imported)); renderDetail(); } catch (error) { window.alert("Arquivo de acompanhamento invalido."); } }; reader.readAsText(file); }); };
   const artifactOptions = { activationMode: 'actual', mode: 'actual', pacingPage: 0, trackingPage: 0 };
   const detailOpen = new Map();
@@ -446,12 +483,13 @@
       $crm("#crm-source-label").textContent = channel.sourceLabel;
     } else if (channel?.sendflow) {
       $crm("#crm-validation-banner").className = "callout validation-banner warn";
-      $crm("#crm-validation-banner strong").textContent = "SendFlow: extracao validada";
+      $crm("#crm-validation-banner strong").textContent = channel.sendflow.activity.available ? "SendFlow: leitura operacional" : "SendFlow: sem atividade carregada no recorte";
       $crm("#crm-validation-banner span:not(.callout-mark)").textContent = ` ${crmState.sendflow.actions.length} acoes; ${crmState.sendflow.messages.length} mensagens. Cobertura: ${sourceDateLabel(crmState.sendflow.source.coverage.start)} a ${sourceDateLabel(crmState.sendflow.source.coverage.end)}. SSOT e ativacao permanecem separados.`;
       $crm("#crm-source-label").textContent = channel.sourceLabel;
     } else {
-      $crm("#crm-validation-banner").className = "callout validation-banner valid";
-      $crm("#crm-validation-banner strong").textContent = "Fontes CRM independentes";
+      const operationalFailed = channel?.id === 'whatsapp-oficial' && whatsappSource.status === 'error';
+      $crm("#crm-validation-banner").className = `callout validation-banner ${operationalFailed ? 'warn' : 'valid'}`;
+      $crm("#crm-validation-banner strong").textContent = operationalFailed ? "Falha na leitura da ativacao; SSOT independente" : "Fontes CRM independentes";
       $crm("#crm-validation-banner span:not(.callout-mark)").textContent = ` WhatsApp Oficial: planilha original somente leitura. SendFlow: ${crmState.sendflow ? "snapshot disponivel" : crmState.sendflowError || "indisponivel"}. RD Station: ${crmState.rd ? "piloto disponivel" : crmState.rdError || "sem carga"}.`;
       $crm("#crm-source-label").textContent = channel?.sourceLabel || "Fontes por canal";
     }
@@ -543,16 +581,38 @@
     });
   };
   const readSendflow = async () => {
-    const configResponse = await fetch("data/crm-sendflow-config.json");
-    if (!configResponse.ok) throw new Error("Configuracao SendFlow indisponivel");
-    const config = await configResponse.json();
-    const cacheKey = new URL("data/crm-sendflow-last-valid.json", location.href).href;
+    const packagedRequest = fetch("data/crm-sendflow-snapshot.json", { cache: 'no-store', signal: AbortSignal.timeout(12000) })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Snapshot SendFlow: HTTP ${response.status}`);
+        return CrmSendFlow.validate(await response.json());
+      }).catch(() => null);
+    let endpoint = '';
     try {
-      if (config.endpoint) {
-        if (config.endpoint !== "/api/crm-sendflow") throw new Error("Ponte SendFlow deve ser do mesmo projeto");
-        const live = await fetch(config.endpoint, { signal: AbortSignal.timeout(15000) });
+      const configResponse = await fetch("data/crm-sendflow-config.json", { cache: 'no-store', signal: AbortSignal.timeout(3000) });
+      if (configResponse.ok) endpoint = (await configResponse.json()).endpoint || '';
+    } catch (error) { /* A configuration failure must not hide the local source. */ }
+    const cacheKey = new URL("data/crm-sendflow-last-valid.json", location.href).href;
+    let cached = null;
+    if (endpoint === '/api/crm-sendflow' && typeof caches !== "undefined") {
+      try {
+        const cache = await caches.open("panorama-crm-sendflow-v1");
+        const response = await cache.match(cacheKey);
+        if (response) {
+          cached = CrmSendFlow.validate(await response.json());
+          cached.source.mode = 'cached_sheet';
+        }
+      } catch (error) { /* Reject invalid browser snapshots. */ }
+    }
+    const packaged = await packagedRequest;
+    const newest = (left, right) => !left ? right : !right ? left : Date.parse(right.source.extractedAt) > Date.parse(left.source.extractedAt) ? right : left;
+    const previous = newest(packaged, cached);
+    try {
+      if (endpoint) {
+        if (endpoint !== "/api/crm-sendflow") throw new Error("Ponte SendFlow deve ser do mesmo projeto");
+        const live = await fetch(endpoint, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
         if (live.ok) {
           const snapshot = CrmSendFlow.validate(await live.json());
+          if (newest(previous, snapshot) === previous) return previous;
           if (typeof caches !== "undefined") {
             try { const cache = await caches.open("panorama-crm-sendflow-v1"); await cache.put(cacheKey, new Response(JSON.stringify(snapshot), { headers: { "content-type": "application/json" } })); } catch (error) { /* Browser caching is optional. */ }
           }
@@ -560,16 +620,8 @@
         }
       }
     } catch (error) { /* An optional server bridge must not block the validated snapshot. */ }
-    if (config.endpoint && typeof caches !== "undefined") {
-      try {
-        const cache = await caches.open("panorama-crm-sendflow-v1");
-        const previous = await cache.match(cacheKey);
-        if (previous) { const snapshot = CrmSendFlow.validate(await previous.json()); snapshot.source.mode = "cached_sheet"; return snapshot; }
-      } catch (error) { /* Reject invalid caches and retain the packaged snapshot. */ }
-    }
-    const response = await fetch("data/crm-sendflow-snapshot.json", { cache: 'no-store', signal: AbortSignal.timeout(12000) });
-    if (!response.ok) throw new Error(`Snapshot SendFlow: HTTP ${response.status}`);
-    return CrmSendFlow.validate(await response.json());
+    if (previous) return previous;
+    throw new Error('Nenhuma leitura SendFlow valida disponivel');
   };
   const readRd = async () => {
     let endpoint = "", accountId = "", warning = "";
@@ -664,30 +716,36 @@
     const button = $crm('#crm-refresh'), feedback = $crm('#crm-refresh-result');
     button.disabled = true; button.textContent = 'Consultando...'; feedback.textContent = '';
     let failed = false;
-    const commercial = readCommercialSnapshot().then((snapshot) => {
-      for (const id of ['email', 'whatsapp-oficial', 'whatsapp-organico']) {
-        const previous = CrmSendFlow.availableDates(crmState.ssotFallback, id).at(-1);
-        const next = CrmSendFlow.availableDates(snapshot, id).at(-1);
-        if (previous && (!next || next < previous)) throw new Error('Extracao SSOT recebida esta atrasada');
-      }
-      if (snapshot.extracted_at !== crmState.ssotFallback?.extracted_at) {
-        crmState.ssotFallback = { ...snapshot, crmSourceMode: 'snapshot' }; pendingRender = true; flushRefresh();
-      }
-    }).catch(() => { failed = true; });
-    const operational = [
-      readRd().then((value) => { if (value.observedAt !== crmState.rd?.observedAt || value.readMode !== crmState.rd?.readMode || value.readWarning !== crmState.rd?.readWarning) { crmState.rd = value; pendingRender = true; } }),
-      readSendflow().then((value) => { if (value.source.extractedAt !== crmState.sendflow?.source.extractedAt || value.source.mode !== crmState.sendflow?.source.mode) { crmState.sendflow = value; pendingRender = true; } }),
-      readWhatsApp().then((rows) => {
-        if (!rows.length) throw new Error('Planilha operacional vazia');
-        if (whatsappSource.status !== 'ready') pendingRender = true;
-        whatsappSource.status = 'ready';
-        if (JSON.stringify(rows) !== JSON.stringify(crmState.campaigns)) { crmState.campaigns = rows; pendingRender = true; }
-      }).catch(() => { whatsappSource.status = 'error'; pendingRender = true; throw new Error('Planilha operacional indisponivel'); }),
-    ];
-    const results = await Promise.allSettled([commercial, ...operational]);
-    failed ||= results.some((result) => result.status === 'rejected');
-    flushRefresh(); renderFreshness();
-    refreshing = false; button.disabled = false; button.textContent = 'Atualizar leitura';
+    try {
+      const commercial = readCommercialSnapshot().then((snapshot) => {
+        for (const id of ['email', 'whatsapp-oficial', 'whatsapp-organico']) {
+          const previous = CrmSendFlow.availableDates(crmState.ssotFallback, id).at(-1);
+          const next = CrmSendFlow.availableDates(snapshot, id).at(-1);
+          if (previous && (!next || next < previous)) throw new Error('Extracao SSOT recebida esta atrasada');
+        }
+        if (snapshot.extracted_at !== crmState.ssotFallback?.extracted_at) {
+          crmState.ssotFallback = { ...snapshot, crmSourceMode: 'snapshot' }; pendingRender = true;
+        }
+      }).catch(() => { failed = true; });
+      const operational = [
+        readRd().then((value) => { if (value.observedAt !== crmState.rd?.observedAt || value.readMode !== crmState.rd?.readMode || value.readWarning !== crmState.rd?.readWarning) { crmState.rd = value; pendingRender = true; } }),
+        readSendflow().then((value) => { if (value.source.extractedAt !== crmState.sendflow?.source.extractedAt || value.source.mode !== crmState.sendflow?.source.mode) { crmState.sendflow = value; pendingRender = true; } }),
+        readWhatsApp().then((rows) => {
+          if (!rows.length) throw new Error('Planilha operacional vazia');
+          if (whatsappSource.status !== 'ready') pendingRender = true;
+          whatsappSource.status = 'ready';
+          if (JSON.stringify(rows) !== JSON.stringify(crmState.campaigns)) { crmState.campaigns = rows; pendingRender = true; }
+        }).catch(() => { whatsappSource.status = 'error'; pendingRender = true; throw new Error('Planilha operacional indisponivel'); }),
+      ];
+      const results = await Promise.allSettled([commercial, ...operational]);
+      failed ||= results.some((result) => result.status === 'rejected');
+      flushRefresh(); renderFreshness();
+    } catch (error) {
+      failed = true;
+      pendingRender = true;
+    } finally {
+      refreshing = false; button.disabled = false; button.textContent = 'Atualizar leitura';
+    }
     feedback.textContent = failed ? 'Falha em uma fonte. Ultima leitura valida preservada.' : `Leitura conferida as ${new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(new Date())}`;
   };
   const boot = async () => {

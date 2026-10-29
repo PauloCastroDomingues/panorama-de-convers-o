@@ -1,4 +1,4 @@
-"""Refresh the last 30 days of the local SSOT snapshot using SELECTs and ADC.
+"""Refresh recent origin details and full paid-channel history using SELECTs and ADC.
 
 Run with .venv/Scripts/python.exe scripts/refresh_crm_ssot.py [--end YYYY-MM-DD].
 No source writes, credential exports, scheduling, or deployment are performed.
@@ -38,17 +38,26 @@ KEY_FIELDS = ("data", "canal", "canal_detalhe", "origem")
 SCHEMA = {"data": "DATE", "canal": "STRING", "canal_detalhe": "STRING", "origem": "STRING",
           "sessoes": "INTEGER", "pedidos_total": "INTEGER", "receita_total": "NUMERIC", "investimento": "FLOAT"}
 BRIDGE_SCHEMA = {"data": "DATE", "canal": "STRING", "sessoes": "INTEGER"}
+PAID_TOTALS_SCHEMA = {**BRIDGE_SCHEMA, "pedidos_total": "INTEGER", "receita_total": "NUMERIC"}
 QUERIES = {
     "commercial_daily": f"""SELECT data, canal, canal_detalhe, origem, sessoes,
        pedidos_total AS pedidos, receita_total AS receita, investimento
 FROM `{SOURCE}`
-WHERE data BETWEEN @start_date AND @end_date
+WHERE data BETWEEN @google_start_date AND @end_date
+  AND (data >= @start_date OR canal_detalhe IN ('Meta Ads 1', 'Meta Ads 2', 'Google ADS'))
 ORDER BY data, canal, canal_detalhe, origem""",
     "google_sessions": f"""SELECT data, sessoes
 FROM `{BRIDGE}`
 WHERE data BETWEEN @google_start_date AND @end_date
   AND {BRIDGE_FILTER}
 ORDER BY data""",
+    "paid_channel_totals": f"""SELECT data, canal, canal AS canal_detalhe,
+       'Consolidado do canal SSOT' AS origem, sessoes,
+       pedidos_total AS pedidos, receita_total AS receita
+FROM `{BRIDGE}`
+WHERE data BETWEEN @google_start_date AND @end_date
+  AND canal IN ('Meta ADS', 'Google ADS')
+ORDER BY data, canal""",
 }
 CRM = {"email": "E-mail", "whatsapp-oficial": "WhatsApp Oficial", "whatsapp-organico": "WhatsApp Organico"}
 CRM_LABELS = {"email": "email", "whatsappoficial": "whatsapp-oficial",
@@ -220,6 +229,52 @@ def reject_regression(previous, rows, end):
                 raise RefreshError("metric_coverage_regression")
 
 
+def paid_channel_snapshot(raw, end, previous=None):
+    rows = normalize_rows(raw, end)
+    seen = set()
+    for row in rows:
+        key = (row['data'], row['canal'])
+        if row['canal'] not in {'Meta ADS', 'Google ADS'} or row['canal_detalhe'] != row['canal']:
+            raise RefreshError('invalid_paid_channel')
+        if key in seen:
+            raise RefreshError('duplicate_paid_channel_day')
+        seen.add(key)
+    previous = previous or {}
+    if previous and previous.get('source') not in {BRIDGE, SOURCE}:
+        raise RefreshError('paid_channel_contract_mismatch')
+    old_daily, new_daily = daily_totals(previous.get('rows', [])), daily_totals(rows)
+    for key, old in old_daily.items():
+        for metric in METRICS:
+            if old[metric] is not None and new_daily.get(key, {}).get(metric) is None:
+                raise RefreshError('paid_channel_coverage_regression')
+    return {'source': BRIDGE, 'grain': 'data + canal', 'start': START.isoformat(),
+            'end': end.isoformat(), 'read_only': True,
+            'mapping': 'Meta consolidado e Google; sem rateio por conta e sem soma com linhas detalhadas',
+            'rows': rows}
+
+
+def reconcile_paid_totals(origins, history, end):
+    """Keep live commercial numerators; use historical sessions only when absent."""
+    origins = normalize_rows(origins, end)
+    grouped = defaultdict(list)
+    for row in origins:
+        label = channel(row)
+        if label not in {'Meta Ads 1', 'Meta Ads 2', 'Google ADS'}:
+            continue
+        label = 'Meta ADS' if label.startswith('Meta Ads') else label
+        grouped[(row['data'], label)].append(dict(row, canal=label, canal_detalhe=label))
+    fallback = {(row['data'], row['canal']): row for row in normalize_rows(history, end)}
+    result = []
+    for day, label in sorted(set(grouped) | set(fallback)):
+        key = (day, label)
+        metrics = daily_totals(grouped[key]).get(key, {metric: None for metric in METRICS})
+        if metrics['sessoes'] is None:
+            metrics['sessoes'] = fallback.get(key, {}).get('sessoes')
+        result.append({'data': day, 'canal': label, 'canal_detalhe': label,
+                       'origem': 'Consolidado do canal SSOT', **metrics})
+    return result
+
+
 def refresh_status(rows, end, checked_at, error=None):
     target = end.isoformat()
     expected = (end - START).days + 1
@@ -266,7 +321,7 @@ def fetch_sources(end):
     client = bigquery.Client(project=PROJECT, location=LOCATION)
     try:
         metadata = inspect_source(client, SOURCE, SCHEMA)
-        bridge_metadata = inspect_source(client, BRIDGE, BRIDGE_SCHEMA, table_type="TABLE")
+        bridge_metadata = inspect_source(client, BRIDGE, PAID_TOTALS_SCHEMA, table_type="TABLE")
         parameters = [bigquery.ScalarQueryParameter("start_date", "DATE", refresh_start(end)),
                       bigquery.ScalarQueryParameter("google_start_date", "DATE", START),
                       bigquery.ScalarQueryParameter("end_date", "DATE", end)]
@@ -309,7 +364,8 @@ def fetch_sources(end):
                                "total_bytes_billed": MAX_BYTES - remaining, "queries": QUERIES,
                                "query_start": refresh_start(end).isoformat(), "query_end": end.isoformat(),
                                "google_query_start": START.isoformat()}
-        return results["commercial_daily"], results["google_sessions"], metadata, jobs, estimates
+        metadata['refresh']['paid_history_start'] = START.isoformat()
+        return results["commercial_daily"], results["google_sessions"], metadata, jobs, estimates, results["paid_channel_totals"]
     finally:
         client.close()
 
@@ -354,13 +410,28 @@ def run(end, output=OUTPUT, status_output=STATUS_OUTPUT, fetch=fetch_sources):
             raise RefreshError("invalid_target_date")
         if end.isoformat() < previous["end"]:
             raise RefreshError("window_regression")
-        raw, bridge, metadata, jobs, estimates = fetch(end)
+        raw, bridge, metadata, jobs, estimates, *paid_totals = fetch(end)
+        if previous.get('paid_channel_totals') and not paid_totals:
+            raise RefreshError('missing_paid_channel_refresh')
+        full_paid_history = metadata.get('refresh', {}).get('paid_history_start') == START.isoformat()
+        paid_raw = paid_totals[0] if paid_totals else None
+        if full_paid_history and paid_raw is not None:
+            paid_raw = reconcile_paid_totals(raw, paid_raw, end)
+        paid_snapshot = paid_channel_snapshot(paid_raw, end, previous.get('paid_channel_totals')) if paid_raw is not None else None
+        if full_paid_history and paid_snapshot:
+            paid_snapshot.update(source=SOURCE, session_history_source=BRIDGE,
+                mapping='Pedidos e receita da visao por origem; sessoes somadas dessa visao, com complemento historico apenas quando ausentes; sem rateio por conta')
         start = refresh_start(end).isoformat()
         canonical = normalize_rows([row for row in raw if iso_date(row["data"]) >= start], end)
         updated, bridge_stats = apply_bridge(canonical, [row for row in bridge if iso_date(row["data"]) >= start], end)
         preserved = [row for row in previous["rows"] if row["data"] < start]
+        if full_paid_history:
+            paid_labels = {'Meta Ads 1', 'Meta Ads 2', 'Google ADS'}
+            history = normalize_rows([row for row in raw if channel(row) in paid_labels], end)
+            preserved = [row for row in preserved if channel(row) not in paid_labels]
+            preserved.extend(row for row in history if row['data'] < start)
         # Reconcile Google's complete history from the same commercial contract.
-        # Other historical channels and all historical orders/revenue stay intact.
+        # Historical CRM rows stay intact; paid numerators come from the live view.
         historical_bridge = [row for row in bridge if iso_date(row["data"]) < start]
         if preserved and historical_bridge:
             history = [dict(row, sessoes=None) for row in preserved if channel(row) == "Google ADS"]
@@ -379,6 +450,8 @@ def run(end, output=OUTPUT, status_output=STATUS_OUTPUT, fetch=fetch_sources):
                     "timezone": "America/Sao_Paulo", "start": START.isoformat(), "end": end.isoformat(),
                     "extracted_at": now, "rows": rows, "row_count": len(rows),
                     "metadata": metadata, "jobs": jobs, "estimates": estimates}
+        if paid_snapshot is not None:
+            snapshot['paid_channel_totals'] = {**paid_snapshot, 'extracted_at': now}
         status = refresh_status(rows, end, now)
         atomic_json(output, snapshot, expected_bytes=original)
     except Exception as error:
