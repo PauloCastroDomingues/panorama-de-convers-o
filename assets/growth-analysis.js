@@ -75,6 +75,7 @@ function filtersForProducts() {
   $("#active-product-filter").textContent = productFilterActive() ? `${active.length} produto(s) no filtro` : `${catalog.length} produtos`;
 }
 function withComparison(current, compare) {
+  if (state.compareEnabled === false) compare = null;
   const base = current || { ...summarize([]), dimension: compare?.dimension || "", key: compare?.key || "" };
   return { ...base, compare,
     comparisonPedidos: compare?.pedidos ?? null, comparisonSessoes: compare?.sessoes ?? null,
@@ -96,6 +97,7 @@ function recordsForDisplay(view) {
 }
 function recordSemaphore(record) {
   if (record?.rate == null) return { tone: "warn", label: "Validar base", title: "A conversao exige pedidos e visitas completos no mesmo recorte." };
+  if (state.compareEnabled === false) return { tone: "neutral", label: "Atual", title: "Comparacao de periodos desligada." };
   const previous = record.compare;
   if (previous?.rate == null) return { tone: "neutral", label: "Sem historico", title: "Nao ha base comparavel para avaliar a variacao." };
   const change = record.rate - previous.rate;
@@ -105,6 +107,7 @@ function recordSemaphore(record) {
 }
 function nextIndicator(record) {
   if (record.rate == null) return "Validar cobertura de visitas e pedidos";
+  if (state.compareEnabled === false) return "Investigar produto, oferta e mix do canal";
   if (record.compare?.rate == null) return "Conferir cobertura do periodo anterior";
   const visits = relativeComparison(record.sessoes, record.compare.sessoes);
   const conversion = delta(record, record.compare);
@@ -121,9 +124,9 @@ function semaphoreMarkup(record) {
   return `<span class="semaphore ${signal.tone}" title="${escapeHtml(signal.title)}"><i></i>${signal.label}</span>`;
 }
 function metricComparisonCell(record, key) {
+  if (state.compareEnabled === false) return `<strong>${metricText(record[key], key)}</strong>`;
   const previous = record.compare?.[key] ?? null;
-  const change = comparisonLabel(record[key], previous, key === "rate" ? "rate" : "number");
-  return `<div class="metric-pair"><strong>${metricText(record[key], key)}</strong><small>Anterior: ${metricText(previous, key)}</small><span class="metric-change">${escapeHtml(change)}</span></div>`;
+  return `<div class="metric-pair"><strong>${metricText(record[key], key)}</strong><small>Anterior: ${metricText(previous, key)}</small>${PerformanceDelta.markup(PerformanceDelta.describe(record[key], previous, { rate: key === 'rate' }))}</div>`;
 }
 function comparisonLabel(current, previous, format = "number") {
   if (!Number.isFinite(current) || !Number.isFinite(previous)) return "Fora da cobertura comparavel";
@@ -144,7 +147,8 @@ function renderSummary() {
     const node = $(`#${id}`); node.textContent = metricText(total[key], key);
     let compare = node.parentElement.querySelector(".kpi-comparison");
     if (!compare) { compare = document.createElement("div"); compare.className = "kpi-comparison"; node.after(compare); }
-    compare.innerHTML = `<span>Anterior: ${metricText(total.compare[key], key)}</span><b>${escapeHtml(comparisonLabel(total[key], total.compare[key], key === "rate" ? "rate" : "number"))}</b>`;
+    compare.hidden = state.compareEnabled === false;
+    compare.innerHTML = compare.hidden ? '' : `<span>Anterior: ${metricText(total.compare?.[key], key)}</span>${PerformanceDelta.markup(PerformanceDelta.describe(total[key], total.compare?.[key], { rate: key === 'rate' }))}`;
   });
   $("#metric-sessions").parentElement.firstElementChild.textContent = productFilterActive() ? "Visitas ao produto" : "Sessoes SSOT";
   $("#metric-orders").parentElement.firstElementChild.textContent = productFilterActive() ? "Pedidos por produto" : "Pedidos";
@@ -157,6 +161,7 @@ function renderSummary() {
 
 // Compare elapsed days rather than pairing arrays: missing days must keep their place.
 function pairedPeriods(rows, previousRows, granularity) {
+  if (state.compareEnabled === false) return aggregatePeriods(rows, granularity).map((row) => withComparison(row, null));
   const offset = Math.round((toDate(state.start) - toDate(state.compareStart)) / 86400000);
   const current = new Map(aggregatePeriods(rows, granularity).map((row) => [row.key, row]));
   const projected = previousRows.map((row) => ({ ...row, data: shiftDate(row.data, offset), originalDate: row.data }));
@@ -189,7 +194,7 @@ function drawPeriodChart(box, series, metric) {
   const max = chartMax(metric, known);
   const x = (i) => margin.left + (axis.length === 1 ? plotWidth / 2 : i / (axis.length - 1) * plotWidth);
   const y = (value) => margin.top + plotHeight - value / max * plotHeight;
-  const svg = [`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${metricLabel(metric)} no periodo atual e comparado">`];
+  const svg = [`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${metricLabel(metric)} no periodo atual${series.some((item) => item.dashed) ? ' e comparado' : ''}">`];
   for (let tick = 0; tick <= 4; tick++) {
     const value = max / 4 * tick;
     svg.push(`<line x1="${margin.left}" y1="${y(value)}" x2="${width - margin.right}" y2="${y(value)}" stroke="var(--line)"/><text x="${margin.left - 10}" y="${y(value) + 4}" text-anchor="end" fill="var(--muted)" font-size="10">${escapeHtml(metricText(value, metric))}</text>`);
@@ -212,6 +217,7 @@ function drawPeriodChart(box, series, metric) {
   window.ReiseCharts?.prepare(box);
 }
 function periodSeries(pairs, label, color) {
+  if (state.compareEnabled === false) return [{ label, color, periods: pairs }];
   return [
     { label: `${label} / Atual`, color, periods: pairs },
     { label: `${label} / Comparado`, color, dashed: true, periods: pairs.map((row) => ({ ...summarize([]), ...row.compare, key: row.key })) },
@@ -221,7 +227,7 @@ function renderRhythmChart(periods) { drawPeriodChart($("#rhythm-chart"), period
 function renderMiniPeriod(id, item, metric) {
   $(`#${id}-label`).textContent = item?.label || "Fora da cobertura";
   $(`#${id}-value`).textContent = metricText(item?.[metric] ?? null, metric);
-  $(`#${id}-note`).textContent = item ? `Anterior: ${metricText(item.compare?.[metric] ?? null, metric)} / ${comparisonLabel(item[metric], item.compare?.[metric], metric === "rate" ? "rate" : "number")}` : "Sem observacao na fonte";
+  $(`#${id}-note`).innerHTML = state.compareEnabled === false ? '' : item ? `<span>Anterior: ${metricText(item.compare?.[metric] ?? null, metric)}</span> ${PerformanceDelta.markup(PerformanceDelta.describe(item[metric], item.compare?.[metric], { rate: metric === 'rate' }))}` : "Sem observacao na fonte";
 }
 function tableSortHeader(label, key, target, active, direction) {
   return `<th scope="col" aria-sort="${active === key ? direction === 'asc' ? 'ascending' : 'descending' : 'none'}"><button type="button" class="table-sort ${active === key ? 'active' : ''}" data-${target}-sort="${key}">${label}<span aria-hidden="true">${active === key ? direction === 'asc' ? '&#8593;' : '&#8595;' : '&#8597;'}</span></button></th>`;
@@ -247,7 +253,7 @@ function renderRhythm() {
   $("#rhythm-window").textContent = `${formatWindow()} / ${comparisonWindowLabel()}`;
   $("#ritmo thead tr").innerHTML = `${tableSortHeader("Periodo", "key", "rhythm", state.rhythmSort, state.rhythmSortDirection)}${metricHeaders("rhythm")}<th>Sinal</th><th>Proximo indicador</th>`;
   const sorted = sortRecords(pairs.map((row) => ({ ...row, dimension: row.label })), state.rhythmSort, state.rhythmSortDirection);
-  $("#rhythm-body").innerHTML = sorted.length ? sorted.map((row) => `<tr><td><strong>${escapeHtml(row.label)}</strong><small class="cell-note">Comparado: ${escapeHtml(row.compare?.label || 'Fora da cobertura')}</small></td>${['pedidos','sessoes','receita','rate'].map((key) => `<td>${metricComparisonCell(row, key)}</td>`).join("")}<td>${semaphoreMarkup(row)}</td><td>${escapeHtml(nextIndicator(row))}</td></tr>`).join("") : '<tr><td colspan="7" class="table-empty">Nao ha observacoes para o recorte selecionado.</td></tr>';
+  $("#rhythm-body").innerHTML = sorted.length ? sorted.map((row) => `<tr><td><strong>${escapeHtml(row.label)}</strong>${state.compareEnabled === false ? '' : `<small class="cell-note">Comparado: ${escapeHtml(row.compare?.label || 'Fora da cobertura')}</small>`}</td>${['pedidos','sessoes','receita','rate'].map((key) => `<td>${metricComparisonCell(row, key)}</td>`).join("")}<td>${semaphoreMarkup(row)}</td><td>${escapeHtml(nextIndicator(row))}</td></tr>`).join("") : '<tr><td colspan="7" class="table-empty">Nao ha observacoes para o recorte selecionado.</td></tr>';
   bindTableSort("rhythm", renderRhythm);
   [["last-day", "day"], ["last-week", "week"], ["last-month", "month"]].forEach(([id, granularity]) => renderMiniPeriod(id, pairedPeriods(rows, previous, granularity).filter((row) => row.rows > 0).at(-1), state.rhythmMetric));
   document.querySelectorAll("[data-granularity]").forEach((button) => button.classList.toggle("active", button.dataset.granularity === state.selectedGranularity));
@@ -271,7 +277,7 @@ function renderChart() {
   const series = scopes.flatMap((scope, index) => periodSeries(pairedPeriods(scopeRows(scope, "current"), scopeRows(scope, "compare"), state.selectedGranularity), scope.label, COLORS[index % COLORS.length]));
   drawPeriodChart($("#line-chart"), series, state.chartMetric);
   $("#chart-window").textContent = `${formatWindow()} / ${comparisonWindowLabel()}`;
-  $("#chart-note").textContent = `Atual: ${formatWindow()}. Comparado: ${dayLabel(state.compareStart)} a ${dayLabel(state.compareEnd)}. Datas alinhadas pela posicao no recorte.${dateSpan(state.start,state.end) !== dateSpan(state.compareStart,state.compareEnd) ? ' Os recortes tem duracoes diferentes.' : ''}`;
+  $("#chart-note").textContent = state.compareEnabled === false ? `Atual: ${formatWindow()}.` : `Atual: ${formatWindow()}. Comparado: ${dayLabel(state.compareStart)} a ${dayLabel(state.compareEnd)}. Datas alinhadas pela posicao no recorte.${dateSpan(state.start,state.end) !== dateSpan(state.compareStart,state.compareEnd) ? ' Os recortes tem duracoes diferentes.' : ''}`;
 }
 function explorerColumns(view) {
   const columns = { product: [["Produto", "product"]], channel: [["Canal", "channel"]], campaign: [["Campanha", "campaign"], ["Canal", "channel"]], ad_group: [["Grupo", "group"], ["Campanha", "campaign"]], ad: [["Criativo", "ad"], ["Campanha", "campaign"]], channel_product: [["Produto", "product"], ["Canal", "channel"]], campaign_product: [["Produto", "product"], ["Campanha", "campaign"], ["Canal", "channel"]], ad_group_product: [["Produto", "product"], ["Grupo", "group"]], ad_product: [["Produto", "product"], ["Criativo", "ad"]] };

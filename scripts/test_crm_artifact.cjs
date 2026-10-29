@@ -67,6 +67,8 @@ const options = { start: '2026-10-22', end: '2026-10-22', compareStart: '2026-10
 const html = artifact.pacing({ daily: result.daily, ssotComparison: { daily: [] } }, email, options);
 assert.match(html, /279/);
 assert.match(html, /Anterior 21\/10/);
+const withoutComparison = artifact.pacing({ daily: result.daily, ssotComparison: { daily: [] } }, email, { ...options, compareEnabled: false });
+assert.doesNotMatch(withoutComparison, /Anterior|Comparacao:|performance-delta/);
 assert.match(artifact.pacing({ daily: [] }, email, { ...options, mode: 'plan' }), /Nao sao resultados realizados/);
 const recorded = { '2026-10-22:0': { Cliques: 3 } };
 assert.equal(artifact.trackingSummary('email', email, options, recorded).goal, 2093, 'Click goal comes from planned clicks, not 2121 SSOT sessions');

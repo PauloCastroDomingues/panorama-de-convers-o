@@ -28,14 +28,16 @@ TIMEZONE = ZoneInfo("America/Sao_Paulo")
 START = date(2025, 1, 1)
 MAX_BYTES = 768 * 1024 * 1024
 SOURCE = PROJECT + ".mart_growth_us.aquisicao_por_canal_origem_daily_v"
-BRIDGE = PROJECT + ".mart_growth_us.shopify_channels_daily_shopify_attrib_with_shopify_sessions_human_complete_v"
-BRIDGE_FILTER = "LOWER(canal) = 'google' AND LOWER(tipo) = 'paid'"
+LEGACY_BRIDGE = PROJECT + ".mart_growth_us.shopify_channels_daily_shopify_attrib_with_shopify_sessions_human_complete_v"
+LEGACY_BRIDGE_FILTER = "LOWER(canal) = 'google' AND LOWER(tipo) = 'paid'"
+BRIDGE = PROJECT + ".mart_growth_us.aquisicao_por_canal8_daily"
+BRIDGE_FILTER = "canal = 'Google ADS'"
 KIND = "ssot_commercial_channel_daily_v1"
 METRICS = ("sessoes", "pedidos", "receita")
 KEY_FIELDS = ("data", "canal", "canal_detalhe", "origem")
 SCHEMA = {"data": "DATE", "canal": "STRING", "canal_detalhe": "STRING", "origem": "STRING",
           "sessoes": "INTEGER", "pedidos_total": "INTEGER", "receita_total": "NUMERIC", "investimento": "FLOAT"}
-BRIDGE_SCHEMA = {"data": "DATE", "canal": "STRING", "tipo": "STRING", "sessoes": "INTEGER"}
+BRIDGE_SCHEMA = {"data": "DATE", "canal": "STRING", "sessoes": "INTEGER"}
 QUERIES = {
     "commercial_daily": f"""SELECT data, canal, canal_detalhe, origem, sessoes,
        pedidos_total AS pedidos, receita_total AS receita, investimento
@@ -44,7 +46,7 @@ WHERE data BETWEEN @start_date AND @end_date
 ORDER BY data, canal, canal_detalhe, origem""",
     "google_sessions": f"""SELECT data, sessoes
 FROM `{BRIDGE}`
-WHERE data BETWEEN @start_date AND @end_date
+WHERE data BETWEEN @google_start_date AND @end_date
   AND {BRIDGE_FILTER}
 ORDER BY data""",
 }
@@ -142,6 +144,8 @@ def apply_bridge(rows, bridge_rows, end):
         day = iso_date(row["data"])
         if not START.isoformat() <= day <= end.isoformat():
             raise RefreshError("bridge_outside_window")
+        if day in sessions:
+            raise RefreshError("duplicate_google_channel_day")
         sessions[day].append(count(row["sessoes"]))
     merged = added = 0
     for day, values in sorted(sessions.items()):
@@ -193,7 +197,9 @@ def validate_previous(snapshot):
     if snapshot.get("kind") != KIND or snapshot.get("source") != SOURCE or snapshot.get("start") != START.isoformat():
         raise RefreshError("snapshot_contract_mismatch")
     bridge = snapshot.get("metadata", {}).get("session_bridge", {})
-    if bridge.get("source") != BRIDGE or bridge.get("filter") != BRIDGE_FILTER:
+    if (bridge.get("source"), bridge.get("filter")) not in {
+        (BRIDGE, BRIDGE_FILTER), (LEGACY_BRIDGE, LEGACY_BRIDGE_FILTER)
+    }:
         raise RefreshError("unverified_existing_bridge")
     normalize_rows(snapshot["rows"], date.fromisoformat(snapshot["end"]))
 
@@ -244,10 +250,10 @@ def refresh_status(rows, end, checked_at, error=None):
             "channels": channels, "status": state, "error": error}
 
 
-def inspect_source(client, source, required):
+def inspect_source(client, source, required, table_type="VIEW"):
     table = client.get_table(source)
     schema = {field.name: field.field_type for field in table.schema}
-    if table.location != LOCATION or table.table_type != "VIEW" or not table.view_query:
+    if table.location != LOCATION or table.table_type != table_type or (table_type == "VIEW" and not table.view_query):
         raise RefreshError("source_view_mismatch")
     if any(schema.get(name) != kind for name, kind in required.items()):
         raise RefreshError("source_schema_mismatch")
@@ -260,8 +266,9 @@ def fetch_sources(end):
     client = bigquery.Client(project=PROJECT, location=LOCATION)
     try:
         metadata = inspect_source(client, SOURCE, SCHEMA)
-        bridge_metadata = inspect_source(client, BRIDGE, BRIDGE_SCHEMA)
+        bridge_metadata = inspect_source(client, BRIDGE, BRIDGE_SCHEMA, table_type="TABLE")
         parameters = [bigquery.ScalarQueryParameter("start_date", "DATE", refresh_start(end)),
+                      bigquery.ScalarQueryParameter("google_start_date", "DATE", START),
                       bigquery.ScalarQueryParameter("end_date", "DATE", end)]
         estimates, jobs, results = {}, [], {}
         for name, sql in QUERIES.items():
@@ -295,12 +302,13 @@ def fetch_sources(end):
             if remaining < 0:
                 raise RefreshError("query_budget_exceeded")
         metadata["session_bridge"] = {"source": BRIDGE, "filter": BRIDGE_FILTER,
-            "mapping": "somente sessoes da origem bruta Google para o canal oficial Google ADS",
+            "mapping": "sessoes comerciais do canal Google ADS; nao usa sessoes_ga4 nem fechamento Shopify",
             "orders_and_revenue": "preservados da fonte oficial aquisicao_por_canal_origem_daily_v",
             **bridge_metadata}
         metadata["refresh"] = {"read_only": True, "maximum_total_bytes_billed": MAX_BYTES,
                                "total_bytes_billed": MAX_BYTES - remaining, "queries": QUERIES,
-                               "query_start": refresh_start(end).isoformat(), "query_end": end.isoformat()}
+                               "query_start": refresh_start(end).isoformat(), "query_end": end.isoformat(),
+                               "google_query_start": START.isoformat()}
         return results["commercial_daily"], results["google_sessions"], metadata, jobs, estimates
     finally:
         client.close()
@@ -351,6 +359,13 @@ def run(end, output=OUTPUT, status_output=STATUS_OUTPUT, fetch=fetch_sources):
         canonical = normalize_rows([row for row in raw if iso_date(row["data"]) >= start], end)
         updated, bridge_stats = apply_bridge(canonical, [row for row in bridge if iso_date(row["data"]) >= start], end)
         preserved = [row for row in previous["rows"] if row["data"] < start]
+        # Reconcile Google's complete history from the same commercial contract.
+        # Other historical channels and all historical orders/revenue stay intact.
+        historical_bridge = [row for row in bridge if iso_date(row["data"]) < start]
+        if preserved and historical_bridge:
+            history = [dict(row, sessoes=None) for row in preserved if channel(row) == "Google ADS"]
+            repaired_google, _ = apply_bridge(history, historical_bridge, end)
+            preserved = [row for row in preserved if channel(row) != "Google ADS"] + repaired_google
         # Replace complete dates in the lookback, never union old and new origins.
         rows = sorted(preserved + updated, key=lambda row: tuple(row[name] or "" for name in KEY_FIELDS))
         reject_regression(previous, rows, end)

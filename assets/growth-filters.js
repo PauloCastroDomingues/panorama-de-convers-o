@@ -1,4 +1,4 @@
-const filterKeys = ['start','end','compareStart','compareEnd','compareMode','selectedChannel','selectedProduct','selectedModel','selectedColor','selectedSize','productSearch','selectedView','selectedGranularity','chartFilter','chartChannels','chartMetric','rhythmMetric'];
+const filterKeys = ['start','end','compareStart','compareEnd','compareMode','compareEnabled','selectedChannel','selectedProduct','selectedModel','selectedColor','selectedSize','productSearch','selectedView','selectedGranularity','chartFilter','chartChannels','chartMetric','rhythmMetric'];
 let filterDraft = null;
 let filterSearchTimer = null;
 let filterOriginalPreset = 'current-day';
@@ -32,6 +32,8 @@ function renderFilterDraft() {
   for (const input of filterForm.querySelectorAll('input[type="date"]')) input.setCustomValidity('');
   inFilterDraft(() => {
     setupFilters();
+    $("#compare-enabled").checked = state.compareEnabled;
+    for (const id of ['compare-mode','compare-start','compare-end']) $(`#${id}`).disabled = !state.compareEnabled;
     $("#period-preset").value = filterDraft.preset;
     $("#date-start").value = state.start; $("#date-end").value = state.end;
     $("#product-search").value = state.productSearch;
@@ -87,6 +89,7 @@ function handleFilterEdit(event) {
     inFilterDraft(() => {
       if (node.id === 'period-preset') { filterDraft.preset = node.value; applyPeriodPreset(node.value); }
       if (node.id === 'compare-mode') { state.compareMode = node.value; applyComparison(); }
+      if (node.id === 'compare-enabled') state.compareEnabled = node.checked;
       if (node.id === 'date-start' || node.id === 'date-end') {
         state[node.id === 'date-start' ? 'start' : 'end'] = node.value;
         filterDraft.preset = 'custom'; applyComparison(); suggestGranularityForWindow();
@@ -107,6 +110,7 @@ filterForm.addEventListener('submit', (event) => {
   clearTimeout(filterSearchTimer);
   const values = filterDraft.values;
   for (const [start,end,id] of [[values.start,values.end,'date-end'], [values.compareStart,values.compareEnd,'compare-end']]) {
+    if (id === 'compare-end' && !values.compareEnabled) continue;
     const node = $(`#${id}`);
     node.setCustomValidity(!start || !end || start > end ? 'Informe um periodo valido, com fim igual ou posterior ao inicio.' : '');
     if (!node.reportValidity()) return;
@@ -125,6 +129,7 @@ $("#clear-filters").onclick = () => {
   for (const key of ['selectedProduct','selectedModel','selectedColor','selectedSize','selectedChannel','productSearch','chartFilter']) filterDraft.values[key] = '';
   filterDraft.values.chartChannels = [];
   filterDraft.values.compareMode = 'previous';
+  filterDraft.values.compareEnabled = true;
   filterDraft.entities = { a:{view:'channel',key:'Meta Ads 1',query:''}, b:{view:'channel',key:'Google ADS',query:''} };
   filterDraft.preset = 'current-day';
   inFilterDraft(() => applyPeriodPreset('current-day'));

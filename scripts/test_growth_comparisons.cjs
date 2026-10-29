@@ -8,6 +8,7 @@ vm.runInContext(fs.readFileSync(path.join(root, 'assets/app.js'), 'utf8'), conte
 const comparisonCode = fs.readFileSync(path.join(root, 'assets/growth-analysis.js'), 'utf8');
 vm.runInContext(comparisonCode.slice(0, comparisonCode.lastIndexOf('setupEvents();')), context);
 const evaluate = (code) => vm.runInContext(code, context);
+vm.runInContext(fs.readFileSync(path.join(root, 'assets/performance-delta.js'), 'utf8'), context);
 evaluate(`
   state.start = '2026-10-26'; state.end = '2026-10-28';
   state.compareStart = '2026-10-23'; state.compareEnd = '2026-10-25';
@@ -48,4 +49,13 @@ assert.equal(evaluate("canonicalChannel({canal:'Meta Ads'})"), 'Facebook (1 + 2)
 assert.equal(evaluate("recordSemaphore({rate:.05,compare:{rate:.06}}).tone"), 'bad');
 assert.equal(evaluate("recordSemaphore({rate:.05,compare:null}).tone"), 'neutral');
 assert.equal(evaluate("nextIndicator({rate:.04,sessoes:100,compare:{rate:.05,sessoes:90}})"), 'Investigar carrinho, checkout e oferta');
-console.log('Growth comparison checks passed: date windows, product scope, nulls, weighted conversion, missing days and independent A/B selections.');
+evaluate('state.compareEnabled = false');
+assert.equal(evaluate("groups(VIEWS.find(v=>v.key==='product'),'compare').length"), 0);
+assert.equal(evaluate("recordsForDisplay(VIEWS.find(v=>v.key==='product')).records.some(r=>r.key==='old')"), false);
+assert.equal(evaluate("pairedPeriods([], [{data:'2026-10-24',pedidos:2,sessoes:100}], 'day').length"), 0);
+assert.equal(evaluate("periodSeries(pairs, 'Pedidos', '#fb5d06').length"), 1);
+assert.doesNotMatch(evaluate("metricComparisonCell({pedidos:10,compare:{pedidos:5}},'pedidos')"), /Anterior|performance-delta/);
+assert.equal(evaluate("entitySelection('a').pedidos"), 4, 'Independent A/B selection keeps working without period comparison');
+evaluate('state.compareEnabled = true');
+assert.equal(evaluate("entitySelection('a').compare.pedidos"), 2);
+console.log('Growth comparison checks passed, including comparison off/on.');

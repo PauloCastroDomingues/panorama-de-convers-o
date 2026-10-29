@@ -1,0 +1,14 @@
+const assert = require('node:assert/strict');
+const { describe, markup } = require('../assets/performance-delta.js');
+assert.equal(describe(120, 100).tone, 'good');
+assert.equal(describe(80, 100).tone, 'bad');
+assert.equal(describe(80, 100, { lowerIsBetter: true }).tone, 'good');
+assert.equal(describe(120, 100, { lowerIsBetter: true }).tone, 'bad');
+assert.equal(describe(100, 100).tone, 'neutral');
+assert.equal(describe(null, 10).direction, 'unknown');
+assert.equal(describe(10, 0).tone, 'neutral');
+assert.equal(describe(10, 1, { complete: false }).direction, 'unknown');
+assert.equal(describe(10, 1, { neutral: true }).tone, 'neutral');
+assert.equal(describe(.02, .01, { rate: true }).text, '+1,00 p.p.');
+assert.match(markup(describe(10, 20)), /data-direction="down"/);
+console.log('Performance signals: polarity, missingness, zero baseline and percentage points OK.');

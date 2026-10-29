@@ -1,6 +1,6 @@
 (() => {
   const $crm = (selector) => document.querySelector(selector);
-  const crmState = { data: null, channel: "whatsapp-oficial", campaigns: [], ssotPayload: null, ssotFallback: null, sendflow: null, sendflowError: "", sendflowPage: 0, sendflowSort: "sentAt", sendflowDirection: -1, rd: null, rdError: "", rdPage: 0, rdSort: "sentAt", rdDirection: -1, rdSearch: "", rdIssueFilter: "all", referenceData: null, availableStart: "", availableEnd: "", start: "", end: "", periodPreset: "current-day", compareMode: "previous", compareStart: "", compareEnd: "" };
+  const crmState = { data: null, channel: "whatsapp-oficial", campaigns: [], ssotPayload: null, ssotFallback: null, sendflow: null, sendflowError: "", sendflowPage: 0, sendflowSort: "sentAt", sendflowDirection: -1, rd: null, rdError: "", rdPage: 0, rdSort: "sentAt", rdDirection: -1, rdSearch: "", rdIssueFilter: "all", referenceData: null, availableStart: "", availableEnd: "", start: "", end: "", periodPreset: "current-day", compareMode: "previous", compareEnabled: true, compareStart: "", compareEnd: "" };
   const WHATSAPP_OFFICIAL_CSV_URL = "https://docs.google.com/spreadsheets/d/1vlkkrA52FBGk79k0ou3vch1XqM-AdHVDj42IXO7hIZo/export?format=csv&gid=404910707";
   const whatsappSource = { status: 'loading' };
   const SSOT_GROWTH_API_URL = "https://script.google.com/macros/s/AKfycby7GYHJIvpKE1hwh3hCq9atS_zKQXaz4oYQ6nzzzGFdvCr-h2sfMATeTst9qgdzghKE8w/exec";
@@ -42,7 +42,7 @@
     if (crmState.compareMode === "year-ago") { crmState.compareStart = crmShiftYear(crmState.start, -1); crmState.compareEnd = crmShiftYear(crmState.end, -1); return; }
     const days = crmDateSpan(crmState.start, crmState.end); crmState.compareEnd = crmShiftDate(crmState.start, -1); crmState.compareStart = crmShiftDate(crmState.compareEnd, -(days - 1));
   };
-  const crmComparisonLabel = () => crmState.compareStart && crmState.compareEnd ? `Comparacao: ${sourceDateLabel(crmState.compareStart)} a ${sourceDateLabel(crmState.compareEnd)}` : "Comparacao nao definida";
+  const crmComparisonLabel = () => !crmState.compareEnabled ? "Sem comparacao" : crmState.compareStart && crmState.compareEnd ? `Comparacao: ${sourceDateLabel(crmState.compareStart)} a ${sourceDateLabel(crmState.compareEnd)}` : "Comparacao nao definida";
   const commercialSource = (channel) => CrmSendFlow.latestCommercialSource([crmState.ssotPayload, crmState.ssotFallback], channel);
   const commercialDates = () => {
     const channels = crmState.channel === 'all' ? ['email', 'whatsapp-oficial', 'whatsapp-organico'] : [crmState.channel];
@@ -97,7 +97,7 @@
     });
     const daily = [...dailyMap.values()].sort((left, right) => left.date.localeCompare(right.date)).map((row) => ({ ...row, rate: row.sessions !== null && row.sessions > 0 && row.orders !== null ? row.orders / row.sessions : null }));
     const staticMetrics = new Map((referenceChannel.metrics || []).map((item) => [item.key, item])); const actualMetric = (key, label, actual, format, invertGood = false) => ({ key, label, meta: staticMetrics.get(key)?.meta ?? null, actual, format, invertGood });
-    const categories = [...new Set(currentRows.map((row) => row.category).filter(Boolean))]; const segments = categories.map((category) => { const rows = currentRows.filter((row) => row.category === category); const planned = referenceChannel.segments?.find((segment) => segment.name === category); const actual = [{ label: "Publico", value: sourceSum(rows, "audience") }, { label: "Entregues", value: sourceSum(rows, "delivered") }, { label: "Aberturas", value: sourceSum(rows, "opens") }, { label: "Cliques", value: sourceSum(rows, "clicks") }]; actual.forEach((stage, index) => { const previous = actual[index - 1]; if (index > 0 && previous?.value > 0 && stage.value !== null) stage.rate = stage.value / previous.value; }); return { name: category, plannedShots: planned?.plannedShots ?? null, actualShots: rows.length, planned: planned?.planned || [], actual, diagnosis: `${rows.length} disparo(s) consolidados diretamente da planilha de WhatsApp Oficial. A conversao usa pedidos / sessoes somente quando as duas metricas existem.` }; });
+    const categories = [...new Set(currentRows.map((row) => row.category).filter(Boolean))]; const segments = categories.map((category) => { const rows = currentRows.filter((row) => row.category === category); const planned = referenceChannel.segments?.find((segment) => segment.name === category); const actual = [["Publico", "audience"], ["Entregues", "delivered"], ["Aberturas", "opens"], ["Cliques", "clicks"]].map(([label, field]) => ({ label, value: sourceSum(rows, field), complete: rows.every(row => Number.isFinite(row[field])) })); actual.forEach((stage, index) => { const previous = actual[index - 1]; if (index > 0 && previous?.value > 0 && stage.value !== null) stage.rate = stage.value / previous.value; }); return { name: category, plannedShots: planned?.plannedShots ?? null, actualShots: rows.length, planned: planned?.planned || [], actual, diagnosis: `${rows.length} disparo(s) consolidados diretamente da planilha de WhatsApp Oficial. A conversao usa pedidos / sessoes somente quando as duas metricas existem.` }; });
     const sourceActivation = { resultLabel: "Pedidos", metaResult: staticMetrics.get("orders")?.meta ?? null, hint: "Funil observado na base de WhatsApp Oficial, separado por categoria de disparo.", segments: segments.map((segment) => { const segmentRows = currentRows.filter((row) => row.category === segment.name); const segmentOrders = sourceSum(segmentRows, "orders"); return { name: segment.name, shots: segment.actualShots, resultPerShot: segment.actualShots && segmentOrders !== null ? segmentOrders / segment.actualShots : null, stages: segment.actual }; }), tracking: referenceChannel.activation?.tracking || { slots: categories, inputs: [], outputs: [], result: "Pedidos", hint: "Leitura somente da planilha de WhatsApp Oficial." } };
     const periodLabel = `${sourceDateLabel(periodStart)} a ${sourceDateLabel(periodEnd)}`;
     const ssotReconciliation = buildSsotWhatsAppReconciliation(ssotPayload, periodStart, periodEnd);
@@ -117,7 +117,7 @@
   const addPeriodComparison = (channel, comparisonChannel) => {
     if (!channel) return channel;
     const comparisonMetrics = new Map((comparisonChannel?.metrics || []).map((metric) => [metric.key, metric.actual]));
-    return { ...channel, metrics: (channel.metrics || []).map((metric) => ({ ...metric, comparison: comparisonMetrics.has(metric.key) ? comparisonMetrics.get(metric.key) : null })) };
+    return { ...channel, activationComparison: comparisonChannel?.activation ?? null, metrics: (channel.metrics || []).map((metric) => ({ ...metric, comparison: comparisonMetrics.has(metric.key) ? comparisonMetrics.get(metric.key) : null })) };
   };
   const rebuildCrmData = () => {
     const referenceChannels = crmState.referenceData.channels || [];
@@ -164,15 +164,14 @@
     return { text: `${relative >= 0 ? "+" : ""}${(relative * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}% vs. meta`, tone };
   };
   const formatPeriodDelta = (metric) => {
-    if (metric.currentComplete === false || metric.comparisonComplete === false) return { text: "Comparacao sem cobertura completa", tone: "neutral" };
-    if (metric.comparison === undefined) return { text: "", tone: "neutral" };
-    if (metric.actual === null || metric.comparison === null) return { text: "Sem comparacao", tone: "neutral" };
-    if (metric.comparison === 0) return { text: metric.actual === 0 ? "Estavel vs. periodo" : "Novo no periodo", tone: metric.actual === 0 ? "neutral" : "good" };
-    const difference = metric.actual - metric.comparison;
-    if (metric.format === "percent") return { text: `${difference >= 0 ? "+" : ""}${(difference * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} p.p.`, tone: difference >= 0 ? "good" : "bad" };
-    const relative = difference / Math.abs(metric.comparison);
-    return { text: `${relative >= 0 ? "+" : ""}${(relative * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}% vs. periodo`, tone: relative >= 0 ? "good" : "bad" };
+    if (!crmState.compareEnabled) return { text: "", tone: "neutral", direction: "unknown" };
+    return PerformanceDelta.describe(metric.actual, metric.comparison, {
+      rate: metric.format === 'percent', lowerIsBetter: metric.invertGood,
+      neutral: metric.key === 'investment',
+      complete: metric.currentComplete !== false && metric.comparisonComplete !== false
+    });
   };
+  const periodMarkup = (metric) => crmState.compareEnabled ? PerformanceDelta.markup(formatPeriodDelta(metric)) : "";
   const selectedChannels = () => {
     if (!crmState.data) return [];
     return crmState.channel === "all" ? crmState.data.channels : crmState.data.channels.filter((channel) => channel.id === crmState.channel);
@@ -182,14 +181,14 @@
   const renderMetricCells = (metrics) => metrics.map((metric) => {
     const delta = formatDelta(metric);
     const periodDelta = formatPeriodDelta(metric);
-    return `<div class="crm-metric"><span>${esc(metric.label)}</span><strong>${formatValue(metric.actual, metric.format)}</strong>${metric.meta !== null ? `<small>Meta ${formatValue(metric.meta, metric.format)}</small><em class="${delta.tone}">${esc(delta.text)}</em>` : ""}${periodDelta.text ? `<em class="${periodDelta.tone}">${esc(periodDelta.text)}</em>` : ""}</div>`;
+    return `<div class="crm-metric"><span>${esc(metric.label)}</span><strong>${formatValue(metric.actual, metric.format)}</strong>${metric.meta !== null ? `<small>Meta ${formatValue(metric.meta, metric.format)}</small><em class="${delta.tone}">${esc(delta.text)}</em>` : ""}${periodMarkup(metric)}</div>`;
   }).join("");
   const renderSummary = () => {
     const metrics = aggregate(selectedChannels());
     const orders = metrics.find((metric) => metric.key === 'orders'), revenue = metrics.find((metric) => metric.key === 'revenue');
     const ticket = (field, complete) => complete && orders[field] > 0 && revenue[field] !== null ? revenue[field] / orders[field] : null;
     metrics.push({ key: 'ticket', format: 'money', meta: null, actual: ticket('actual', orders.currentComplete && revenue.currentComplete), comparison: ticket('comparison', orders.comparisonComplete && revenue.comparisonComplete) });
-    $crm("#crm-summary-kpis").innerHTML = metrics.map((metric) => `<article class="kpi"><span>${esc(metric.key === "rate" ? "Conversao SSOT" : metric.key === "sessions" ? metric.currentComplete === false ? "Sessoes conhecidas SSOT" : "Sessoes SSOT" : metric.key === "orders" ? "Pedidos SSOT" : "Receita SSOT")}</span><strong>${formatValue(metric.actual, metric.format)}</strong>${metric.meta !== null ? `<small>Meta ${formatValue(metric.meta, metric.format)}</small>` : ""}<small>${esc(formatPeriodDelta(metric).text)}</small></article>`).join("");
+    $crm("#crm-summary-kpis").innerHTML = metrics.map((metric) => `<article class="kpi"><span>${esc(metric.key === "rate" ? "Conversao SSOT" : metric.key === "sessions" ? metric.currentComplete === false ? "Sessoes conhecidas SSOT" : "Sessoes SSOT" : metric.key === "orders" ? "Pedidos SSOT" : "Receita SSOT")}</span><strong>${formatValue(metric.actual, metric.format)}</strong>${metric.meta !== null ? `<small>Meta ${formatValue(metric.meta, metric.format)}</small>` : ""}${periodMarkup(metric)}</article>`).join("");
     $crm('#crm-summary-kpis .kpi:last-child > span').textContent = 'Ticket medio SSOT';
     const calendar = commercialDates(), latest = calendar.at(-1);
     const sourceRoot = $crm('#crm-commercial-availability');
@@ -211,7 +210,7 @@
     const rows = channels.flatMap((channel) => channel.metrics.filter((metric) => ["sessions", "orders", "revenue", "rate"].includes(metric.key)).map((metric) => {
       const delta = formatPeriodDelta(metric);
       const label = { sessions: metric.currentComplete === false ? "Sessoes conhecidas" : "Sessoes", orders: "Pedidos", revenue: "Receita", rate: "Conversao" }[metric.key];
-      return `<tr>${singleChannel ? "" : `<td>${esc(channel.name)}</td>`}<td>${label}</td><td>${formatValue(metric.actual, metric.format)}</td><td>${formatValue(metric.comparison, metric.format)}</td><td class="${delta.tone}">${esc(delta.text)}</td></tr>`;
+      return `<tr>${singleChannel ? "" : `<td>${esc(channel.name)}</td>`}<td>${label}</td><td>${formatValue(metric.actual, metric.format)}</td>${crmState.compareEnabled ? `<td>${formatValue(metric.comparison, metric.format)}</td><td>${periodMarkup(metric)}</td>` : ""}</tr>`;
     })).join("");
     const complete = channels.every((channel) => channel.ssotCommercial.complete);
     const channel = channels.length === 1 ? channels[0] : null;
@@ -222,7 +221,7 @@
       return `<tr><td>${esc(metric.label)}</td><td>${formatValue(metric.actual, metric.format)}</td><td>${formatValue(official, metric.format)}</td><td>${formatValue(official !== null ? metric.actual - official : null, metric.format)}</td></tr>`;
     }).join("")}</tbody></table></div>` : "";
     root.hidden = false;
-    root.innerHTML = `<div class="crm-reconciliation-head"><div><p class="eyebrow">Cruzamento de fontes</p><h3>${channel?.id === "whatsapp-organico" ? "WhatsApp Organico: SSOT + SendFlow" : "Resultado comercial por canal no SSOT"}</h3><p>Canal e periodo sao as chaves da leitura comercial. A ativacao complementa o resultado; nao substitui as vendas nem comprova atribuicao por mensagem.</p></div><span class="status-pill ${complete ? "ok" : "warn"}">${complete ? "SSOT completo no recorte" : "Cobertura da extracao SSOT parcial"}</span></div><div class="table-scroll"><table class="data-table crm-reconciliation-table ${singleChannel ? "single-channel" : ""}"><thead><tr>${singleChannel ? "" : "<th>Canal</th>"}<th>Indicador</th><th>SSOT atual</th><th>SSOT comparacao</th><th>Variacao</th></tr></thead><tbody>${rows}</tbody></table></div>${audit}${channels.map((item) => `<p class="crm-reconciliation-note">${esc(item.name)}: ${item.ssotCommercial.sessionsKnownDays}/${item.ssotCommercial.expectedDays} dias com sessoes; ${item.ssotCommercial.ordersKnownDays}/${item.ssotCommercial.expectedDays} com pedidos; ${item.ssotCommercial.revenueKnownDays}/${item.ssotCommercial.expectedDays} com receita. ${item.ssotCommercial.mode === "snapshot" ? "Snapshot SSOT" : "SSOT"}: ${esc(item.ssotCommercial.source)}, extraido em ${esc(item.ssotCommercial.generatedAt || "data nao informada")}. Ativacao: ${esc(item.operationalSource)}.</p>`).join("")}`;
+    root.innerHTML = `<div class="crm-reconciliation-head"><div><p class="eyebrow">Cruzamento de fontes</p><h3>${channel?.id === "whatsapp-organico" ? "WhatsApp Organico: SSOT + SendFlow" : "Resultado comercial por canal no SSOT"}</h3><p>Canal e periodo sao as chaves da leitura comercial. A ativacao complementa o resultado; nao substitui as vendas nem comprova atribuicao por mensagem.</p></div><span class="status-pill ${complete ? "ok" : "warn"}">${complete ? "SSOT completo no recorte" : "Cobertura da extracao SSOT parcial"}</span></div><div class="table-scroll"><table class="data-table crm-reconciliation-table ${singleChannel ? "single-channel" : ""}"><thead><tr>${singleChannel ? "" : "<th>Canal</th>"}<th>Indicador</th><th>SSOT atual</th>${crmState.compareEnabled ? "<th>SSOT comparacao</th><th>Variacao</th>" : ""}</tr></thead><tbody>${rows}</tbody></table></div>${audit}${channels.map((item) => `<p class="crm-reconciliation-note">${esc(item.name)}: ${item.ssotCommercial.sessionsKnownDays}/${item.ssotCommercial.expectedDays} dias com sessoes; ${item.ssotCommercial.ordersKnownDays}/${item.ssotCommercial.expectedDays} com pedidos; ${item.ssotCommercial.revenueKnownDays}/${item.ssotCommercial.expectedDays} com receita. ${item.ssotCommercial.mode === "snapshot" ? "Snapshot SSOT" : "SSOT"}: ${esc(item.ssotCommercial.source)}, extraido em ${esc(item.ssotCommercial.generatedAt || "data nao informada")}. Ativacao: ${esc(item.operationalSource)}.</p>`).join("")}`;
   };
   const renderChannels = () => {
     $crm("#crm-channel-cards").innerHTML = selectedChannels().map((channel) => {
@@ -232,23 +231,14 @@
     }).join("");
   };
   const renderPriorities = () => {
-    const cards = selectedChannels().map((channel) => {
-      const metrics = metricMap(channel), rate = metrics.get("rate"), sessions = metrics.get("sessions");
-      let issue = "Resultado comercial do SSOT; comparacao ainda sem cobertura equivalente";
-      let action = "Cruzar o ritmo de ativacao com sessoes e conversao do canal, sem atribuir vendas a disparos por coincidencia de datas.";
-      let tone = "warn";
-      if (rate?.actual !== null && rate?.comparison !== null && rate?.actual !== undefined && rate?.comparison !== undefined) {
-        issue = `Conversao SSOT: ${percent(rate.actual)} contra ${percent(rate.comparison)} no periodo comparado`;
-        tone = rate.actual >= rate.comparison ? "good" : "bad";
-        action = rate.actual < rate.comparison ? "Investigar produto, oferta, carrinho e checkout. Depois confrontar mudancas na ativacao." : "Verificar se o ganho de eficiencia acompanha o volume de sessoes e pedidos.";
-      } else if (sessions?.currentComplete === false) {
-        issue = "Extracao SSOT com cobertura de sessoes parcial no recorte";
-        action = "Validar a fonte e o mapeamento do canal no SSOT. Isso nao comprova ausencia de dados no projeto de origem.";
-      }
-      if (channel.sendflow?.activity.inconsistentReceipts) action += ` SendFlow: ${channel.sendflow.activity.inconsistentReceipts} mensagens com recibos divergentes; nao interpretar como funil validado.`;
-      return `<article class="crm-priority ${tone}"><div><p class="eyebrow">${tone === "good" ? "Acompanhar resultado" : "Investigar primeiro"}</p><h3>${esc(channel.name)}</h3><strong>${esc(issue)}</strong></div><p>${esc(action)}</p></article>`;
-    }).sort((left, right) => Number(right.includes("Investigar primeiro")) - Number(left.includes("Investigar primeiro")));
-    $crm("#crm-priority-list").innerHTML = cards.join("");
+    $crm("#crm-priority-list").innerHTML = selectedChannels().map(channel => {
+      const reading = CrmDecision.analyze(channel, { compareEnabled: crmState.compareEnabled, days: crmDateSpan(crmState.start, crmState.end), previousDays: crmDateSpan(crmState.compareStart, crmState.compareEnd) });
+      const drivers = reading.drivers.map(driver => `<div><span>${esc(driver.label)}</span><strong>${formatValue(driver.actual, driver.format)}</strong><small>Anterior: ${formatValue(driver.previous, driver.format)}</small>${PerformanceDelta.markup(PerformanceDelta.describe(driver.actual, driver.previous, { rate: driver.format === 'percent' }))}<small class="crm-driver-effect">Contribuicao: ${money(driver.effect)}</small></div>`).join('');
+      const quality = channel.rd ? 'RD: cobertura operacional nao homologada; os contadores nao comprovam atribuicao de vendas.'
+        : channel.sendflow ? (channel.sendflow.activity.available ? 'SendFlow: recibos e vinculo com vendas ainda precisam de validacao.' : 'SendFlow sem registros carregados neste recorte; isso nao significa ausencia de vendas no SSOT.')
+        : 'Ativacao e resultado SSOT pertencem a bases distintas; nao ha atribuicao comprovada por disparo.';
+      return `<article class="crm-decision" data-decision-status="${reading.status}"><header><h3>${esc(channel.name)}</h3><span class="status-pill ${reading.status === 'ready' ? 'ok' : 'warn'}">${reading.status === 'ready' ? 'SSOT: periodos completos' : reading.status === 'off' ? 'Comparacao desligada' : 'Leitura limitada'}</span></header><h4>${esc(reading.title)}</h4>${reading.status === 'ready' ? `<p class="crm-decision-change">Variacao da receita: <strong class="${reading.tone}">${money(reading.delta)}</strong></p><p class="crm-decision-method">Decomposicao matematica da variacao, nao atribuicao de vendas.</p><div class="crm-decision-drivers">${drivers}</div>` : ''}<p class="crm-decision-action"><strong>Proxima verificacao</strong> ${esc(reading.action)}</p><details class="crm-decision-evidence"><summary>Evidencia e limites</summary><p>${esc(quality)}</p><p>Receita = sessoes x conversao x ticket. As contribuicoes distribuem a variacao entre os tres fatores pela media das seis ordens de substituicao. Explicam a conta, nao a causa. Mesma duracao nao elimina sazonalidade nem comprova significancia estatistica.</p></details></article>`;
+    }).join("");
   };
   const funnelRows = (segment) => {
     const actual = new Map(segment.actual.map((stage) => [stage.label, stage]));
@@ -288,30 +278,6 @@
     const rows = (channel.daily || []).map((day) => `<tr><td>${sourceDateLabel(day.date)}</td><td>${int(day.sessions)}</td><td>${int(day.orders)}</td><td>${money(day.revenue)}</td><td>${percent(day.rate)}</td></tr>`).join("");
     return `<div class="crm-detail-card"><h3>Ritmo diario</h3><p class="crm-detail-hint">Realizado no recorte selecionado. A conversao e calculada somente quando sessoes e pedidos existem no mesmo dia.</p><div class="table-scroll"><table class="data-table crm-daily-table"><thead><tr><th>Dia</th><th>Sessoes</th><th>Pedidos</th><th>Receita</th><th>Conversao</th></tr></thead><tbody>${rows || `<tr><td colspan="5" class="table-empty">Sem lancamentos diarios no recorte.</td></tr>`}</tbody></table></div></div>`;
   };
-  const renderActivationGraphic = (activation) => {
-    const numericStage = (value) => value === null || value === undefined || !Number.isFinite(Number(value)) ? null : Number(value);
-    const segmentHtml = activation.segments.map((segment) => {
-      const max = segment.stages.map((stage) => numericStage(stage.value)).find((value) => value !== null) || 1;
-      const bands = segment.stages.slice(0, -1).map((stage, index) => {
-        const next = segment.stages[index + 1];
-        const stageValue = numericStage(stage.value);
-        const nextValue = numericStage(next.value);
-        if (stageValue === null || nextValue === null) return "";
-        const top = Math.max(88 * Math.sqrt(Math.max(stageValue / max, 0)), 5);
-        const bottom = Math.max(88 * Math.sqrt(Math.max(nextValue / max, 0)), 5);
-        const topLeft = (100 - top) / 2;
-        const bottomLeft = (100 - bottom) / 2;
-        return `<polygon points="${topLeft},${index * 28} ${topLeft + top},${index * 28} ${bottomLeft + bottom},${(index + 1) * 28} ${bottomLeft},${(index + 1) * 28}" fill="#e2793f" fill-opacity="${Math.max(.3, .82 - index * .16)}" stroke="#f4934f" stroke-width=".35"/>`;
-      }).join("");
-      const expected = segment.resultPerShot && segment.shots ? segment.resultPerShot * segment.shots : null;
-      return `<div class="crm-chain-column"><div class="crm-chain-head"><strong>${esc(segment.name)}</strong><span>${segment.shots ? `${int(segment.shots)}x na semana` : ""}</span></div><div class="crm-chain-stages">${segment.stages.map((stage) => `<div><span>${esc(stage.label)}</span><b>${int(stage.value)}${stage.rate !== undefined ? ` <small>${percent(stage.rate)}</small>` : ""}</b></div>`).join("")}</div><svg viewBox="0 0 100 ${(segment.stages.length - 1) * 28}" preserveAspectRatio="none" aria-label="Funil de ativacao de ${esc(segment.name)}">${bands}</svg>${segment.resultPerShot ? `<p class="crm-chain-result">Aproximadamente <strong>${int(segment.resultPerShot)}</strong> ${esc(activation.resultLabel.toLowerCase())} por disparo${expected ? ` x ${int(segment.shots)} = <strong>${int(expected)}</strong> esperados` : ""}.</p>` : ""}${segment.source ? `<p class="crm-detail-hint">${esc(segment.source)}</p>` : ""}</div>`;
-    }).join("");
-    const totalShots = activation.segments.reduce((sum, segment) => sum + Number(segment.shots || 0), 0);
-    const expected = activation.combined ? Number(activation.combined.nextValue || 0) * totalShots : activation.segments.reduce((sum, segment) => sum + Number(segment.resultPerShot || 0) * Number(segment.shots || 0), 0);
-    const meta = Number(activation.metaResult || 0); const diff = expected - meta; const delta = meta ? `${diff >= 0 ? "+" : ""}${int(Math.round(diff))} ${esc(activation.resultLabel.toLowerCase())} ${diff >= 0 ? "acima" : "abaixo"} da meta (${percent(diff / meta)})` : "Meta nao informada";
-    const combined = activation.combined ? `<div class="crm-combined-result"><span>${esc(activation.combined.label)}</span><strong>${int(activation.combined.value)}</strong><span>${esc(activation.combined.nextLabel)}</span><strong>${int(activation.combined.nextValue)}</strong><small>${percent(activation.combined.rate)}</small></div>` : "";
-    return `<div class="crm-chain-grid">${segmentHtml}</div>${combined}<div class="crm-activation-summary"><div class="crm-activation-summary-row"><span>Total esperado de ${esc(activation.resultLabel.toLowerCase())} na semana</span><strong>${int(Math.round(expected))}</strong></div><div class="crm-progress"><span style="width:${Math.min(meta ? (expected / meta) * 100 : 0, 100)}%"></span></div><div class="crm-activation-summary-row"><span class="${diff >= 0 ? "good" : "bad"}">${delta}</span><span>Meta: ${int(meta)} ${esc(activation.resultLabel.toLowerCase())}</span></div></div>`;
-  };
   const trackingKey = (channel) => `reise-crm-tracking-${channel.id}`;
   const readTracking = (channel) => { try { return JSON.parse(localStorage.getItem(trackingKey(channel)) || "{}"); } catch (error) { return {}; } };
   const trackingOutput = (channel, row) => {
@@ -325,14 +291,12 @@
   };
   const renderTracking = (channel) => { const activation = channel.activation; const values = readTracking(channel); const rows = activation.tracking.slots.map((slot, index) => { const row = values[index] || {}; const inputs = activation.tracking.inputs.map((field) => `<td><input type="number" min="0" data-track-row="${index}" data-track-field="${esc(field)}" value="${row[field] ?? ""}" aria-label="${esc(`${slot} ${field}`)}"></td>`).join(""); const outputs = trackingOutput(channel, row).map((value) => `<td class="crm-track-output">${value === null ? "Sem dado" : percent(value)}</td>`).join(""); return `<tr><td>${esc(slot)}</td>${inputs}${outputs}</tr>`; }).join(""); const hasEntries = activation.tracking.slots.some((slot, index) => activation.tracking.inputs.some((field) => values[index]?.[field] !== "" && values[index]?.[field] !== null && values[index]?.[field] !== undefined)); const total = hasEntries ? activation.tracking.slots.reduce((sum, slot, index) => { const row = values[index] || {}; const result = row[activation.tracking.result] || 0; return sum + Number(result); }, 0) : null; const totalLabel = total === null ? "Sem lancamentos" : int(total); return `<div class="crm-tracking-head"><div><h3>Acompanhamento</h3><p class="crm-detail-hint">${esc(activation.tracking.hint)} Os valores ficam salvos neste navegador.</p></div><div class="crm-tracking-actions"><button type="button" class="outline-button" data-track-action="export">Exportar</button><label class="outline-button" for="crm-track-import">Importar</label><input id="crm-track-import" type="file" accept="application/json" class="is-hidden"><button type="button" class="outline-button" data-track-action="reset">Limpar</button></div></div><div class="crm-tracking-summary"><strong>${totalLabel}</strong><span>${esc(activation.tracking.result)} registrados · meta ${int(activation.metaResult)} · preenchimento manual</span></div><div class="table-scroll"><table class="data-table crm-tracking-table"><thead><tr><th>Disparo</th>${activation.tracking.inputs.map((field) => `<th>${esc(field)}</th>`).join("")}${activation.tracking.outputs.map((field) => `<th>${esc(field)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`; };
   const sendflowDelta = (value, previous, comparable, invert = false) => {
-    if (!comparable || value === null || previous === null) return '<small class="muted-note">Sem base equivalente de comparacao</small>';
-    const delta = formatPeriodDelta({ actual: value, comparison: previous, format: "int" });
-    const tone = value === previous ? "neutral" : (invert ? value < previous : value > previous) ? "good" : "bad";
-    return `<small class="${tone}">${esc(delta.text)}</small>`;
+    if (!crmState.compareEnabled) return "";
+    return PerformanceDelta.markup(PerformanceDelta.describe(value, previous, { complete: comparable, lowerIsBetter: invert }));
   };
   const renderSendflowDetail = (channel) => {
     const { source, activity: current, comparison, commercial } = channel.sendflow;
-    const comparable = current.complete && comparison.complete;
+    const comparable = crmState.compareEnabled && current.complete && comparison.complete;
     const observed = (value) => value === null ? "Nao informado" : int(value);
     const removalComplete = (value) => value.knownDays === value.expectedDays;
     const tiles = [["Acoes de envio", current.actions, comparison.actions, comparable], ["Mensagens", current.messages, comparison.messages, comparable],
@@ -357,14 +321,14 @@
     const actionRows = pageRows.map((row) => `<tr><td><time datetime="${esc(row.sentAt)}">${sourceDateLabel(row.date)}</time><small class="muted-note">${new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date(row.sentAt))}</small></td><td>${observed(row.messageCount)}</td><td>${observed(row.recipients)}</td><td>${observed(row.delivered)}</td><td>${observed(row.read)}</td><td>${observed(row.played)}</td><td><span class="status-pill ${row.read > row.delivered ? "warn" : "ok"}">${row.read > row.delivered ? "Recibos divergentes" : "Sem divergencia observada"}</span></td></tr>`).join("");
     const movementRows = [["Entradas", "add"], ["Saidas", "remove"], ["Cliques registrados", "clicks"]].map(([label, key]) => {
       const a = current.movement[key], b = comparison.movement[key];
-      return `<tr><td>${label}</td><td>${observed(a.subtotal)}${a.subtotal !== null && !removalComplete(a) ? " (subtotal conhecido)" : ""}</td><td>${a.knownDays}/${a.expectedDays} dias</td><td>${observed(b.subtotal)}</td><td>${sendflowDelta(a.subtotal, b.subtotal, comparable && removalComplete(a) && removalComplete(b), key === "remove")}</td></tr>`;
+      return `<tr><td>${label}</td><td>${observed(a.subtotal)}${a.subtotal !== null && !removalComplete(a) ? " (subtotal conhecido)" : ""}</td><td>${a.knownDays}/${a.expectedDays} dias</td>${crmState.compareEnabled ? `<td>${observed(b.subtotal)}</td><td>${sendflowDelta(a.subtotal, b.subtotal, comparable && removalComplete(a) && removalComplete(b), key === "remove")}</td>` : ""}</tr>`;
     }).join("");
     return `<div class="crm-sendflow-report">
       <div class="crm-sendflow-source"><div><p class="eyebrow">SendFlow | WhatsApp Organico</p><h3>${esc(source.releaseName)}</h3><p>Envios de ${sourceDateLabel(source.coverage.start)} a ${sourceDateLabel(source.coverage.end)}. Recibos acumulados consultados em ${esc(new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(source.extractedAt)))}.</p></div><span class="status-pill warn">${source.mode === "live_sheet" ? "Leitura da planilha" : source.mode === "cached_sheet" ? "Ultima leitura em cache" : "Snapshot validado"}</span></div>
       <div class="crm-sendflow-kpis">${tiles.map(([label, value, previous, valid, invert]) => `<article class="kpi"><span>${label}</span><strong>${observed(value)}</strong>${sendflowDelta(value, previous, valid, invert)}</article>`).join("")}</div>
       <p class="crm-sendflow-warning">${current.available ? `${current.inconsistentReceipts} de ${current.messages} mensagens com leituras maiores que entregas. Contadores preservados; nao representam um funil validado nem pessoas unicas.` : "O recorte selecionado nao esta coberto por esta extracao. Nenhum resultado foi estimado."} ${!current.complete && current.available ? "Cobertura SendFlow parcial no periodo selecionado." : ""}</p>
-      <div class="crm-sendflow-chart"><h3>Ritmo de envio</h3><p class="muted-note">Acoes pela data do primeiro envio, nao horarios de leitura. ${comparable ? "Laranja: periodo atual. Cinza: comparacao." : "Comparacao fora da cobertura desta extracao."}</p>${bars ? `<div class="crm-sendflow-timeline" role="img" aria-label="Acoes por dia de envio" style="grid-template-columns:repeat(${current.daily.length},minmax(6px,1fr))">${bars}</div>` : ""}</div>
-      <h3>Movimentacao da campanha</h3><div class="table-scroll"><table class="data-table"><thead><tr><th>Indicador</th><th>Atual</th><th>Cobertura atual</th><th>Comparacao</th><th>Variacao</th></tr></thead><tbody>${movementRows}</tbody></table></div>
+      <div class="crm-sendflow-chart"><h3>Ritmo de envio</h3><p class="muted-note">Acoes pela data do primeiro envio, nao horarios de leitura. ${!crmState.compareEnabled ? "" : comparable ? "Laranja: periodo atual. Cinza: comparacao." : "Comparacao fora da cobertura desta extracao."}</p>${bars ? `<div class="crm-sendflow-timeline" role="img" aria-label="Acoes por dia de envio" style="grid-template-columns:repeat(${current.daily.length},minmax(6px,1fr))">${bars}</div>` : ""}</div>
+      <h3>Movimentacao da campanha</h3><div class="table-scroll"><table class="data-table"><thead><tr><th>Indicador</th><th>Atual</th><th>Cobertura atual</th>${crmState.compareEnabled ? "<th>Comparacao</th><th>Variacao</th>" : ""}</tr></thead><tbody>${movementRows}</tbody></table></div>
       <p class="muted-note">Datas sem valor nao foram convertidas em zero. Cliques nao representam sessoes. Subtotais incompletos nao recebem sinal de desempenho.</p>
       <div class="crm-sendflow-table-head"><h3>Acoes e recibos</h3><span>${current.actionRows.length} acoes | ${current.messages ?? 0} mensagens</span></div><div class="table-scroll"><table class="data-table crm-sendflow-actions"><thead><tr>${headings.map(([field, label]) => `<th aria-sort="${crmState.sendflowSort === field ? crmState.sendflowDirection > 0 ? "ascending" : "descending" : "none"}"><button type="button" data-sendflow-sort="${field}" title="Ordenar por ${label}">${label} ${crmState.sendflowSort === field ? crmState.sendflowDirection > 0 ? "&#8593;" : "&#8595;" : "&#8597;"}</button></th>`).join("")}<th>Qualidade dos recibos</th></tr></thead><tbody>${actionRows || '<tr><td colspan="7">Nenhuma acao na cobertura selecionada.</td></tr>'}</tbody></table></div>
       <div class="crm-sendflow-pagination"><span>Pagina ${crmState.sendflowPage + 1} de ${pages}</span><button type="button" data-sendflow-page="-1" title="Pagina anterior" aria-label="Pagina anterior" ${crmState.sendflowPage === 0 ? "disabled" : ""}>&larr;</button><button type="button" data-sendflow-page="1" title="Proxima pagina" aria-label="Proxima pagina" ${crmState.sendflowPage + 1 === pages ? "disabled" : ""}>&rarr;</button></div>
@@ -409,7 +373,7 @@
     return `<div class="crm-rd-report"><div class="crm-sendflow-source"><div><p class="eyebrow">E-mail | RD Station</p><h3>Campanhas e engajamento</h3><p>${readLabel}. Coleta de ${clock}. Envios de ${sourceDateLabel(snapshot.period.start)} a ${sourceDateLabel(snapshot.period.end)}; contadores observados por campanha.</p>${snapshot.readWarning ? `<p class="crm-rd-read-warning">${esc(snapshot.readWarning)}</p>` : ""}</div><span class="status-pill warn">Piloto | taxas provisorias</span></div>
       <div class="crm-sendflow-kpis"><article class="kpi"><span>Campanhas observadas</span><strong>${current.records.length}</strong><small>No recorte selecionado</small></article><article class="kpi"><span>Contadores consistentes</span><strong>${current.records.length - current.countIssues}</strong><small>Nao representa homologacao</small></article><article class="kpi"><span>Revisar contadores</span><strong>${current.countIssues}</strong><small>Zeros com atividade registrada</small></article><article class="kpi"><span>Cliques informados</span><strong>${current.receivedTotals.clicked === null ? "Sem coleta" : int(current.receivedTotals.clicked)}</strong><small>Subtotal recebido, nao audiencia unica</small></article></div>
       <p class="crm-sendflow-warning">${current.records.length ? `${current.countIssues} campanhas com ressalvas no recorte. Zeros recebidos preservados; taxas afetadas fora da leitura de desempenho.` : "O recorte nao possui registros nesta extracao; o resultado comercial continua separado no SSOT."} Cobertura total e equivalencia das contagens unicas no MCP ainda nao homologadas.</p>
-      <div class="crm-rd-comparison"><strong>${crmComparisonLabel()}</strong><p>${comparisonText}</p></div>
+      ${crmState.compareEnabled ? `<div class="crm-rd-comparison"><strong>${crmComparisonLabel()}</strong><p>${comparisonText}</p></div>` : ""}
       <div class="crm-rd-tools"><label><span>Campanha</span><input type="search" id="crm-rd-search" placeholder="Buscar por nome" value="${esc(crmState.rdSearch)}"></label><label><span>Contadores</span><select id="crm-rd-quality"><option value="all" ${crmState.rdIssueFilter === "all" ? "selected" : ""}>Todos</option><option value="consistent" ${crmState.rdIssueFilter === "consistent" ? "selected" : ""}>Consistentes</option><option value="review" ${crmState.rdIssueFilter === "review" ? "selected" : ""}>Revisar</option></select></label><button type="button" class="outline-button" data-rd-pilot>Ver periodo da coleta</button></div>
       <p class="crm-rd-rate-note">Taxas provisorias: entrega / selecionados; abertura / entregues; CTOR = cliques / aberturas. Nao sao a conversao comercial nem eventos de engajamento ocorridos no dia do envio.</p>
       <div id="crm-rd-table-root">${renderRdTable(channel)}</div>
@@ -436,26 +400,35 @@
   };
   const renderDetailTabs = () => { const tabs = [{ id: "all", name: "Visao geral" }, ...(crmState.data?.channels || [])]; $crm("#crm-channel-tabs").innerHTML = tabs.map((tab) => `<button type="button" role="tab" aria-selected="${crmState.channel === tab.id}" class="crm-channel-tab ${crmState.channel === tab.id ? "active" : ""}" data-crm-tab="${esc(tab.id)}">${CrmIcons(tab.id === 'all' ? 'LayoutDashboard' : tab.id === 'email' ? 'Mail' : 'MessageCircle')}<span>${esc(tab.name)}</span></button>`).join(""); $crm("#crm-channel-tabs").querySelectorAll("[data-crm-tab]").forEach((button) => button.addEventListener("click", () => { crmState.channel = button.dataset.crmTab; $crm("#crm-channel-filter").value = crmState.channel; crmApplyPeriodPreset(crmState.periodPreset); syncCrmPeriodControls(); artifactOptions.pacingPage = artifactOptions.trackingPage = 0; rebuildCrmData(); })); };
   const bindTracking = (channel) => { const root = $crm("#crm-detail"); root.querySelectorAll("[data-track-field]").forEach((input) => input.addEventListener("input", (event) => { const values = readTracking(channel); const row = Number(event.target.dataset.trackRow); values[row] = values[row] || {}; values[row][event.target.dataset.trackField] = event.target.value === "" ? "" : Number(event.target.value); localStorage.setItem(trackingKey(channel), JSON.stringify(values)); renderDetail(); })); root.querySelector('[data-track-action="reset"]')?.addEventListener("click", () => { localStorage.removeItem(trackingKey(channel)); renderDetail(); }); root.querySelector('[data-track-action="export"]')?.addEventListener("click", () => { const blob = new Blob([JSON.stringify(readTracking(channel), null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `crm-${channel.id}-acompanhamento.json`; link.click(); URL.revokeObjectURL(link.href); }); root.querySelector("#crm-track-import")?.addEventListener("change", (event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { try { const parsed = JSON.parse(reader.result); const imported = parsed?.data || parsed; if (!imported || typeof imported !== "object" || Array.isArray(imported)) throw new Error("Formato invalido"); localStorage.setItem(trackingKey(channel), JSON.stringify(imported)); renderDetail(); } catch (error) { window.alert("Arquivo de acompanhamento invalido."); } }; reader.readAsText(file); }); };
-  const artifactOptions = { mode: 'actual', pacingPage: 0, trackingPage: 0 };
+  const artifactOptions = { activationMode: 'actual', mode: 'actual', pacingPage: 0, trackingPage: 0 };
+  const detailOpen = new Map();
   const renderDetail = () => {
     renderDetailTabs();
     const channel = selectedChannels()[0];
     if (crmState.channel === "all" || !channel) {
-      $crm("#crm-detail").innerHTML = `<div class="table-scroll"><table class="data-table"><thead><tr><th>Canal</th><th>Receita SSOT</th><th>Pedidos</th><th>Sessoes</th><th>Conversao</th></tr></thead><tbody>${selectedChannels().map((item) => `<tr><th>${esc(item.name)}</th>${['revenue', 'orders', 'sessions', 'rate'].map((key) => { const metric = metricMap(item).get(key); return `<td>${formatValue(metric?.actual, metric?.format)}<small>${esc(formatPeriodDelta(metric).text)}</small></td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
+      $crm("#crm-detail").innerHTML = `<div class="table-scroll"><table class="data-table"><thead><tr><th>Canal</th><th>Receita SSOT</th><th>Pedidos</th><th>Sessoes</th><th>Conversao</th></tr></thead><tbody>${selectedChannels().map((item) => `<tr><th>${esc(item.name)}</th>${['revenue', 'orders', 'sessions', 'rate'].map((key) => { const metric = metricMap(item).get(key); return `<td>${formatValue(metric?.actual, metric?.format)}${periodMarkup(metric)}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
       return;
     }
     const metrics = metricMap(channel);
     const reference = crmState.referenceData.channels.find((item) => item.id === channel.id);
-    const activation = { ...reference.activation, resultLabel: channel.id === 'whatsapp-organico' ? 'Sessoes de referencia' : 'Cliques estimados como sessoes' };
-    const options = { ...artifactOptions, start: crmState.start, end: crmState.end, compareStart: crmState.compareStart, compareEnd: crmState.compareEnd, referencePeriod: crmState.referenceData.period, sheetRecords: crmState.campaigns.flatMap((row) => row.trackingRecords || []), sheetStatus: whatsappSource.status };
+    const options = { ...artifactOptions, compareEnabled: crmState.compareEnabled, start: crmState.start, end: crmState.end, compareStart: crmState.compareStart, compareEnd: crmState.compareEnd, referencePeriod: crmState.referenceData.period, sheetRecords: crmState.campaigns.flatMap((row) => row.trackingRecords || []), sheetStatus: whatsappSource.status };
     const orderMetric = metrics.get("orders"), revenueMetric = metrics.get("revenue");
     const ticket = orderMetric?.actual > 0 && revenueMetric?.actual !== null && orderMetric.currentComplete !== false && revenueMetric.currentComplete !== false ? revenueMetric.actual / orderMetric.actual : null;
-    const referenceLabel = `${sourceDateLabel(options.referencePeriod.start)} a ${sourceDateLabel(options.referencePeriod.end)}`;
-    const activationHtml = `<section data-crm-view="activation" class="crm-artifact-activation"><h3>Funil completo de ativacao</h3><p class="crm-detail-hint">Plano do artefato · ${referenceLabel}. ${esc(activation.hint)} Valores planejados, nao realizados no recorte atual.${channel.id === 'whatsapp-organico' ? '' : ' A projecao original assume um clique como uma sessao; essa hipotese nao e usada na conversao SSOT.'}</p>${renderActivationGraphic(activation)}</section>`;
+    const activationHtml = CrmFunnel.render(channel, reference, options);
     const provider = channel.rd ? renderRdDetail(channel) : channel.sendflow ? renderSendflowDetail(channel) : '';
-    $crm("#crm-detail").innerHTML = `<section data-crm-view="conversion" class="crm-artifact-conversion"><div><h3>Funil de conversao</h3><p class="crm-detail-hint">Realizado SSOT · ${crmState.data.period.label}</p>${renderConversionFunnel(channel)}</div><div class="crm-side-stats">${['revenue', 'ticket', 'rate'].map((key) => { const metric = key === 'ticket' ? { actual: ticket, comparison: channel.ssotComparison?.orders > 0 && channel.ssotComparison.complete ? channel.ssotComparison.revenue / channel.ssotComparison.orders : null, format: 'money' } : metrics.get(key); const delta = formatPeriodDelta(metric); return `<div><span>${{ revenue: 'Receita SSOT', ticket: 'Ticket medio SSOT', rate: 'Conversao SSOT' }[key]}</span><strong>${formatValue(metric.actual, metric.format)}</strong><small>Anterior: ${formatValue(metric.comparison, metric.format)}</small><small class="${delta.tone}">${esc(delta.text)}</small></div>`; }).join('')}</div></section>${CrmArtifact.pacing(channel, reference, options)}${activationHtml}${CrmArtifact.tracking(channel, reference, options)}${provider ? `<details class="crm-provider-details" open><summary>Dados operacionais · ${channel.rd ? 'RD Station' : 'SendFlow'}</summary>${provider}</details>` : ''}`;
+    $crm("#crm-detail").innerHTML = `<details class="crm-analysis-details" data-detail-key="conversion"><summary>Conversao comercial e ticket</summary><section data-crm-view="conversion" class="crm-artifact-conversion"><div><h3>Funil de conversao</h3><p class="crm-detail-hint">Realizado SSOT · ${crmState.data.period.label}</p>${renderConversionFunnel(channel)}</div><div class="crm-side-stats">${['revenue', 'ticket', 'rate'].map((key) => { const metric = key === 'ticket' ? { actual: ticket, comparison: channel.ssotComparison?.orders > 0 && channel.ssotComparison.complete ? channel.ssotComparison.revenue / channel.ssotComparison.orders : null, format: 'money' } : metrics.get(key); const delta = formatPeriodDelta(metric); return `<div><span>${{ revenue: 'Receita SSOT', ticket: 'Ticket medio SSOT', rate: 'Conversao SSOT' }[key]}</span><strong>${formatValue(metric.actual, metric.format)}</strong>${crmState.compareEnabled ? `<small>Anterior: ${formatValue(metric.comparison, metric.format)}</small>${periodMarkup(metric)}` : ""}</div>`; }).join('')}</div></section></details><details class="crm-analysis-details" data-detail-key="pacing"><summary>Ritmo diario e metas</summary>${CrmArtifact.pacing(channel, reference, options)}</details>${activationHtml}<details class="crm-analysis-details" data-detail-key="tracking"><summary>Acompanhamento dos envios</summary>${CrmArtifact.tracking(channel, reference, options)}</details>${provider ? `<details class="crm-provider-details" data-detail-key="provider"><summary>Dados operacionais · ${channel.rd ? 'RD Station' : 'SendFlow'}</summary>${provider}</details>` : ''}`;
+    $crm('#crm-detail').querySelectorAll('details[data-detail-key]').forEach(detail => {
+      const key = `${channel.id}:${detail.dataset.detailKey}`;
+      detail.open = detailOpen.get(key) || false;
+      detail.addEventListener('toggle', () => { if (detail.isConnected) detailOpen.set(key, detail.open); });
+    });
     window.ReiseCharts?.prepare($crm('#crm-detail'));
     CrmArtifact.bind($crm('#crm-detail'), channel, reference, options, (patch) => { Object.assign(artifactOptions, patch); renderDetail(); });
+    $crm('#crm-detail').querySelectorAll('button[data-activation-mode]').forEach(button => button.addEventListener('click', () => {
+      artifactOptions.activationMode = button.dataset.activationMode;
+      renderDetail();
+      $crm('#crm-detail').querySelector('button[data-activation-mode][aria-pressed="true"]').focus({ preventScroll: true });
+    }));
     if (channel.rd) bindRdDetail(channel);
     if (channel.sendflow) bindSendflowDetail();
   };
@@ -490,13 +463,15 @@
     $crm("#crm-date-start").value = crmState.start;
     $crm("#crm-date-end").value = crmState.end;
     $crm("#crm-compare-mode").value = crmState.compareMode;
+    $crm("#crm-compare-enabled").checked = crmState.compareEnabled;
+    for (const id of ['crm-compare-mode','crm-compare-start','crm-compare-end']) $crm('#' + id).disabled = !crmState.compareEnabled;
     $crm("#crm-compare-custom-fields").classList.toggle("is-hidden", crmState.compareMode !== "custom");
     $crm("#crm-compare-start").value = crmState.compareStart;
     $crm("#crm-compare-end").value = crmState.compareEnd;
     $crm("#crm-comparison-window").textContent = crmComparisonLabel();
     if (crmState.start && crmState.end) $crm('#crm-period-note').textContent = `${sourceDateLabel(crmState.start)} a ${sourceDateLabel(crmState.end)}`;
   };
-  const crmFilterKeys = ['channel', 'start', 'end', 'periodPreset', 'compareMode', 'compareStart', 'compareEnd'];
+  const crmFilterKeys = ['channel', 'start', 'end', 'periodPreset', 'compareMode', 'compareEnabled', 'compareStart', 'compareEnd'];
   let crmFilterDraft = null;
   const snapshotCrmFilters = () => Object.fromEntries(crmFilterKeys.map((key) => [key, crmState[key]]));
   const refreshCrmFilterSummary = () => {
@@ -540,6 +515,7 @@
           crmState[id.endsWith('start') ? 'start' : 'end'] = value;
           crmState.periodPreset = 'custom'; crmApplyComparison();
         }
+        if (id === 'crm-compare-enabled') crmState.compareEnabled = event.target.checked;
         if (id === 'crm-compare-mode') { crmState.compareMode = value; crmApplyComparison(); }
         if (id === 'crm-compare-start' || id === 'crm-compare-end') {
           crmState[id.endsWith('start') ? 'compareStart' : 'compareEnd'] = value; crmState.compareMode = 'custom';
@@ -548,12 +524,13 @@
     });
     $crm('#crm-clear-filters').onclick = () => {
       clearValidity();
-      editCrmDraft(() => { crmState.channel = 'whatsapp-oficial'; crmState.periodPreset = 'current-day'; crmState.compareMode = 'previous'; crmApplyPeriodPreset('current-day'); });
+      editCrmDraft(() => { crmState.channel = 'whatsapp-oficial'; crmState.periodPreset = 'current-day'; crmState.compareMode = 'previous'; crmState.compareEnabled = true; crmApplyPeriodPreset('current-day'); });
     };
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       if (!crmFilterDraft) return;
       for (const [start,end,id] of [[crmFilterDraft.start,crmFilterDraft.end,'crm-date-end'],[crmFilterDraft.compareStart,crmFilterDraft.compareEnd,'crm-compare-end']]) {
+        if (id === 'crm-compare-end' && !crmFilterDraft.compareEnabled) continue;
         const input = $crm(`#${id}`);
         input.setCustomValidity(!start || !end || start > end ? 'Informe um periodo valido, com fim igual ou posterior ao inicio.' : '');
         if (!input.reportValidity()) return;

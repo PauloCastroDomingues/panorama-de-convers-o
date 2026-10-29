@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "runId": "2026-10-29T10:05:53.136019-03:00",
-  "startedAt": "2026-10-29T10:05:53.136019-03:00",
-  "checkedAt": "2026-10-29T10:06:36.146595-03:00",
-  "finishedAt": "2026-10-29T10:06:36.146595-03:00",
+  "runId": "2026-10-29T11:49:51.427029-03:00",
+  "startedAt": "2026-10-29T11:49:51.427029-03:00",
+  "checkedAt": "2026-10-29T11:50:32.868439-03:00",
+  "finishedAt": "2026-10-29T11:50:32.868439-03:00",
   "targetDate": "2026-10-28",
   "status": "stale",
   "readOnly": true,
@@ -12,7 +12,7 @@
       "id": "ssot",
       "label": "SSOT comercial",
       "status": "current",
-      "checkedAt": "2026-10-29T10:06:11.622563-03:00",
+      "checkedAt": "2026-10-29T11:50:01.804010-03:00",
       "targetDate": "2026-10-28",
       "latestDate": "2026-10-28",
       "channels": {
@@ -120,14 +120,14 @@
         }
       },
       "error": null,
-      "lastSuccessfulReadAt": "2026-10-29T10:06:11.787745-03:00"
+      "lastSuccessfulReadAt": "2026-10-29T11:50:02.345991-03:00"
     },
     {
       "id": "growth",
       "label": "Visoes Growth",
       "status": "current",
       "latestDate": "2026-10-28",
-      "checkedAt": "2026-10-29T10:06:28.486736-03:00",
+      "checkedAt": "2026-10-29T11:50:22.298373-03:00",
       "views": [
         {
           "id": "channel",
@@ -144,7 +144,7 @@
           "status": "current",
           "latestDate": "2026-10-28",
           "error": null,
-          "rows": 8486,
+          "rows": 8499,
           "conversionAvailable": true
         },
         {
@@ -204,7 +204,7 @@
       ],
       "coverageComplete": false,
       "note": "Tres cruzamentos com produto sem fonte validada; grupo/anuncio sem sessoes.",
-      "lastSuccessfulReadAt": "2026-10-29T10:06:28.876247-03:00",
+      "lastSuccessfulReadAt": "2026-10-29T11:50:23.528376-03:00",
       "error": null
     },
     {
@@ -216,8 +216,8 @@
       "rows": 738,
       "coverageComplete": false,
       "note": "Ultima data com ativacao preenchida; dias sem disparo nao sao zeros inferidos.",
-      "checkedAt": "2026-10-29T10:06:31.147339-03:00",
-      "lastSuccessfulReadAt": "2026-10-29T10:06:31.148329-03:00",
+      "checkedAt": "2026-10-29T11:50:26.601828-03:00",
+      "lastSuccessfulReadAt": "2026-10-29T11:50:26.602709-03:00",
       "error": null
     },
     {
@@ -225,20 +225,20 @@
       "label": "RD Station",
       "status": "current",
       "error": null,
-      "checkedAt": "2026-10-29T10:06:33.424271-03:00",
+      "checkedAt": "2026-10-29T11:50:29.560063-03:00",
       "latestDate": "2026-10-28",
       "observedAt": "2026-10-29T07:06:08.847-03:00",
       "rows": 73,
       "coverageComplete": false,
       "note": "Ultima coleta committed da planilha; a coleta no RD precisa alimentar esta origem.",
-      "lastSuccessfulReadAt": "2026-10-29T10:06:33.424785-03:00"
+      "lastSuccessfulReadAt": "2026-10-29T11:50:29.560745-03:00"
     },
     {
       "id": "sendflow",
       "label": "SendFlow",
       "status": "stale",
       "error": null,
-      "checkedAt": "2026-10-29T10:06:36.146289-03:00",
+      "checkedAt": "2026-10-29T11:50:32.867783-03:00",
       "latestDate": "2026-09-30",
       "observedAt": "2026-10-28T13:13:05.781Z",
       "rows": 197,
@@ -247,7 +247,7 @@
       ],
       "coverageComplete": false,
       "note": "Todas as campanhas da planilha; campanhas ausentes ainda dependem da coleta SendFlow.",
-      "lastSuccessfulReadAt": "2026-10-29T10:06:36.146566-03:00"
+      "lastSuccessfulReadAt": "2026-10-29T11:50:32.868363-03:00"
     }
   ],
   "excluded": [

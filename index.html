@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="assets/crm-sendflow.css?v=20261028-04">
   <link rel="stylesheet" href="assets/crm-artifact.css?v=20261028-sheet-11">
   <link rel="stylesheet" href="assets/data-refresh.css?v=20261029-01">
-  <link rel="stylesheet" href="assets/reise-theme.css?v=20261029-ui-02">
+  <link rel="stylesheet" href="assets/reise-theme.css?v=20261029-decision-01">
 </head>
 <body>
   <div id="data-loader" class="data-loader" role="status" aria-live="polite" aria-label="Atualizando dados do painel">
@@ -79,6 +79,7 @@
       </div>
       <div class="control-group date-control"><label for="date-start">Inicio</label><input id="date-start" type="date"></div>
       <div class="control-group date-control"><label for="date-end">Fim</label><input id="date-end" type="date"></div>
+      <label class="comparison-toggle"><input id="compare-enabled" type="checkbox" role="switch" checked><span>Comparar periodos</span></label>
       <div class="control-group comparison-control"><label for="compare-mode">Comparar com</label><select id="compare-mode"><option value="previous">Periodo anterior</option><option value="year-ago">Mesmo periodo do ano anterior</option><option value="custom">Periodo selecionado</option></select><div id="compare-custom-fields" class="compare-dates is-hidden"><input id="compare-start" type="date" aria-label="Inicio da comparacao"><input id="compare-end" type="date" aria-label="Fim da comparacao"></div><small id="comparison-window" class="muted-note">Comparacao automatica</small></div>
       </div>
     </section>
@@ -206,6 +207,7 @@
       <div class="control-group"><label for="crm-period-preset">Janela</label><select id="crm-period-preset"><option value="current-day">Último dia disponível no SSOT</option><option value="today">Hoje</option><option value="previous-day">Dia anterior</option><option value="week">Semana atual</option><option value="fortnight">Quinzena atual</option><option value="month">Mês atual</option><option value="quarter">Trimestre atual</option><option value="semester">Semestre atual</option><option value="year">Ano atual</option><option value="last-complete">Últimos 12 meses completos</option><option value="custom">Data específica</option><option value="all">Toda a base</option></select></div>
       <div class="control-group date-control"><label for="crm-date-start">Início</label><input id="crm-date-start" type="date"></div>
       <div class="control-group date-control"><label for="crm-date-end">Fim</label><input id="crm-date-end" type="date"></div>
+      <label class="comparison-toggle"><input id="crm-compare-enabled" type="checkbox" role="switch" checked><span>Comparar periodos</span></label>
       <div class="control-group comparison-control"><label for="crm-compare-mode">Comparar com</label><select id="crm-compare-mode"><option value="previous">Período anterior</option><option value="year-ago">Mesmo período do ano anterior</option><option value="custom">Período selecionado</option></select><div id="crm-compare-custom-fields" class="compare-dates is-hidden"><input id="crm-compare-start" type="date" aria-label="Início da comparação"><input id="crm-compare-end" type="date" aria-label="Fim da comparação"></div><small id="crm-comparison-window" class="muted-note">Comparação automática</small></div>
       <div class="control-group"><label for="crm-channel-filter">Canal CRM</label><select id="crm-channel-filter"><option value="all">Todos os canais</option></select></div>
       <div class="crm-period-note"><span>Período da leitura</span><strong id="crm-period-note">19 a 25/10/2026</strong></div>
@@ -232,29 +234,34 @@
     </section>
 
     <section class="report-section">
-      <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">Desempenho</p><h2>Funil e ritmo do canal</h2></div></div>
-      <div id="crm-detail" class="crm-detail"></div>
+      <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">Prioridade de atuação</p><h2>Onde atacar primeiro</h2></div></div>
+      <div id="crm-priority-list" class="crm-priority-list"></div>
     </section>
 
     <section class="report-section">
-      <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">Prioridade de atuação</p><h2>Onde atacar primeiro</h2></div></div>
-      <div id="crm-priority-list" class="crm-priority-list"></div>
+      <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">Desempenho</p><h2>Funil e ritmo do canal</h2></div></div>
+      <div id="crm-detail" class="crm-detail"></div>
     </section>
+
+
 
     <details class="crm-source-details"><summary>Conferencia das fontes e cobertura SSOT</summary><section id="crm-ssot-reconciliation" class="crm-reconciliation" hidden aria-live="polite"></section></details>
     <footer><strong>Regra CRM:</strong> pedidos, receita, sessões e conversão vêm do SSOT. Ativação operacional e metas do artefato são leituras separadas, sem alterar as fontes.</footer>
   </main>
   <script src="assets/chart-interactions.js?v=20261029-ui-02"></script>
+  <script src="assets/performance-delta.js?v=20261029-01"></script>
   <script src="assets/data-refresh.js?v=20261029-ui-02"></script>
-  <script src="assets/app.js?v=20261029-ui-02"></script>
-  <script src="assets/growth-analysis.js?v=20261029-ui-02"></script>
-  <script src="assets/growth-filters.js?v=20261027-11"></script>
+  <script src="assets/app.js?v=20261029-comparison-01"></script>
+  <script src="assets/growth-analysis.js?v=20261029-comparison-01"></script>
+  <script src="assets/growth-filters.js?v=20261029-comparison-01"></script>
   <script src="assets/crm-sendflow.js?v=20261029-01"></script>
   <script src="assets/crm-email.js?v=20261028-01"></script>
   <script src="assets/crm-rd.js?v=20261028-03"></script>
   <script src="assets/crm-icons.js?v=20261028-01"></script>
   <script src="assets/crm-whatsapp.js?v=20261028-01"></script>
-  <script src="assets/crm-artifact.js?v=20261028-sheet-11"></script>
-  <script src="assets/crm.js?v=20261029-ui-02"></script>
+  <script src="assets/crm-artifact.js?v=20261029-comparison-01"></script>
+  <script src="assets/crm-funnel.js?v=20261029-decision-01"></script>
+  <script src="assets/crm-decision.js?v=20261029-decision-01"></script>
+  <script src="assets/crm.js?v=20261029-decision-01"></script>
 </body>
 </html>

@@ -169,7 +169,9 @@ class RefreshTests(unittest.TestCase):
             self.assertEqual(location, "US")
             self.assertFalse(job_config.use_legacy_sql)
             self.assertEqual(job_config.query_parameters[0].value, date(2026, 9, 28))
-            self.assertEqual(job_config.query_parameters[1].value, date(2026, 10, 27))
+            params = {p.name: p.value for p in job_config.query_parameters}
+            self.assertEqual(params['end_date'], date(2026, 10, 27))
+            self.assertEqual(params['google_start_date'], refresh.START)
             job = SimpleNamespace(statement_type="SELECT", total_bytes_processed=100,
                                   total_bytes_billed=200, job_id="fixture", cache_hit=False,
                                   result=lambda timeout: [])
@@ -193,6 +195,27 @@ class RefreshTests(unittest.TestCase):
                 refresh.fetch_sources(date(2026, 10, 27))
         self.assertEqual(client.query.call_count, 2)
         self.assertTrue(all(call.kwargs["job_config"].dry_run for call in client.query.call_args_list))
+
+    def test_duplicate_google_day_is_rejected_not_added(self):
+        with self.assertRaisesRegex(refresh.RefreshError, 'duplicate_google_channel_day'):
+            refresh.apply_bridge([row()], [{'data': '2025-01-01', 'sessoes': 10}] * 2, date(2025, 1, 1))
+
+    def test_commercial_google_contract_and_history_repair(self):
+        self.assertIn('aquisicao_por_canal8_daily', refresh.QUERIES['google_sessions'])
+        self.assertNotIn('sessoes_ga4', refresh.QUERIES['google_sessions'])
+        with tempfile.TemporaryDirectory() as directory:
+            output, status_path = Path(directory) / 'snapshot.json', Path(directory) / 'status.json'
+            old = snapshot([row('2025-01-01', label='Google ADS', sessions=3078, origin='Google'), row('2026-10-28')])
+            old['metadata']['session_bridge'] = {'source': refresh.LEGACY_BRIDGE, 'filter': refresh.LEGACY_BRIDGE_FILTER}
+            refresh.atomic_json(output, old)
+            def fetch(end):
+                return ([row('2026-10-28')], [{'data': '2025-01-01', 'sessoes': 3423}, {'data': '2026-10-28', 'sessoes': 3423}],
+                        {'session_bridge': {'source': refresh.BRIDGE, 'filter': refresh.BRIDGE_FILTER}}, [], {})
+            status = refresh.run(date(2026, 10, 28), output, status_path, fetch)
+            self.assertIsNone(status['error'])
+            repaired = json.loads(output.read_bytes())['rows'][0]
+            self.assertEqual(repaired['sessoes'], 3423)
+            self.assertEqual((repaired['pedidos'], repaired['receita']), (1, '10'))
 
 
 if __name__ == "__main__":

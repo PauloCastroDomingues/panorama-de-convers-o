@@ -50,6 +50,7 @@ const state = {
   compareStart: "",
   compareEnd: "",
   compareMode: "previous",
+  compareEnabled: true,
   availableStart: "",
   availableEnd: "",
   selectedChannel: "",
@@ -184,7 +185,7 @@ function summarize(rows) {
   return { rows: cleanRows.length, pedidos: orders, sessoes: sessions, receita: revenue, rate, coverage, complete, status: complete ? "Completa" : coverage > 0 ? "Parcial" : "Ausente" };
 }
 function periodBounds(period) { return period === "compare" ? { start: state.compareStart, end: state.compareEnd } : { start: state.start, end: state.end }; }
-function inPeriod(row, period) { const bounds = periodBounds(period); return Boolean(row.data && bounds.start && bounds.end && row.data >= bounds.start && row.data <= bounds.end); }
+function inPeriod(row, period) { if (period === "compare" && state.compareEnabled === false) return false; const bounds = periodBounds(period); return Boolean(row.data && bounds.start && bounds.end && row.data >= bounds.start && row.data <= bounds.end); }
 function consolidatedChannelRows(rows) {
   const groups = new Map();
   (rows || []).forEach((row) => {
@@ -202,6 +203,7 @@ function consolidatedChannelRows(rows) {
   return [...groups.values()].map((row) => { delete row._knownSessions; return row; });
 }
 function channelSourceRows(period) {
+  if (period === "compare" && state.compareEnabled === false) return [];
   const bounds = periodBounds(period); const cacheKey = `${period}|${bounds.start}|${bounds.end}`;
   if (state.channelRowsCache.has(cacheKey)) return state.channelRowsCache.get(cacheKey);
   const entryRows = normalizedViewRows("channel").filter((row) => isPaidRawChannel(row.canal));
@@ -330,7 +332,7 @@ function applyPeriodPreset(preset) {
   state.start = start; state.end = finish; applyComparison();
   suggestGranularityForWindow();
 }
-function comparisonWindowLabel() { return state.compareStart && state.compareEnd ? `Comparacao: ${dayLabel(state.compareStart)} a ${dayLabel(state.compareEnd)}` : "Comparacao nao definida"; }
+function comparisonWindowLabel() { return state.compareEnabled === false ? "Sem comparacao" : state.compareStart && state.compareEnd ? `Comparacao: ${dayLabel(state.compareStart)} a ${dayLabel(state.compareEnd)}` : "Comparacao nao definida"; }
 function suggestedGranularity() {
   const days = dateSpan(state.start, state.end);
   if (days <= 1) return state.hourlyAvailable ? "hour" : "day";
@@ -463,7 +465,7 @@ async function loadGrowthNetwork() {
 }
 function hydrateData(commercial, growth, alternative, cached = false) {
   const previousPeriod = state.start ? { preset: $("#period-preset").value, start: state.start, end: state.end,
-    compareMode: state.compareMode, compareStart: state.compareStart, compareEnd: state.compareEnd, selectedGranularity: state.selectedGranularity } : null;
+    compareEnabled: state.compareEnabled, compareMode: state.compareMode, compareStart: state.compareStart, compareEnd: state.compareEnd, selectedGranularity: state.selectedGranularity } : null;
   state.commercial = commercial || null;
   state.rows = normalizedRows(commercial?.rows || []);
   state.growthPayload = growth && growth.ok !== false && Array.isArray(growth.data) ? growth : null;
