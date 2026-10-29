@@ -14,6 +14,14 @@ async function checkLayout(page, label) {
   const errors = await page.evaluate(() => {
     const problems = [];
     if (document.documentElement.scrollWidth > innerWidth + 1) problems.push('page overflow');
+    const gutter = innerWidth <= 560 ? 16 : innerWidth <= 800 ? 20 : 32;
+    for (const element of document.querySelectorAll('.workspace-panel, .base-refresh')) {
+      if (!element.checkVisibility()) continue;
+      const bounds = element.getBoundingClientRect();
+      const available = document.documentElement.clientWidth;
+      if (Math.abs(bounds.left - gutter) > 1 || Math.abs(available - bounds.right - gutter) > 1) problems.push('content gutter: ' + (element.id || element.className));
+    }
+    if (Math.abs(parseFloat(getComputedStyle(document.querySelector('.workspace-tabs')).paddingLeft) - gutter) > 1) problems.push('header gutter');
     for (const element of document.querySelectorAll('dialog[open], .kpi > strong, .filter-dialog-footer, .workspace-tabs')) {
       if (!element.checkVisibility()) continue;
       if (element.scrollWidth > element.clientWidth + 2) problems.push(element.id || element.className);
@@ -45,7 +53,7 @@ async function checkLayout(page, label) {
     assert.equal(await page.evaluate(() => document.fonts.check('16px Aalto') && document.fonts.check('20px Formula1')), true);
     assert.equal(await page.locator('body').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(29, 29, 27)');
     const originalGrowth = await page.locator('#resumo .kpi > strong').allTextContents();
-    for (const [width, height] of [[1920, 1080], [1440, 1000], [820, 1180], [390, 844], [320, 740]]) {
+    for (const [width, height] of [[2560, 1440], [1920, 1080], [1440, 1000], [820, 1180], [768, 1024], [390, 844], [320, 740]]) {
       await page.setViewportSize({ width, height });
       await page.locator('[data-workspace="growth"]').click();
       await page.evaluate(() => scrollTo(0, 0));
@@ -90,10 +98,14 @@ async function checkLayout(page, label) {
           const values = [[expected.sessions, integer], [expected.orders, integer], [expected.revenue, money], [expected.rate, percent], [ticket, money]]
             .map(([value, formatter]) => value === null ? 'Indisponivel' : formatter.format(value));
           assert.deepEqual(await page.locator('#crm-summary-kpis .kpi > strong').allTextContents(), values, `${channel}: SSOT unchanged`);
-          assert.equal(await page.locator('.crm-funnel-rate strong').innerText(), values[3]);
+          assert.equal(await page.locator('.crm-funnel-rate strong').textContent(), values[3]);
           if (width === 1440 || width === 390) {
+            await page.locator('[data-detail-key="conversion"] > summary').click();
             await page.locator('[data-crm-view="conversion"]').screenshot({ path: path.join(output, `${channel}-funnel-${width}.png`) });
+            await page.locator('[data-detail-key="conversion"] > summary').click();
+            await page.locator('[data-detail-key="tracking"] > summary').click();
             await page.locator('[data-crm-view="tracking"]').screenshot({ path: path.join(output, `${channel}-tracking-${width}.png`) });
+            await page.locator('[data-detail-key="tracking"] > summary').click();
             await page.evaluate(() => scrollTo(0, 0));
           }
         }
@@ -125,6 +137,6 @@ async function checkLayout(page, label) {
     assert.deepEqual(errors, []);
     assert.deepEqual(missing, []);
     assert.deepEqual(writes, [], 'UI review must not write to sources or trigger refreshes');
-    console.log(JSON.stringify({ ok: true, viewports: 5, crmChecks: checks.length, fonts: 'loaded', assets: 'loaded', data: 'SSOT values unchanged', filters: 'Growth and CRM open/close; weekly comparison applied', sorting: 'both directions', sourceWrites: 0, errors }));
+    console.log(JSON.stringify({ ok: true, viewports: 7, crmChecks: checks.length, fonts: 'loaded', assets: 'loaded', data: 'SSOT values unchanged', filters: 'Growth and CRM open/close; weekly comparison applied', sorting: 'both directions', sourceWrites: 0, errors }));
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

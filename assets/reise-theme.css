@@ -4,7 +4,7 @@
   --ink: #f4f4f4; --ink-soft: #d1d1ce; --muted: #a6a6a1;
   --line: #353532; --line-strong: #4a4945; --orange: #fb5d06; --orange-soft: rgb(251 93 6 / .08);
   --green: #99c9a7; --green-soft: #24342a; --yellow: #e0be82; --yellow-soft: #342e22;
-  --red: #e99b91; --red-soft: #382826; --data-font: "Segoe UI", system-ui, sans-serif; --content-width: 1360px;
+  --red: #e99b91; --red-soft: #382826; --data-font: "Segoe UI", system-ui, sans-serif; --content-width: 100%;
 }
 html { scroll-padding-top: 88px; scrollbar-color: #555550 var(--bg); }
 body { font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
