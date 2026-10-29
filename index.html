@@ -6,22 +6,36 @@
   <meta name="description" content="Painel de ritmo e performance comercial com dados SSOT.">
   <title>Reise | Performance comercial</title>
   <link rel="stylesheet" href="assets/styles.css?v=20261028-01">
-  <link rel="stylesheet" href="assets/reise-theme.css?v=20261027-13">
   <link rel="stylesheet" href="assets/crm-sendflow.css?v=20261028-04">
+  <link rel="stylesheet" href="assets/crm-artifact.css?v=20261028-sheet-11">
+  <link rel="stylesheet" href="assets/data-refresh.css?v=20261029-01">
+  <link rel="stylesheet" href="assets/reise-theme.css?v=20261029-ui-02">
 </head>
 <body>
   <div id="data-loader" class="data-loader" role="status" aria-live="polite" aria-label="Atualizando dados do painel">
     <div class="data-loader-panel">
       <img class="data-loader-logo" src="assets/reise-cult-logo-orange.png" alt="Reise Cult">
-      <p id="data-loader-message" class="data-loader-message">Atualizando dados<span class="data-loader-dots" aria-hidden="true">...</span></p>
       <div class="data-loader-track" aria-hidden="true"><span id="data-loader-progress"></span></div>
+      <p id="data-loader-message" class="data-loader-message">Atualizando dados</p>
     </div>
   </div>
   <nav class="workspace-tabs" aria-label="Área de análise">
     <a class="workspace-brand" href="#growth" aria-label="Reise Performance"><img src="assets/reise-cult-logo-orange.png" alt="Reise Cult"></a>
+    <div class="workspace-identity"><strong>Performance comercial</strong><span>Panorama Reise</span></div>
     <button class="workspace-tab active" type="button" data-workspace="growth">Growth Performance</button>
     <button class="workspace-tab" type="button" data-workspace="crm">CRM</button>
+    <span class="workspace-access" title="As bases de origem sao acessadas somente para leitura">Somente leitura</span>
   </nav>
+  <section class="base-refresh" aria-label="Atualizacao das fontes">
+    <div class="base-refresh-line">
+      <details>
+        <summary id="base-refresh-summary">Conferindo atualizacao das fontes</summary>
+        <div class="source-table"><table><thead><tr><th>Fonte</th><th>Dados ate</th><th>Leitura</th><th>Cobertura</th></tr></thead><tbody id="base-refresh-body"></tbody></table></div>
+      </details>
+      <button id="base-refresh" class="outline-button" type="button" aria-label="Atualizar todas as fontes" title="Atualizar todas as fontes">Atualizar base</button>
+      <span id="base-refresh-feedback" role="status"></span>
+    </div>
+  </section>
   <main id="growth-workspace" class="wrap workspace-panel">
     <header class="top">
       <div>
@@ -32,7 +46,7 @@
       <div class="top-meta">
         <span id="source-pill" class="status-pill pending">Validando fonte</span>
         <span id="source-status">Carregando SSOT</span>
-        <button id="reload-data" class="text-button" type="button">Atualizar leitura</button>
+        <button id="reload-data" class="text-button" type="button" aria-label="Atualizar base" title="Atualizar base">Atualizar leitura</button>
       </div>
     </header>
 
@@ -176,7 +190,7 @@
         <h1>CRM</h1>
         <p class="dek">WhatsApp Oficial / WhatsApp Organico / E-mail</p>
       </div>
-      <div class="crm-header-meta"><span class="status-pill ok">Aba independente</span><span id="crm-period-label">Semana de referência</span></div>
+      <div class="crm-header-meta"><span id="crm-freshness" class="status-pill" role="status">Consultando SSOT</span><span id="crm-period-label">Periodo da analise</span><button id="crm-refresh" class="outline-button" type="button" aria-label="Atualizar base" title="Atualizar base" disabled>Atualizar leitura</button><small id="crm-refresh-result" role="status"></small></div>
     </header>
 
     <section class="unified-filterbar" aria-label="Recorte CRM">
@@ -189,7 +203,7 @@
       <div class="filter-dialog-content">
     <section class="crm-controls" aria-label="Filtros da análise de CRM">
       <h3>Periodo e comparacao</h3>
-      <div class="control-group"><label for="crm-period-preset">Janela</label><select id="crm-period-preset"><option value="current-day">Último dia disponível</option><option value="previous-day">Dia anterior</option><option value="week">Semana atual</option><option value="fortnight">Quinzena atual</option><option value="month">Mês atual</option><option value="quarter">Trimestre atual</option><option value="semester">Semestre atual</option><option value="year">Ano atual</option><option value="last-complete">Últimos 12 meses completos</option><option value="custom">Data específica</option><option value="all">Toda a base</option></select></div>
+      <div class="control-group"><label for="crm-period-preset">Janela</label><select id="crm-period-preset"><option value="current-day">Último dia disponível no SSOT</option><option value="today">Hoje</option><option value="previous-day">Dia anterior</option><option value="week">Semana atual</option><option value="fortnight">Quinzena atual</option><option value="month">Mês atual</option><option value="quarter">Trimestre atual</option><option value="semester">Semestre atual</option><option value="year">Ano atual</option><option value="last-complete">Últimos 12 meses completos</option><option value="custom">Data específica</option><option value="all">Toda a base</option></select></div>
       <div class="control-group date-control"><label for="crm-date-start">Início</label><input id="crm-date-start" type="date"></div>
       <div class="control-group date-control"><label for="crm-date-end">Fim</label><input id="crm-date-end" type="date"></div>
       <div class="control-group comparison-control"><label for="crm-compare-mode">Comparar com</label><select id="crm-compare-mode"><option value="previous">Período anterior</option><option value="year-ago">Mesmo período do ano anterior</option><option value="custom">Período selecionado</option></select><div id="crm-compare-custom-fields" class="compare-dates is-hidden"><input id="crm-compare-start" type="date" aria-label="Início da comparação"><input id="crm-compare-end" type="date" aria-label="Fim da comparação"></div><small id="crm-comparison-window" class="muted-note">Comparação automática</small></div>
@@ -207,51 +221,40 @@
       <div><strong>Escopo CRM separado</strong><span>Os números abaixo são meta versus realizado do fechamento semanal. Eles não entram na base, nos filtros ou nas conversões de Growth.</span></div>
     </section>
 
-    <section id="crm-ssot-reconciliation" class="crm-reconciliation" hidden aria-live="polite"></section>
-
     <section class="crm-channel-switcher" aria-label="Canais CRM">
-      <div class="section-heading"><span class="section-number">01</span><div><p class="eyebrow">Canal</p><h2>Escolha a leitura</h2><p class="section-intro">Abra um canal para ver o resultado semanal, o ritmo e o funil completo.</p></div></div>
       <div id="crm-channel-tabs" class="crm-channel-tabs" role="tablist"></div>
     </section>
 
     <section class="report-section first-section">
-      <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">Resumo CRM</p><h2>O que aconteceu no recorte</h2><p class="section-intro">Leitura do canal selecionado no período escolhido.</p></div><span id="crm-summary-window" class="section-meta">19 a 25/10/2026</span></div>
+      <div class="section-heading"><span class="section-number">01</span><div><p class="eyebrow">Resumo CRM</p><h2>O que aconteceu no recorte</h2></div><span id="crm-summary-window" class="section-meta">19 a 25/10/2026</span></div>
       <div id="crm-summary-kpis" class="kpis"></div>
+      <div id="crm-commercial-availability" class="crm-commercial-availability" role="status"></div>
     </section>
 
     <section class="report-section">
-      <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">Meta versus realizado</p><h2>Resultado do canal</h2><p class="section-intro">Compare o realizado com a meta e localize o primeiro ponto de ataque.</p></div></div>
-      <div id="crm-channel-cards" class="crm-channel-cards"></div>
-    </section>
-
-    <section class="report-section">
-      <div class="section-heading"><span class="section-number">04</span><div><p class="eyebrow">Visoes completas</p><h2>Funil e ritmo do canal</h2><p class="section-intro">A mesma ordem do racional: conversao, ritmo diario, ativacao e acompanhamento.</p></div></div>
+      <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">Desempenho</p><h2>Funil e ritmo do canal</h2></div></div>
       <div id="crm-detail" class="crm-detail"></div>
     </section>
 
     <section class="report-section">
-      <div class="section-heading"><span class="section-number">05</span><div><p class="eyebrow">Prioridade de atuação</p><h2>Onde atacar primeiro</h2><p class="section-intro">Prioridades calculadas a partir dos gaps do fechamento, sem misturar causalidade de mídia paga.</p></div></div>
+      <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">Prioridade de atuação</p><h2>Onde atacar primeiro</h2></div></div>
       <div id="crm-priority-list" class="crm-priority-list"></div>
     </section>
 
-    <section class="report-section">
-      <div class="section-heading"><span class="section-number">06</span><div><p class="eyebrow">Funil de ativação</p><h2>Planejado versus realizado por etapa</h2><p class="section-intro">A comparação mostra em qual etapa o canal perdeu volume. Etapas sem rastreamento continuam explícitas.</p></div></div>
-      <div id="crm-funnel" class="crm-funnel-grid"></div>
-    </section>
-
-    <section class="report-section">
-      <div class="section-heading"><span class="section-number">07</span><div><p class="eyebrow">Ritmo do recorte</p><h2>Meta diária de referência</h2><p class="section-intro">Distribuição diária da meta do anexo. É uma referência de pace, não uma medição diária realizada.</p></div></div>
-      <div id="crm-pacing" class="table-scroll"></div>
-    </section>
-
-    <footer><strong>Regra CRM:</strong> esta aba usa a planilha oficial e as metas dos anexos como referência. Ela permanece separada da camada Growth Performance e não transforma etapas não rastreadas em zero.</footer>
+    <details class="crm-source-details"><summary>Conferencia das fontes e cobertura SSOT</summary><section id="crm-ssot-reconciliation" class="crm-reconciliation" hidden aria-live="polite"></section></details>
+    <footer><strong>Regra CRM:</strong> pedidos, receita, sessões e conversão vêm do SSOT. Ativação operacional e metas do artefato são leituras separadas, sem alterar as fontes.</footer>
   </main>
-  <script src="assets/app.js?v=20261028-01"></script>
-  <script src="assets/growth-analysis.js?v=20261027-11"></script>
+  <script src="assets/chart-interactions.js?v=20261029-ui-02"></script>
+  <script src="assets/data-refresh.js?v=20261029-ui-02"></script>
+  <script src="assets/app.js?v=20261029-ui-02"></script>
+  <script src="assets/growth-analysis.js?v=20261029-ui-02"></script>
   <script src="assets/growth-filters.js?v=20261027-11"></script>
-  <script src="assets/crm-sendflow.js?v=20261028-02"></script>
+  <script src="assets/crm-sendflow.js?v=20261029-01"></script>
   <script src="assets/crm-email.js?v=20261028-01"></script>
   <script src="assets/crm-rd.js?v=20261028-03"></script>
-  <script src="assets/crm.js?v=20261028-06"></script>
+  <script src="assets/crm-icons.js?v=20261028-01"></script>
+  <script src="assets/crm-whatsapp.js?v=20261028-01"></script>
+  <script src="assets/crm-artifact.js?v=20261028-sheet-11"></script>
+  <script src="assets/crm.js?v=20261029-ui-02"></script>
 </body>
 </html>

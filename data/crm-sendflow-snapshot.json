@@ -1,20 +1,5 @@
 {
   "schemaVersion": 1,
-  "source": {
-    "spreadsheetId": "1OcM3LBfMUnToMbLKXtZfgB_3CAux4om7rQ1iLSSEHXc",
-    "name": "Base SendFlow - Setembro 2026",
-    "releaseId": "8TVmVDvdGL3OWrTYv9xx",
-    "releaseName": "Ativacoes [Setembro/26]",
-    "timeZone": "America/Sao_Paulo",
-    "extractedAt": "2026-10-28T13:13:05.781Z",
-    "coverage": {
-      "start": "2026-09-01",
-      "end": "2026-09-30"
-    },
-    "scope": "one_campaign",
-    "mode": "validated_snapshot",
-    "includesPersonalData": false
-  },
   "messages": [
     {
       "releaseId": "8TVmVDvdGL3OWrTYv9xx",
@@ -4278,5 +4263,24 @@
       "remove": 16,
       "clicks": null
     }
-  ]
+  ],
+  "source": {
+    "spreadsheetId": "1OcM3LBfMUnToMbLKXtZfgB_3CAux4om7rQ1iLSSEHXc",
+    "name": "Base SendFlow \u2014 whats_organico",
+    "releaseId": "8TVmVDvdGL3OWrTYv9xx",
+    "releaseIds": [
+      "8TVmVDvdGL3OWrTYv9xx"
+    ],
+    "releaseName": "Campanhas presentes na base SendFlow",
+    "timeZone": "America/Sao_Paulo",
+    "extractedAt": "2026-10-28T13:13:05.781Z",
+    "coverage": {
+      "start": "2026-09-01",
+      "end": "2026-09-30"
+    },
+    "coverageComplete": false,
+    "scope": "auxiliary_sheet",
+    "mode": "live_sheet",
+    "includesPersonalData": false
+  }
 }

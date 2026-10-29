@@ -2,6 +2,7 @@
   const $crm = (selector) => document.querySelector(selector);
   const crmState = { data: null, channel: "whatsapp-oficial", campaigns: [], ssotPayload: null, ssotFallback: null, sendflow: null, sendflowError: "", sendflowPage: 0, sendflowSort: "sentAt", sendflowDirection: -1, rd: null, rdError: "", rdPage: 0, rdSort: "sentAt", rdDirection: -1, rdSearch: "", rdIssueFilter: "all", referenceData: null, availableStart: "", availableEnd: "", start: "", end: "", periodPreset: "current-day", compareMode: "previous", compareStart: "", compareEnd: "" };
   const WHATSAPP_OFFICIAL_CSV_URL = "https://docs.google.com/spreadsheets/d/1vlkkrA52FBGk79k0ou3vch1XqM-AdHVDj42IXO7hIZo/export?format=csv&gid=404910707";
+  const whatsappSource = { status: 'loading' };
   const SSOT_GROWTH_API_URL = "https://script.google.com/macros/s/AKfycby7GYHJIvpKE1hwh3hCq9atS_zKQXaz4oYQ6nzzzGFdvCr-h2sfMATeTst9qgdzghKE8w/exec";
 
   const parseCsv = (text) => {
@@ -16,7 +17,7 @@
     }
     if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
     const headers = rows.shift()?.map((header) => header.trim()) || [];
-    return rows.filter((values) => values.some((value) => value.trim() !== "")).map((values) => Object.fromEntries(headers.map((header, index) => [header, (values[index] || "").trim()])));
+    return rows.flatMap((values, sourceIndex) => values.some((value) => value.trim() !== "") ? [{ ...Object.fromEntries(headers.map((header, index) => [header, (values[index] || "").trim()])), __sourceRow: sourceIndex + 2 }] : []);
   };
   const sourceNumber = (value) => {
     if (value === null || value === undefined || value === "" || value === "-" || String(value).startsWith("#")) return null;
@@ -42,8 +43,17 @@
     const days = crmDateSpan(crmState.start, crmState.end); crmState.compareEnd = crmShiftDate(crmState.start, -1); crmState.compareStart = crmShiftDate(crmState.compareEnd, -(days - 1));
   };
   const crmComparisonLabel = () => crmState.compareStart && crmState.compareEnd ? `Comparacao: ${sourceDateLabel(crmState.compareStart)} a ${sourceDateLabel(crmState.compareEnd)}` : "Comparacao nao definida";
+  const commercialSource = (channel) => CrmSendFlow.latestCommercialSource([crmState.ssotPayload, crmState.ssotFallback], channel);
+  const commercialDates = () => {
+    const channels = crmState.channel === 'all' ? ['email', 'whatsapp-oficial', 'whatsapp-organico'] : [crmState.channel];
+    const calendars = channels.map((channel) => CrmSendFlow.availableDates(commercialSource(channel), channel));
+    return calendars[0]?.filter((date) => calendars.every((calendar) => calendar.includes(date))).sort() || [];
+  };
   const crmApplyPeriodPreset = (preset) => {
-    const end = crmState.availableEnd; if (!end || preset === "custom") return;
+    const calendar = commercialDates();
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const end = ['current-day', 'all'].includes(preset) ? calendar.at(-1) : today;
+    if (!end || preset === "custom") return;
     const date = dateFromIso(end); let start = end; let finish = end;
     if (preset === "previous-day") start = finish = crmShiftDate(end, -1);
     if (preset === "week") { const day = date.getDay() || 7; start = crmShiftDate(end, -day + 1); }
@@ -53,12 +63,12 @@
     if (preset === "semester") start = isoFromDate(new Date(date.getFullYear(), date.getMonth() < 6 ? 0 : 6, 1, 12));
     if (preset === "year") start = isoFromDate(new Date(date.getFullYear(), 0, 1, 12));
     if (preset === "last-complete") { const last = new Date(date.getFullYear(), date.getMonth(), 0, 12); finish = isoFromDate(last); start = isoFromDate(new Date(last.getFullYear(), last.getMonth() - 11, 1, 12)); }
-    if (preset === "all") { start = crmState.availableStart; finish = crmState.availableEnd; }
+    if (preset === "all") { start = calendar[0]; finish = end; }
     crmState.start = start; crmState.end = finish; crmApplyComparison();
   };
   const sourceRowsWithDates = (rows) => {
     const dated = rows.filter((row) => sourceDateKey(row.Data) !== null); let year = new Date().getFullYear(); let previousKey = null;
-    for (let index = dated.length - 1; index >= 0; index -= 1) { const key = sourceDateKey(dated[index].Data); if (previousKey !== null && key > previousKey) year -= 1; dated[index].isoDate = sourceIsoDate(dated[index].Data, year); previousKey = key; }
+    for (let index = dated.length - 1; index >= 0; index -= 1) { const key = sourceDateKey(dated[index].Data); if (previousKey !== null && key > previousKey) year -= 1; dated[index].isoDate ||= sourceIsoDate(dated[index].Data, year); previousKey = key; }
     return rows;
   };
   const consolidateWhatsAppRows = (csvRows) => {
@@ -67,11 +77,11 @@
     csvRows.forEach((row) => { if (row.Tema) { current = { parent: row, children: [] }; groups.push(current); } else if (current) current.children.push(row); });
     return groups.map((group) => {
       const core = ["Sessões", "Pedidos", "Receita"]; const parentComplete = core.every((key) => sourceNumber(group.parent[key]) !== null); const metricRows = parentComplete ? [group.parent] : group.children.length ? group.children : [group.parent];
-      return { date: group.parent.isoDate, theme: group.parent.Tema, category: group.parent.Categoria || "Sem categoria", segment: group.parent.Segmentação || "Sem segmentacao", time: group.parent.Hora || "", delivered: sourceSum(metricRows, "Total Entregue"), audience: sourceSum(metricRows, "Público"), opens: sourceSum(metricRows, "Aberturas"), clicks: sourceSum(metricRows, "Total de cliques"), sessions: sourceSum(metricRows, "Sessões"), orders: sourceSum(metricRows, "Pedidos"), revenue: sourceSum(metricRows, "Receita"), investment: sourceSum(metricRows, "Investimento") };
+      return { date: group.parent.isoDate, theme: group.parent.Tema, category: group.parent.Categoria || "Sem categoria", segment: group.parent.Segmentação || "Sem segmentacao", time: group.parent.Hora || "", delivered: sourceSum(metricRows, "Total Entregue"), audience: sourceSum(metricRows, "Público"), opens: sourceSum(metricRows, "Aberturas"), clicks: sourceSum(metricRows, "Total de cliques"), sessions: sourceSum(metricRows, "Sessões"), orders: sourceSum(metricRows, "Pedidos"), revenue: sourceSum(metricRows, "Receita"), investment: sourceSum(metricRows, "Investimento"), trackingRecords: CrmWhatsApp.recordsForGroup(group, sourceNumber) };
     }).filter((row) => row.date);
   };
   const buildSsotWhatsAppReconciliation = (payload, periodStart, periodEnd) => {
-    const input = CrmSendFlow.hasChannel(payload, "whatsapp-oficial") ? payload : crmState.ssotFallback;
+    const input = CrmSendFlow.latestCommercialSource([payload, crmState.ssotFallback], 'whatsapp-oficial');
     const result = CrmSendFlow.commercial(input, "whatsapp-oficial", periodStart, periodEnd);
     return result.rows ? result : null;
   };
@@ -116,7 +126,7 @@
     const comparisonWhatsApp = crmState.compareStart && crmState.compareEnd ? buildWhatsAppOfficialChannel(crmState.campaigns, referenceChannels.find((channel) => channel.id === "whatsapp-oficial"), crmState.ssotPayload, crmState.compareStart, crmState.compareEnd) : null;
     const sameReferenceWindow = crmState.start === referencePeriod.start && crmState.end === referencePeriod.end;
     const channels = referenceChannels.map((channel) => {
-      const payload = CrmSendFlow.hasChannel(crmState.ssotPayload, channel.id) ? crmState.ssotPayload : crmState.ssotFallback;
+      const payload = commercialSource(channel.id);
       if (channel.id === "whatsapp-organico" && crmState.sendflow) return CrmSendFlow.buildChannel(crmState.sendflow, channel, payload, crmState.start, crmState.end, crmState.compareStart, crmState.compareEnd);
       if (channel.id === "email" && crmState.rd) {
         const operational = { ...makeUnavailableChannel(channel), metrics: [], operationalSource: "RD Station | piloto observado" };
@@ -124,7 +134,7 @@
           rd: { snapshot: crmState.rd, current: CrmRd.selectPeriod(crmState.rd, crmState.start, crmState.end), comparison: CrmRd.selectPeriod(crmState.rd, crmState.compareStart, crmState.compareEnd) } };
       }
       const operational = channel.id === "whatsapp-oficial" ? addPeriodComparison(currentWhatsApp, comparisonWhatsApp) || makeUnavailableChannel(channel)
-        : sameReferenceWindow ? { ...channel, metrics: (channel.metrics || []).map((metric) => ({ ...metric, comparison: null })) } : makeUnavailableChannel(channel);
+        : makeUnavailableChannel(channel);
       if (channel.id === "whatsapp-organico") operational.operationalSource = "SendFlow sem carga no recorte";
       return CrmSendFlow.withCommercial(operational, channel, payload, crmState.start, crmState.end, crmState.compareStart, crmState.compareEnd, sameReferenceWindow);
     });
@@ -176,7 +186,19 @@
   }).join("");
   const renderSummary = () => {
     const metrics = aggregate(selectedChannels());
+    const orders = metrics.find((metric) => metric.key === 'orders'), revenue = metrics.find((metric) => metric.key === 'revenue');
+    const ticket = (field, complete) => complete && orders[field] > 0 && revenue[field] !== null ? revenue[field] / orders[field] : null;
+    metrics.push({ key: 'ticket', format: 'money', meta: null, actual: ticket('actual', orders.currentComplete && revenue.currentComplete), comparison: ticket('comparison', orders.comparisonComplete && revenue.comparisonComplete) });
     $crm("#crm-summary-kpis").innerHTML = metrics.map((metric) => `<article class="kpi"><span>${esc(metric.key === "rate" ? "Conversao SSOT" : metric.key === "sessions" ? metric.currentComplete === false ? "Sessoes conhecidas SSOT" : "Sessoes SSOT" : metric.key === "orders" ? "Pedidos SSOT" : "Receita SSOT")}</span><strong>${formatValue(metric.actual, metric.format)}</strong>${metric.meta !== null ? `<small>Meta ${formatValue(metric.meta, metric.format)}</small>` : ""}<small>${esc(formatPeriodDelta(metric).text)}</small></article>`).join("");
+    $crm('#crm-summary-kpis .kpi:last-child > span').textContent = 'Ticket medio SSOT';
+    const calendar = commercialDates(), latest = calendar.at(-1);
+    const sourceRoot = $crm('#crm-commercial-availability');
+    sourceRoot.innerHTML = latest ? `<span>SSOT comercial ate <strong>${sourceDateLabel(latest)}</strong> · datas operacionais independentes</span>${crmState.end > latest ? '<button type="button" class="outline-button" id="crm-open-latest">Abrir ultimo dia SSOT</button>' : ''}` : '<span>A fonte comercial deste canal nao foi carregada.</span>';
+    $crm('#crm-open-latest')?.addEventListener('click', () => { crmState.periodPreset = 'current-day'; crmApplyPeriodPreset('current-day'); syncCrmPeriodControls(); rebuildCrmData(); });
+    const hasResult = metrics.some((metric) => metric.actual !== null);
+    $crm('#crm-summary-kpis').hidden = !hasResult;
+    sourceRoot.classList.toggle('warn', !hasResult);
+    renderFreshness();
     const scopeLabel = crmState.channel === "all" ? "Todos os canais CRM" : selectedChannels()[0]?.name || "Canal CRM";
     $crm("#crm-summary-window").textContent = `${scopeLabel} · ${crmState.data.period.label}`;
   };
@@ -254,9 +276,10 @@
     const metrics = metricMap(channel); const sessions = metrics.get("sessions")?.actual ?? null; const orders = metrics.get("orders")?.actual ?? null; const rate = metrics.get("rate")?.actual ?? null;
     const rateLabel = channel.ssotCommercial ? "Conversao SSOT do canal" : "Conversao CRM";
     const rateNote = "Pedidos SSOT / sessoes SSOT no mesmo canal e periodo; independente do registro de disparos.";
+    if (sessions === null && orders === null) return '<p class="crm-detail-hint">Sem cobertura comercial SSOT neste recorte. Consulte a data disponivel acima ou abra as metas do artefato abaixo.</p>';
     if (rate === null && channel.ssotCommercial) return `<div class="crm-funnel-visual"><div class="crm-funnel-label"><span>Sessoes conhecidas SSOT</span><strong>${int(sessions)}</strong></div><div class="crm-funnel-label"><span>Pedidos SSOT</span><strong>${int(orders)}</strong></div><p class="crm-funnel-note">A extracao possui sessoes em ${channel.ssotCommercial.sessionsKnownDays}/${channel.ssotCommercial.expectedDays} dias. Validar a cobertura da fonte SSOT antes de calcular a taxa; a ausencia de disparos nao impede esse cruzamento.</p></div>`;
     const ratio = rate !== null ? Math.max(Math.sqrt(rate), 0.05) : 0.05; const bottom = Math.max(88 * ratio, 6); const left = (100 - bottom) / 2;
-    return `<div class="crm-funnel-visual"><div class="crm-funnel-label"><span>Sessoes</span><strong>${int(sessions)}</strong></div><svg viewBox="0 0 100 48" preserveAspectRatio="none" role="img" aria-label="Funil de sessoes para pedidos"><defs><linearGradient id="crm-funnel-${esc(channel.id)}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4934f" stop-opacity=".85"/><stop offset="1" stop-color="#e2793f" stop-opacity=".28"/></linearGradient></defs><polygon points="6,0 94,0 ${100 - left},48 ${left},48" fill="url(#crm-funnel-${esc(channel.id)})" stroke="#f4934f" stroke-width=".5"/><text x="50" y="25" text-anchor="middle" fill="#fff" font-size="4.2">${percent(rate)}</text><text x="50" y="31" text-anchor="middle" fill="#fff" font-size="3.1">${esc(rateLabel)}</text></svg><div class="crm-funnel-label"><span>Pedidos</span><strong>${int(orders)}</strong></div><small class="crm-funnel-note">${esc(rateNote)}</small></div>`;
+    return `<div class="crm-funnel-visual"><div class="crm-funnel-label"><span>Sessoes</span><strong>${int(sessions)}</strong></div><div class="crm-funnel-shape"><svg viewBox="0 0 100 48" preserveAspectRatio="none" role="img" aria-label="Funil de sessoes para pedidos"><polygon points="6,0 94,0 ${100 - left},48 ${left},48" fill="var(--orange)" stroke="var(--orange)" stroke-width=".5"/></svg><div class="crm-funnel-rate"><strong>${percent(rate)}</strong><span>${esc(rateLabel)}</span></div></div><div class="crm-funnel-label"><span>Pedidos</span><strong>${int(orders)}</strong></div><small class="crm-funnel-note">${esc(rateNote)}</small></div>`;
   };
   const renderMetaChart = (channel) => {
     const values = channel.pacing.daily?.Receita || []; if (!values.length) return ""; const totals = cumulative(values); const max = Math.max(...totals, ...values, 1); const bars = values.map((value, index) => { const x = 18 + index * 88; const h = (value / max) * 118; return `<rect x="${x}" y="${140 - h}" width="46" height="${h}" rx="2" fill="#e2793f" fill-opacity=".62"><title>${days[index]}: ${money(value)}</title></rect>`; }).join(""); const points = totals.map((value, index) => `${18 + index * 88 + 23},${140 - (value / max) * 118}`).join(" "); return `<div class="crm-chart-box"><svg viewBox="0 0 650 180" role="img" aria-label="Grafico de meta diaria e acumulada"><line x1="12" y1="140" x2="638" y2="140" stroke="var(--line)"/><line x1="12" y1="20" x2="638" y2="20" stroke="var(--line)"/><g>${bars}</g><polyline points="${points}" fill="none" stroke="#f4934f" stroke-width="2.5"/><g>${totals.map((value, index) => `<circle cx="${18 + index * 88 + 23}" cy="${140 - (value / max) * 118}" r="3" fill="#f4934f"><title>${days[index]} acumulado: ${money(value)}</title></circle>`).join("")}</g>${days.map((label, index) => `<text x="${18 + index * 88 + 23}" y="162" text-anchor="middle">${label.split(" ")[0]}</text>`).join("")}</svg><div class="crm-chart-legend"><span><i class="crm-legend-bar"></i>Meta do dia: receita</span><span><i class="crm-legend-line"></i>Meta acumulada</span></div></div>`;
@@ -411,29 +434,37 @@
     });
     bindTable();
   };
-  const renderDetailTabs = () => { const tabs = [{ id: "all", name: "Visao geral" }, ...(crmState.data?.channels || [])]; $crm("#crm-channel-tabs").innerHTML = tabs.map((tab) => `<button type="button" role="tab" class="crm-channel-tab ${crmState.channel === tab.id ? "active" : ""}" data-crm-tab="${esc(tab.id)}">${esc(tab.name || tab.name)}</button>`).join(""); $crm("#crm-channel-tabs").querySelectorAll("[data-crm-tab]").forEach((button) => button.addEventListener("click", () => { crmState.channel = button.dataset.crmTab; $crm("#crm-channel-filter").value = crmState.channel; renderAll(); })); };
+  const renderDetailTabs = () => { const tabs = [{ id: "all", name: "Visao geral" }, ...(crmState.data?.channels || [])]; $crm("#crm-channel-tabs").innerHTML = tabs.map((tab) => `<button type="button" role="tab" aria-selected="${crmState.channel === tab.id}" class="crm-channel-tab ${crmState.channel === tab.id ? "active" : ""}" data-crm-tab="${esc(tab.id)}">${CrmIcons(tab.id === 'all' ? 'LayoutDashboard' : tab.id === 'email' ? 'Mail' : 'MessageCircle')}<span>${esc(tab.name)}</span></button>`).join(""); $crm("#crm-channel-tabs").querySelectorAll("[data-crm-tab]").forEach((button) => button.addEventListener("click", () => { crmState.channel = button.dataset.crmTab; $crm("#crm-channel-filter").value = crmState.channel; crmApplyPeriodPreset(crmState.periodPreset); syncCrmPeriodControls(); artifactOptions.pacingPage = artifactOptions.trackingPage = 0; rebuildCrmData(); })); };
   const bindTracking = (channel) => { const root = $crm("#crm-detail"); root.querySelectorAll("[data-track-field]").forEach((input) => input.addEventListener("input", (event) => { const values = readTracking(channel); const row = Number(event.target.dataset.trackRow); values[row] = values[row] || {}; values[row][event.target.dataset.trackField] = event.target.value === "" ? "" : Number(event.target.value); localStorage.setItem(trackingKey(channel), JSON.stringify(values)); renderDetail(); })); root.querySelector('[data-track-action="reset"]')?.addEventListener("click", () => { localStorage.removeItem(trackingKey(channel)); renderDetail(); }); root.querySelector('[data-track-action="export"]')?.addEventListener("click", () => { const blob = new Blob([JSON.stringify(readTracking(channel), null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `crm-${channel.id}-acompanhamento.json`; link.click(); URL.revokeObjectURL(link.href); }); root.querySelector("#crm-track-import")?.addEventListener("change", (event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { try { const parsed = JSON.parse(reader.result); const imported = parsed?.data || parsed; if (!imported || typeof imported !== "object" || Array.isArray(imported)) throw new Error("Formato invalido"); localStorage.setItem(trackingKey(channel), JSON.stringify(imported)); renderDetail(); } catch (error) { window.alert("Arquivo de acompanhamento invalido."); } }; reader.readAsText(file); }); };
+  const artifactOptions = { mode: 'actual', pacingPage: 0, trackingPage: 0 };
   const renderDetail = () => {
     renderDetailTabs();
     const channel = selectedChannels()[0];
     if (crmState.channel === "all" || !channel) {
-      const organic = selectedChannels().find((item) => item.sendflow);
-      $crm("#crm-detail").innerHTML = organic ? renderSendflowDetail(organic) : `<div class="crm-detail-overview"><strong>Visao geral ativa</strong><span>Selecione um canal para consultar seus resultados.</span></div>`;
-      if (organic) bindSendflowDetail();
+      $crm("#crm-detail").innerHTML = `<div class="table-scroll"><table class="data-table"><thead><tr><th>Canal</th><th>Receita SSOT</th><th>Pedidos</th><th>Sessoes</th><th>Conversao</th></tr></thead><tbody>${selectedChannels().map((item) => `<tr><th>${esc(item.name)}</th>${['revenue', 'orders', 'sessions', 'rate'].map((key) => { const metric = metricMap(item).get(key); return `<td>${formatValue(metric?.actual, metric?.format)}<small>${esc(formatPeriodDelta(metric).text)}</small></td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
       return;
     }
-    if (channel.sendflow) { $crm("#crm-detail").innerHTML = renderSendflowDetail(channel); bindSendflowDetail(); return; }
-    if (channel.rd) { $crm("#crm-detail").innerHTML = renderRdDetail(channel); bindRdDetail(channel); return; }
-    const metrics = metricMap(channel); const activation = channel.activation;
+    const metrics = metricMap(channel);
+    const reference = crmState.referenceData.channels.find((item) => item.id === channel.id);
+    const activation = { ...reference.activation, resultLabel: channel.id === 'whatsapp-organico' ? 'Sessoes de referencia' : 'Cliques estimados como sessoes' };
+    const options = { ...artifactOptions, start: crmState.start, end: crmState.end, compareStart: crmState.compareStart, compareEnd: crmState.compareEnd, referencePeriod: crmState.referenceData.period, sheetRecords: crmState.campaigns.flatMap((row) => row.trackingRecords || []), sheetStatus: whatsappSource.status };
     const orderMetric = metrics.get("orders"), revenueMetric = metrics.get("revenue");
     const ticket = orderMetric?.actual > 0 && revenueMetric?.actual !== null && orderMetric.currentComplete !== false && revenueMetric.currentComplete !== false ? revenueMetric.actual / orderMetric.actual : null;
-    const activationHtml = activation.segments.length ? `<div class="crm-detail-card"><h3>Funil completo de ativacao</h3><p class="crm-detail-hint">${esc(activation.hint)}</p>${renderActivationGraphic(activation)}</div><div class="crm-detail-card">${renderTracking(channel)}</div>` : '<p class="crm-detail-hint">Ativacao sem carga operacional neste recorte. O resultado comercial acima permanece vinculado ao SSOT do canal.</p>';
-    $crm("#crm-detail").innerHTML = `<div class="crm-detail-grid"><div class="crm-detail-card"><h3>Funil de conversao SSOT</h3><p class="crm-detail-hint">Sessoes e pedidos do canal no SSOT, no mesmo periodo.</p>${renderConversionFunnel(channel)}<div class="crm-side-stats"><div><span>Receita SSOT</span><strong>${money(metrics.get("revenue")?.actual)}</strong></div><div><span>Ticket medio SSOT</span><strong>${money(ticket)}</strong></div><div><span>Conversao SSOT</span><strong>${percent(metrics.get("rate")?.actual)}</strong></div></div></div>${renderPacingDetail(channel)}</div>${activationHtml}`;
-    bindTracking(channel);
+    const referenceLabel = `${sourceDateLabel(options.referencePeriod.start)} a ${sourceDateLabel(options.referencePeriod.end)}`;
+    const activationHtml = `<section data-crm-view="activation" class="crm-artifact-activation"><h3>Funil completo de ativacao</h3><p class="crm-detail-hint">Plano do artefato · ${referenceLabel}. ${esc(activation.hint)} Valores planejados, nao realizados no recorte atual.${channel.id === 'whatsapp-organico' ? '' : ' A projecao original assume um clique como uma sessao; essa hipotese nao e usada na conversao SSOT.'}</p>${renderActivationGraphic(activation)}</section>`;
+    const provider = channel.rd ? renderRdDetail(channel) : channel.sendflow ? renderSendflowDetail(channel) : '';
+    $crm("#crm-detail").innerHTML = `<section data-crm-view="conversion" class="crm-artifact-conversion"><div><h3>Funil de conversao</h3><p class="crm-detail-hint">Realizado SSOT · ${crmState.data.period.label}</p>${renderConversionFunnel(channel)}</div><div class="crm-side-stats">${['revenue', 'ticket', 'rate'].map((key) => { const metric = key === 'ticket' ? { actual: ticket, comparison: channel.ssotComparison?.orders > 0 && channel.ssotComparison.complete ? channel.ssotComparison.revenue / channel.ssotComparison.orders : null, format: 'money' } : metrics.get(key); const delta = formatPeriodDelta(metric); return `<div><span>${{ revenue: 'Receita SSOT', ticket: 'Ticket medio SSOT', rate: 'Conversao SSOT' }[key]}</span><strong>${formatValue(metric.actual, metric.format)}</strong><small>Anterior: ${formatValue(metric.comparison, metric.format)}</small><small class="${delta.tone}">${esc(delta.text)}</small></div>`; }).join('')}</div></section>${CrmArtifact.pacing(channel, reference, options)}${activationHtml}${CrmArtifact.tracking(channel, reference, options)}${provider ? `<details class="crm-provider-details" open><summary>Dados operacionais · ${channel.rd ? 'RD Station' : 'SendFlow'}</summary>${provider}</details>` : ''}`;
+    window.ReiseCharts?.prepare($crm('#crm-detail'));
+    CrmArtifact.bind($crm('#crm-detail'), channel, reference, options, (patch) => { Object.assign(artifactOptions, patch); renderDetail(); });
+    if (channel.rd) bindRdDetail(channel);
+    if (channel.sendflow) bindSendflowDetail();
   };
   const renderSideConversion = () => { const channel = selectedChannels()[0]; const cell = $crm("#crm-detail .crm-side-stats div:last-child"); if (!channel || !cell) return; const rate = metricMap(channel).get("rate")?.actual ?? null; cell.querySelector("span").textContent = channel.ssotCommercial ? "Conversao SSOT" : "Conversao CRM"; cell.querySelector("strong").textContent = percent(rate); };
   const renderAll = () => {
-    renderSummary(); renderSourceReconciliation(); renderChannels(); renderPriorities(); renderFunnel(); renderPacing(); renderDetail(); renderSideConversion(); refreshCrmFilterSummary();
+    renderSummary(); renderSourceReconciliation(); renderPriorities(); renderDetail(); renderSideConversion(); refreshCrmFilterSummary();
+    renderSourceBanner();
+  };
+  const renderSourceBanner = () => {
     const channel = selectedChannels()[0];
     if (channel?.rd) {
       $crm("#crm-validation-banner").className = "callout validation-banner warn";
@@ -452,7 +483,7 @@
       $crm("#crm-source-label").textContent = channel?.sourceLabel || "Fontes por canal";
     }
   };
-  const switchWorkspace = (workspace) => { const button = document.querySelector(`[data-workspace="${workspace}"]`); if (!button) return; document.querySelectorAll("[data-workspace]").forEach((item) => item.classList.toggle("active", item === button)); document.querySelectorAll(".workspace-panel").forEach((panel) => panel.classList.toggle("is-hidden", panel.id !== `${workspace}-workspace`)); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const switchWorkspace = (workspace) => { const button = document.querySelector(`[data-workspace="${workspace}"]`); if (!button) return; document.querySelectorAll("[data-workspace]").forEach((item) => item.classList.toggle("active", item === button)); document.querySelectorAll(".workspace-panel").forEach((panel) => panel.classList.toggle("is-hidden", panel.id !== `${workspace}-workspace`)); window.scrollTo({ top: 0, behavior: "auto" }); };
   const bindWorkspaceTabs = () => { document.querySelectorAll("[data-workspace]").forEach((button) => button.addEventListener("click", () => { const workspace = button.dataset.workspace; history.replaceState(null, "", workspace === "crm" ? "#crm" : "#growth"); switchWorkspace(workspace); })); if (location.hash === "#crm") switchWorkspace("crm"); };
   const syncCrmPeriodControls = () => {
     $crm("#crm-period-preset").value = crmState.periodPreset;
@@ -481,6 +512,7 @@
     const applied = snapshotCrmFilters();
     try {
       Object.assign(crmState, crmFilterDraft);
+      crmApplyPeriodPreset(crmState.periodPreset);
       callback();
       crmFilterDraft = snapshotCrmFilters();
       syncCrmPeriodControls();
@@ -502,7 +534,7 @@
       clearValidity();
       const { id, value } = event.target;
       editCrmDraft(() => {
-        if (id === 'crm-channel-filter') crmState.channel = value;
+        if (id === 'crm-channel-filter') { crmState.channel = value; crmApplyPeriodPreset(crmState.periodPreset); }
         if (id === 'crm-period-preset') { crmState.periodPreset = value; crmApplyPeriodPreset(value); }
         if (id === 'crm-date-start' || id === 'crm-date-end') {
           crmState[id.endsWith('start') ? 'start' : 'end'] = value;
@@ -529,6 +561,7 @@
       Object.assign(crmState, crmFilterDraft);
       crmState.sendflowPage = 0;
       crmState.rdPage = 0;
+      artifactOptions.pacingPage = artifactOptions.trackingPage = 0;
       crmFilterDraft = null; dialog.close(); syncCrmPeriodControls(); rebuildCrmData();
     });
   };
@@ -557,7 +590,7 @@
         if (previous) { const snapshot = CrmSendFlow.validate(await previous.json()); snapshot.source.mode = "cached_sheet"; return snapshot; }
       } catch (error) { /* Reject invalid caches and retain the packaged snapshot. */ }
     }
-    const response = await fetch("data/crm-sendflow-snapshot.json");
+    const response = await fetch("data/crm-sendflow-snapshot.json", { cache: 'no-store', signal: AbortSignal.timeout(12000) });
     if (!response.ok) throw new Error(`Snapshot SendFlow: HTTP ${response.status}`);
     return CrmSendFlow.validate(await response.json());
   };
@@ -611,49 +644,134 @@
     if (accountId && packaged.snapshot.source.accountId !== accountId) throw new Error("Conta do snapshot RD diferente da configurada.");
     return { ...CrmRd.normalizeSnapshot(packaged.snapshot), readMode: "snapshot", readWarning: warning };
   };
+  let refreshing = false;
+  const readWhatsApp = async () => {
+    try {
+      const response = await fetch('data/crm-whatsapp-snapshot.json', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+      if (response.ok) {
+        const snapshot = await response.json();
+        if (snapshot.schemaVersion === 1 && snapshot.source?.spreadsheetId === '1vlkkrA52FBGk79k0ou3vch1XqM-AdHVDj42IXO7hIZo' && snapshot.rows?.length) return consolidateWhatsAppRows(snapshot.rows);
+      }
+    } catch (error) { /* The public read-only source remains a fallback. */ }
+    const response = await fetch(WHATSAPP_OFFICIAL_CSV_URL, { cache: 'no-store', signal: AbortSignal.timeout(12000) });
+    if (!response.ok) throw new Error('Planilha operacional indisponivel');
+    return consolidateWhatsAppRows(parseCsv(await response.text()));
+  };
+  let pendingRender = false;
+  let lastRefreshAttempt = 0;
+  const editingCrm = () => Boolean(crmFilterDraft || document.activeElement?.closest('#crm-workspace input, #crm-workspace select, #crm-workspace textarea'));
+  const renderFreshness = () => {
+    const ids = crmState.channel === 'all' ? ['email', 'whatsapp-oficial', 'whatsapp-organico'] : [crmState.channel];
+    const checks = ids.map((id) => CrmSendFlow.freshness(commercialSource(id), id));
+    const ready = checks.every((check) => check.status === 'current');
+    const oldest = checks.map((check) => check.latest).filter(Boolean).sort()[0];
+    const badge = $crm('#crm-freshness');
+    badge.className = `status-pill ${ready ? 'ok' : 'warn'}`;
+    badge.textContent = ready ? `SSOT ate ${sourceDateLabel(checks[0].target)} | D-1` : `${checks.some((check) => check.status === 'stale') ? 'Base atrasada' : 'Cobertura parcial'}${oldest ? ` | ate ${sourceDateLabel(oldest)}` : ''}`;
+    badge.title = checks.map((check, index) => `${ids[index]}: ${check.status}; fechamento esperado ${check.target}`).join('\n');
+  };
+  const flushRefresh = () => {
+    if (!pendingRender || editingCrm() || !crmState.referenceData) return;
+    pendingRender = false;
+    crmApplyPeriodPreset(crmState.periodPreset);
+    syncCrmPeriodControls(); rebuildCrmData();
+  };
+  const readCommercialSnapshot = async () => {
+    const response = await fetch('data/ssot-commercial-channels.json', { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw new Error('Falha ao ler a extracao SSOT');
+    return CrmSendFlow.validateCommercialSnapshot(await response.json());
+  };
+  const refreshCrm = async (manual = false) => {
+    if (!crmState.referenceData || refreshing || (!manual && (document.hidden || editingCrm() || $crm('#crm-workspace').classList.contains('is-hidden') || Date.now() - lastRefreshAttempt < 300000))) return;
+    refreshing = true; lastRefreshAttempt = Date.now();
+    const button = $crm('#crm-refresh'), feedback = $crm('#crm-refresh-result');
+    button.disabled = true; button.textContent = 'Consultando...'; feedback.textContent = '';
+    let failed = false;
+    const commercial = readCommercialSnapshot().then((snapshot) => {
+      for (const id of ['email', 'whatsapp-oficial', 'whatsapp-organico']) {
+        const previous = CrmSendFlow.availableDates(crmState.ssotFallback, id).at(-1);
+        const next = CrmSendFlow.availableDates(snapshot, id).at(-1);
+        if (previous && (!next || next < previous)) throw new Error('Extracao SSOT recebida esta atrasada');
+      }
+      if (snapshot.extracted_at !== crmState.ssotFallback?.extracted_at) {
+        crmState.ssotFallback = { ...snapshot, crmSourceMode: 'snapshot' }; pendingRender = true; flushRefresh();
+      }
+    }).catch(() => { failed = true; });
+    const operational = [
+      readRd().then((value) => { if (value.observedAt !== crmState.rd?.observedAt || value.readMode !== crmState.rd?.readMode || value.readWarning !== crmState.rd?.readWarning) { crmState.rd = value; pendingRender = true; } }),
+      readSendflow().then((value) => { if (value.source.extractedAt !== crmState.sendflow?.source.extractedAt || value.source.mode !== crmState.sendflow?.source.mode) { crmState.sendflow = value; pendingRender = true; } }),
+      readWhatsApp().then((rows) => {
+        if (!rows.length) throw new Error('Planilha operacional vazia');
+        if (whatsappSource.status !== 'ready') pendingRender = true;
+        whatsappSource.status = 'ready';
+        if (JSON.stringify(rows) !== JSON.stringify(crmState.campaigns)) { crmState.campaigns = rows; pendingRender = true; }
+      }).catch(() => { whatsappSource.status = 'error'; pendingRender = true; throw new Error('Planilha operacional indisponivel'); }),
+    ];
+    const results = await Promise.allSettled([commercial, ...operational]);
+    failed ||= results.some((result) => result.status === 'rejected');
+    flushRefresh(); renderFreshness();
+    refreshing = false; button.disabled = false; button.textContent = 'Atualizar leitura';
+    feedback.textContent = failed ? 'Falha em uma fonte. Ultima leitura valida preservada.' : `Leitura conferida as ${new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(new Date())}`;
+  };
   const boot = async () => {
     bindWorkspaceTabs();
     window.addEventListener("panorama:ssot", (event) => {
+      const ids = crmState.channel === 'all' ? ['email', 'whatsapp-oficial', 'whatsapp-organico'] : [crmState.channel];
+      const before = ids.map(commercialSource);
       crmState.ssotPayload = event.detail?.rows ? { ...event.detail, crmSourceMode: "snapshot" } : event.detail;
-      if (crmState.referenceData && crmState.start) rebuildCrmData();
+      const changed = ids.some((id, index) => {
+        const next = commercialSource(id), previous = before[index];
+        return (next?.extracted_at || next?.generatedAt) !== (previous?.extracted_at || previous?.generatedAt) || next?.source !== previous?.source;
+      });
+      if (changed && crmState.referenceData && crmState.start) { pendingRender = true; flushRefresh(); }
     });
     try {
-      const [referenceResponse, whatsappResponse, ssotSnapshot, sendflow, rd] = await Promise.all([
-        fetch("data/crm-weekly-reference.json", { cache: "no-store" }),
-        fetch(WHATSAPP_OFFICIAL_CSV_URL, { cache: "no-store", signal: AbortSignal.timeout(12000) }).catch(() => null),
-        fetch("data/ssot-commercial-channels.json").then((response) => response.ok ? response.json() : null).catch(() => null),
+      const operational = [
+      readWhatsApp().catch(() => null),
         readSendflow().catch((error) => { crmState.sendflowError = error.message; return null; }),
         readRd().catch((error) => { crmState.rdError = error.message; return null; }),
+      ];
+      const [referenceResponse, ssotSnapshot] = await Promise.all([
+        fetch("data/crm-weekly-reference.json", { cache: "no-store" }),
+        readCommercialSnapshot().catch(() => null),
       ]);
       if (!referenceResponse.ok) throw new Error(`HTTP ${referenceResponse.status}`);
       crmState.referenceData = await referenceResponse.json();
       crmState.ssotFallback = ssotSnapshot ? { ...ssotSnapshot, crmSourceMode: "snapshot" } : null;
       crmState.ssotPayload = crmState.ssotPayload || (typeof state !== "undefined" ? state.growthPayload : null) || crmState.ssotFallback;
-      crmState.sendflow = sendflow;
-      crmState.rd = rd;
-      if (whatsappResponse?.ok) {
-        crmState.campaigns = consolidateWhatsAppRows(parseCsv(await whatsappResponse.text()));
-      }
-      const available = [...crmState.campaigns.map((row) => row.date), ...CrmSendFlow.availableDates(crmState.ssotPayload), ...CrmSendFlow.availableDates(crmState.ssotFallback), ...(sendflow ? [sendflow.source.coverage.start, sendflow.source.coverage.end] : []), ...(rd ? [rd.period.start, rd.period.end] : [])].sort();
+      const available = [...CrmSendFlow.availableDates(crmState.ssotPayload), ...CrmSendFlow.availableDates(crmState.ssotFallback)].sort();
       if (!available.length) throw new Error("As fontes CRM nao possuem datas validas para filtrar.");
       crmState.availableStart = available.at(0);
       crmState.availableEnd = available.at(-1);
       crmState.start = crmState.end = crmState.availableEnd;
-      const params = new URLSearchParams(location.search);
-      if (params.get("crmChannel") === "whatsapp-organico" && sendflow) {
-        crmState.channel = "whatsapp-organico";
-        crmState.start = sendflow.source.coverage.start; crmState.end = sendflow.source.coverage.end; crmState.periodPreset = "custom";
-      }
-      if (params.get("crmChannel") === "email" && rd) {
-        crmState.channel = "email";
-        crmState.start = rd.period.start; crmState.end = rd.period.end; crmState.periodPreset = "custom";
-      }
+      crmApplyPeriodPreset('current-day');
       crmApplyComparison();
       const filter = $crm("#crm-channel-filter");
       filter.innerHTML = `<option value="all">Todos os canais CRM</option>${crmState.referenceData.channels.map((channel) => `<option value="${esc(channel.id)}">${esc(channel.name)}</option>`).join("")}`; filter.value = crmState.channel;
       bindCrmPeriodControls();
       syncCrmPeriodControls();
       rebuildCrmData();
+      if (location.hash === '#crm' && typeof hideLoadingScreen === 'function') hideLoadingScreen();
+      $crm('#crm-refresh').disabled = false;
+      $crm('#crm-refresh').addEventListener('click', () => window.PanoramaRefresh ? window.PanoramaRefresh.request() : refreshCrm(true));
+      window.addEventListener('panorama:data-refreshed', () => refreshCrm(true));
+      $crm('#crm-workspace').addEventListener('focusout', () => setTimeout(flushRefresh, 0));
+      document.addEventListener('visibilitychange', () => refreshCrm());
+      setInterval(() => refreshCrm(), 300000);
+      const requested = new URLSearchParams(location.search).get('crmChannel');
+      await Promise.all(operational.map(async (request, index) => {
+        const value = await request;
+        if (index === 0) { crmState.campaigns = value || []; whatsappSource.status = value?.length ? 'ready' : 'error'; }
+        if (index === 1) crmState.sendflow = value;
+        if (index === 2) crmState.rd = value;
+        if (value && !editingCrm() && ((requested === 'whatsapp-organico' && index === 1) || (requested === 'email' && index === 2))) {
+          const period = index === 1 ? value.source.coverage : value.period;
+          crmState.channel = requested; crmState.start = period.start; crmState.end = period.end; crmState.periodPreset = 'custom'; crmApplyComparison();
+        }
+        const channelId = ['whatsapp-oficial', 'whatsapp-organico', 'email'][index];
+        if (crmState.channel === channelId || crmState.channel === 'all') { pendingRender = true; flushRefresh(); }
+        renderSourceBanner();
+      }));
     } catch (error) {
       $crm("#crm-validation-banner").className = "callout validation-banner error";
       $crm("#crm-validation-banner strong").textContent = "Falha na leitura CRM";

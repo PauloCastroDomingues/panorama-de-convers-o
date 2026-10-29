@@ -1,0 +1,111 @@
+{
+  "checkedAt": "2026-10-29T10:06:11.622563-03:00",
+  "targetDate": "2026-10-28",
+  "latestDate": "2026-10-28",
+  "channels": {
+    "email": {
+      "name": "E-mail",
+      "latestDate": "2026-10-28",
+      "metrics": {
+        "sessoes": {
+          "latestDate": "2026-10-28",
+          "knownDays": 137,
+          "expectedDays": 666,
+          "missingDays": 529,
+          "targetValue": 865,
+          "coverageStatus": "partial",
+          "status": "current"
+        },
+        "pedidos": {
+          "latestDate": "2026-10-28",
+          "knownDays": 265,
+          "expectedDays": 666,
+          "missingDays": 401,
+          "targetValue": 12,
+          "coverageStatus": "partial",
+          "status": "current"
+        },
+        "receita": {
+          "latestDate": "2026-10-28",
+          "knownDays": 265,
+          "expectedDays": 666,
+          "missingDays": 401,
+          "targetValue": "6918.39",
+          "coverageStatus": "partial",
+          "status": "current"
+        }
+      },
+      "status": "current"
+    },
+    "whatsapp-oficial": {
+      "name": "WhatsApp Oficial",
+      "latestDate": "2026-10-28",
+      "metrics": {
+        "sessoes": {
+          "latestDate": "2026-10-28",
+          "knownDays": 275,
+          "expectedDays": 666,
+          "missingDays": 391,
+          "targetValue": 554,
+          "coverageStatus": "partial",
+          "status": "current"
+        },
+        "pedidos": {
+          "latestDate": "2026-10-28",
+          "knownDays": 276,
+          "expectedDays": 666,
+          "missingDays": 390,
+          "targetValue": 17,
+          "coverageStatus": "partial",
+          "status": "current"
+        },
+        "receita": {
+          "latestDate": "2026-10-28",
+          "knownDays": 276,
+          "expectedDays": 666,
+          "missingDays": 390,
+          "targetValue": "11480.63",
+          "coverageStatus": "partial",
+          "status": "current"
+        }
+      },
+      "status": "current"
+    },
+    "whatsapp-organico": {
+      "name": "WhatsApp Organico",
+      "latestDate": "2026-10-28",
+      "metrics": {
+        "sessoes": {
+          "latestDate": "2026-10-28",
+          "knownDays": 273,
+          "expectedDays": 666,
+          "missingDays": 393,
+          "targetValue": 376,
+          "coverageStatus": "partial",
+          "status": "current"
+        },
+        "pedidos": {
+          "latestDate": "2026-10-28",
+          "knownDays": 274,
+          "expectedDays": 666,
+          "missingDays": 392,
+          "targetValue": 9,
+          "coverageStatus": "partial",
+          "status": "current"
+        },
+        "receita": {
+          "latestDate": "2026-10-28",
+          "knownDays": 274,
+          "expectedDays": 666,
+          "missingDays": 392,
+          "targetValue": "4699.61",
+          "coverageStatus": "partial",
+          "status": "current"
+        }
+      },
+      "status": "current"
+    }
+  },
+  "status": "current",
+  "error": null
+}

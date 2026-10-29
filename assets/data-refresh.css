@@ -1,0 +1,15 @@
+.base-refresh { padding: 10px 22px; border-bottom: 1px solid var(--line); background: var(--bg); font-size: 12px; }
+.base-refresh-line { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.base-refresh details { flex: 1 1 240px; min-width: 0; }
+.base-refresh summary { cursor: pointer; color: var(--ink-soft); width: fit-content; }
+.base-refresh summary[data-state="warn"] { color: var(--yellow); }
+.base-refresh summary[data-state="ok"] { color: var(--green); }
+.base-refresh .source-table { overflow-x: auto; margin-top: 12px; }
+.base-refresh table { width: 100%; font-size: 12px; }
+.base-refresh th, .base-refresh td { text-align: left; padding: 8px 10px; white-space: normal; }
+.base-refresh td:nth-child(2) { white-space: nowrap; }
+.base-refresh tr[data-status="error"] td:nth-child(3) { color: var(--red); }
+.base-refresh tr[data-status="stale"] td:nth-child(3) { color: var(--yellow); }
+#base-refresh-feedback { color: var(--muted); overflow-wrap: anywhere; }
+#base-refresh { flex: 0 0 auto; min-height: 34px; }
+@media (max-width: 600px) { .base-refresh { padding: 10px 14px; } .base-refresh details { flex-basis: 100%; } }

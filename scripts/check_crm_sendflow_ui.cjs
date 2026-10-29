@@ -51,6 +51,7 @@ const root = path.resolve(__dirname, '..');
       const expectedCommercial = adapter.commercial(ssotSnapshot, id, '2026-09-15', '2026-09-21');
       assert.ok(expectedCommercial.orders !== null);
       assert.equal(await page.locator('#crm-summary-kpis .kpi strong').nth(1).innerText(), new Intl.NumberFormat('pt-BR').format(expectedCommercial.orders));
+      await page.locator('.crm-source-details').evaluate((element) => { element.open = true; });
       assert.equal(await page.locator('#crm-ssot-reconciliation').isVisible(), true);
     }
     await page.locator('#crm-channel-tabs [data-crm-tab="whatsapp-organico"]').click();
@@ -81,7 +82,8 @@ const root = path.resolve(__dirname, '..');
     await noProvider.locator('#crm-apply-filters').click();
     const noProviderExpected = adapter.commercial(ssotSnapshot, 'whatsapp-organico', '2026-09-15', '2026-09-21');
     assert.equal(await noProvider.locator('#crm-summary-kpis .kpi strong').nth(1).innerText(), new Intl.NumberFormat('pt-BR').format(noProviderExpected.orders));
-    assert.equal(await noProvider.locator('.crm-activation-summary').count(), 0, 'No provider must not create a zero-valued activation funnel');
+    assert.match(await noProvider.locator('[data-crm-view="activation"]').innerText(), /Plano do artefato/, 'Planning views remain available without fabricating observed activation');
+    assert.equal(await noProvider.locator('.crm-sendflow-report').count(), 0, 'No provider cannot create observed activity');
     await noProviderContext.close();
     const bridgedContext = await browser.newContext();
     const bridgedPage = await bridgedContext.newPage();

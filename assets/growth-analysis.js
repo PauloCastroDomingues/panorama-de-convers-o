@@ -168,17 +168,19 @@ function pairedPeriods(rows, previousRows, granularity) {
   });
   const previous = new Map(aggregatePeriods(projected, granularity).map((row) => {
     const bounds = originalBounds.get(row.key);
-    return [row.key, { ...row, label: bounds ? `${dayLabel(bounds[0])} a ${dayLabel(bounds[1])}` : row.label }];
+    return [row.key, { ...row, axisLabel: row.label, label: bounds ? `${dayLabel(bounds[0])} a ${dayLabel(bounds[1])}` : row.label }];
   }));
   return [...new Set([...current.keys(), ...previous.keys()])].sort().map((key) => {
     const currentPeriod = current.get(key);
     const previousPeriod = previous.get(key);
-    return { ...withComparison(currentPeriod || { ...summarize([]), key, label: previousPeriod?.label }, previousPeriod || null), key };
+    return { ...withComparison(currentPeriod || { ...summarize([]), key, label: previousPeriod?.axisLabel }, previousPeriod || null), key };
   });
 }
 function drawPeriodChart(box, series, metric) {
   const axis = [...new Set(series.flatMap((item) => item.periods.map((period) => period.key)))].sort();
-  const labels = new Map(series.flatMap((item) => item.periods.map((period) => [period.key, period.label])));
+  const labels = new Map();
+  // Current periods define the shared axis; original comparison dates stay in the tooltip.
+  series.forEach((item) => item.periods.forEach((period) => { if (!labels.has(period.key)) labels.set(period.key, period.label); }));
   const known = series.flatMap((item) => item.periods.map((period) => metricValue(period, metric))).filter(Number.isFinite);
   if (!axis.length || !known.length) { box.innerHTML = '<div class="empty-state">Sem base valida para este indicador no recorte.</div>'; return; }
   const width = Math.max(box.clientWidth, 640); const height = 280;
@@ -207,6 +209,7 @@ function drawPeriodChart(box, series, metric) {
   });
   svg.push("</svg>");
   box.innerHTML = `<div class="chart-legend">${series.map((item) => `<span><i style="border-color:${item.color};border-top-style:${item.dashed ? 'dashed' : 'solid'}"></i>${escapeHtml(item.label)}</span>`).join("")}</div>${svg.join("")}`;
+  window.ReiseCharts?.prepare(box);
 }
 function periodSeries(pairs, label, color) {
   return [

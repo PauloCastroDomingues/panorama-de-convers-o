@@ -35,6 +35,11 @@ assert.equal(evaluate("summarize([{pedidos:4,sessoes:100},{pedidos:1,sessoes:400
 evaluate("state.selectedProduct=''; const pairs=pairedPeriods(normalizedViewRows('channel_product').filter(r=>inPeriod(r,'current')),normalizedViewRows('channel_product').filter(r=>inPeriod(r,'compare')),'day')");
 assert.equal(evaluate("pairs.find(p=>p.key==='2026-10-28').compare.pedidos"), 2, 'Missing intermediate dates must not shift the reference');
 assert.equal(evaluate("pairs.find(p=>p.key==='2026-10-26').compare.pedidos"), 3);
+evaluate("globalThis.window = {}; const chartBox = { clientWidth: 800 }; drawPeriodChart(chartBox, periodSeries(pairs, 'Pedidos', '#fb5d06'), 'pedidos')");
+assert.match(evaluate('chartBox.innerHTML'), /<text[^>]+>26\/10\/26<\/text>/, 'Shared chart axis keeps current dates');
+assert.doesNotMatch(evaluate('chartBox.innerHTML'), /<text[^>]+>23\/10\/26 a 23\/10\/26<\/text>/, 'Comparison dates must not replace current axis labels');
+assert.match(evaluate('chartBox.innerHTML'), /<title>Pedidos \/ Comparado \/ 23\/10\/26 a 23\/10\/26/, 'Comparison tooltip retains its own original dates');
+assert.equal(evaluate("pairedPeriods([], [{data:'2026-10-24',pedidos:2,sessoes:100}], 'day')[0].label"), '27/10/26', 'Comparison-only points also use projected current-axis dates');
 evaluate("entityState.a.view='product'; entityState.a.key='gray'; entityState.b.view='product'; entityState.b.key='white'");
 assert.equal(evaluate("entitySelection('a').pedidos"), 4);
 assert.equal(evaluate("entitySelection('b').pedidos"), 1);

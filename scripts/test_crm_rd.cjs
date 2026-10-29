@@ -81,14 +81,16 @@ assert.throws(() => importer.prepare({ ...preparedSource, counts: { ...preparedS
 assert.equal(/workflow_email_statistics|reise_rates_provisional|collectedAt|account_id/.test(JSON.stringify(snapshot)), false, 'Pilot only contains whitelisted data, not workflow IDs or ready-made rates');
 console.log('CRM RD actual pilot: 26 received, 25 selected, five flagged, snapshot import and coverage guards passed.');
 
-const latest = rd.normalizeSnapshot(require('../data/crm-rd-snapshot.json'));
-assert.equal(latest.receivedRows, 72);
-assert.equal(latest.records.length, 72);
-assert.equal(latest.outsidePeriod.length, 0);
-assert.equal(latest.countIssueRows, 5);
+const latestSnapshot = require('../data/crm-rd-snapshot.json');
+const latest = rd.normalizeSnapshot(latestSnapshot);
+assert.equal(latest.receivedRows, latestSnapshot.campaigns.length + latestSnapshot.outsideCampaigns.length);
+assert.equal(latest.records.length, latestSnapshot.campaigns.length);
+assert.equal(latest.outsidePeriod.length, latestSnapshot.outsideCampaigns.length);
+assert.ok(latest.records.length > 0);
 assert.equal(latest.duplicateRows, 0);
-assert.equal(latest.period.start, '2026-09-28');
-assert.equal(latest.period.end, '2026-10-27');
+assert.equal(latest.period.start, latestSnapshot.source.start);
+assert.equal(latest.period.end, latestSnapshot.source.end);
 assert.equal(latest.scopeComplete, false, 'Committed auxiliary load does not certify RD coverage');
-assert.deepEqual(rd.selectPeriod(latest, latest.period.start, latest.period.end).receivedTotals, { selected: 3646448, delivered: 3256712, opened: 1042239, clicked: 6269 });
-console.log('CRM RD latest sheet load: 72 observations, five flags; original pilot retained as a regression fixture.');
+const sums = Object.fromEntries([['selected', 'contacts_count'], ['delivered', 'email_delivered_count'], ['opened', 'email_opened_count'], ['clicked', 'email_clicked_count']].map(([key, field]) => [key, latestSnapshot.campaigns.reduce((sum, row) => sum + row[field], 0)]));
+assert.deepEqual(rd.selectPeriod(latest, latest.period.start, latest.period.end).receivedTotals, sums);
+console.log(`CRM RD latest sheet load: ${latest.records.length} observations; original pilot retained as a regression fixture.`);

@@ -1,0 +1,57 @@
+const assert = require('node:assert/strict');
+const { chromium } = require('C:/Users/reise/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const source = require('../data/ssot-commercial-channels.json');
+const day = (date, sessions) => ({ ...source, extracted_at: `${date}T20:00:00-03:00`, rows: ['E-mail', 'WhatsApp Oficial', 'WhatsApp Nao Oficial'].map((canal) => ({ data: date, canal, canal_detalhe: canal, sessoes: sessions, pedidos: 4, receita: '2000' })) });
+
+(async () => {
+  const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+  const errors = [];
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.clock.setFixedTime(new Date('2026-10-28T16:00:00Z'));
+    page.on('pageerror', (error) => errors.push(error.message));
+    let payload = day('2026-10-26', 100), fail = false, releaseOperational;
+    const operationalGate = new Promise((resolve) => { releaseOperational = resolve; });
+    const json = (route, body) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+    await page.route('**/data/ssot-commercial-channels.json', (route) => fail ? route.fulfill({ status: 503, body: 'offline' }) : json(route, payload));
+    await page.route('https://script.google.com/**', (route) => json(route, { ok: false }));
+    await page.route('https://docs.google.com/**', async (route) => { await operationalGate; return route.fulfill({ contentType: 'text/csv', body: 'Data,Tema\n' }); });
+    await page.goto('http://127.0.0.1:8020/#crm', { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-crm-view="tracking"]').waitFor({ timeout: 5000 });
+    assert.equal(await page.locator('#crm-date-start').inputValue(), '2026-10-26', 'Commercial analysis does not wait for operational Sheets');
+    assert.match(await page.locator('#crm-freshness').innerText(), /Base atrasada/);
+    releaseOperational();
+    await page.waitForFunction(() => document.querySelector('#crm-validation-banner').textContent.includes('piloto disponivel'));
+    payload = day('2026-10-27', 200);
+    await page.locator('#crm-refresh').click();
+    await page.waitForFunction(() => !document.querySelector('#crm-refresh').disabled);
+    assert.equal(await page.locator('#crm-date-start').inputValue(), '2026-10-27');
+    assert.equal(await page.locator('#crm-summary-kpis strong').first().innerText(), '200');
+    assert.match(await page.locator('#crm-freshness').innerText(), /D-1/);
+    await page.evaluate((old) => window.dispatchEvent(new CustomEvent('panorama:ssot', { detail: old })), day('2026-10-22', 50));
+    assert.equal(await page.locator('#crm-date-start').inputValue(), '2026-10-27', 'Late stale Growth payload cannot downgrade CRM');
+    fail = true;
+    await page.locator('#crm-refresh').click();
+    await page.waitForFunction(() => !document.querySelector('#crm-refresh').disabled);
+    assert.equal(await page.locator('#crm-summary-kpis strong').first().innerText(), '200', 'Network failure retains last good data');
+    assert.match(await page.locator('#crm-refresh-result').innerText(), /Ultima leitura valida preservada/);
+    await page.locator('[data-tracking-source="local"]').click();
+    const input = page.locator('[data-artifact-track="Publico"]').first();
+    await input.fill('123');
+    await page.evaluate((old) => window.dispatchEvent(new CustomEvent('panorama:ssot', { detail: old })), day('2026-10-22', 50));
+    assert.equal(await input.inputValue(), '123');
+    assert.equal(await input.evaluate((element) => element === document.activeElement), true, 'Background refresh preserves editing focus');
+    await input.blur();
+    await page.locator('#crm-open-filters').click();
+    await page.locator('#crm-date-start').fill('2026-10-26');
+    await page.locator('#crm-date-end').fill('2026-10-26');
+    await page.locator('#crm-apply-filters').click();
+    fail = false;
+    payload = { ...day('2026-10-27', 210), extracted_at: '2026-10-28T20:00:00-03:00' };
+    await page.locator('#crm-refresh').click();
+    await page.waitForFunction(() => !document.querySelector('#crm-refresh').disabled);
+    assert.equal(await page.locator('#crm-date-start').inputValue(), '2026-10-26', 'Refresh preserves explicit custom dates');
+    assert.deepEqual(errors, []);
+    console.log('CRM refresh browser checks passed: nonblocking load, D-1, newer source, failure fallback, custom dates and editing focus.');
+  } finally { await browser.close(); }
+})().catch((error) => { console.error(error); process.exitCode = 1; });

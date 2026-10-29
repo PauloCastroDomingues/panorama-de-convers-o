@@ -427,23 +427,20 @@ function reorderGrowthSections() {
   Object.entries(numbers).forEach(([id, number]) => { const node = document.querySelector(`#${id} .section-number`); if (node) node.textContent = number; });
 }
 
-let loadingHideTimer = null;
-function setLoadingStep(stage, message, progress) {
-  const stageNode = $("#data-loader-stage"); const messageNode = $("#data-loader-message"); const progressNode = $("#data-loader-progress");
+function setLoadingStep(stage, message) {
+  const stageNode = $("#data-loader-stage"); const messageNode = $("#data-loader-message");
   if (stageNode) stageNode.textContent = stage;
   if (messageNode) messageNode.textContent = message;
-  if (progressNode) progressNode.style.width = `${progress}%`;
 }
 function showLoadingScreen() {
   const loader = $("#data-loader"); if (!loader) return;
-  if (loadingHideTimer) clearTimeout(loadingHideTimer);
   loader.classList.remove("is-complete"); loader.setAttribute("aria-hidden", "false"); document.body.classList.add("is-loading");
-  setLoadingStep("01", "Conectando ao SSOT", 18);
+  setLoadingStep("01", "Conectando ao SSOT");
 }
 function hideLoadingScreen() {
   const loader = $("#data-loader"); if (!loader) return;
-  setLoadingStep("03", "Leitura pronta", 100);
-  loadingHideTimer = setTimeout(() => { loader.classList.add("is-complete"); loader.setAttribute("aria-hidden", "true"); document.body.classList.remove("is-loading"); }, 260);
+  setLoadingStep("03", "Leitura pronta");
+  loader.classList.add("is-complete"); loader.setAttribute("aria-hidden", "true"); document.body.classList.remove("is-loading");
 }
 async function loadJson(url, timeout = 18000) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeout); try { const response = await fetch(url, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return await response.json(); } finally { clearTimeout(timer); } }
 async function loadGrowth() { try { return await loadJson(`${API_URL}?view=growth_views&_ts=${Date.now()}`, 120000); } catch (remoteError) { return { ok: false, error: `Ponte growth_views indisponivel: ${remoteError.message}` }; } }
@@ -465,10 +462,12 @@ async function loadGrowthNetwork() {
   return payload;
 }
 function hydrateData(commercial, growth, alternative, cached = false) {
+  const previousPeriod = state.start ? { preset: $("#period-preset").value, start: state.start, end: state.end,
+    compareMode: state.compareMode, compareStart: state.compareStart, compareEnd: state.compareEnd, selectedGranularity: state.selectedGranularity } : null;
   state.commercial = commercial || null;
   state.rows = normalizedRows(commercial?.rows || []);
   state.growthPayload = growth && growth.ok !== false && Array.isArray(growth.data) ? growth : null;
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("panorama:ssot", { detail: state.growthPayload || commercial }));
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("panorama:ssot", { detail: commercial || state.growthPayload }));
   state.growthViews = state.growthPayload?.data || [];
   state.growthViewMap = new Map(state.growthViews.map((view) => [view.view, view]));
   state.normalizedViewRows.clear();
@@ -488,26 +487,36 @@ function hydrateData(commercial, growth, alternative, cached = false) {
   $("#period-preset").value = "current-day";
   $("#date-start").value = state.start;
   $("#date-end").value = state.end;
+  if (previousPeriod) {
+    Object.assign(state, previousPeriod);
+    if (previousPeriod.preset !== 'custom') applyPeriodPreset(previousPeriod.preset);
+    state.selectedGranularity = previousPeriod.selectedGranularity;
+    $("#period-preset").value = previousPeriod.preset;
+    $("#date-start").value = state.start; $("#date-end").value = state.end;
+  }
   const liveChannel = viewEntry("channel");
   const liveChannelRows = normalizedViewRows("channel");
   const liveMaxDate = liveChannelRows.map((row) => row.data).filter(Boolean).sort().at(-1) || state.availableEnd;
   const liveSource = liveChannel?.source || commercial?.source || "SSOT";
-  const updatedAt = growth?.generatedAt || commercial?.extracted_at || "Atualizacao nao informada";
+  const updatedAt = liveChannel?.generatedAt || commercial?.extracted_at || growth?.generatedAt || "Atualizacao nao informada";
+  const businessToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const expectedDate = new Date(Date.parse(`${businessToday}T12:00:00Z`) - 86400000).toISOString().slice(0, 10);
+  const staleSource = !liveMaxDate || liveMaxDate < expectedDate;
   $("#source-name").textContent = liveSource;
   $("#extracted-at").textContent = `${updatedAt} · ultimo dado ${liveMaxDate ? dayLabel(liveMaxDate) : "nao informado"}`;
-  $("#source-status").textContent = cached ? "SSOT em cache; validando atualizacao" : state.growthPayload ? "SSOT ao vivo conectado" : "Snapshot de canais";
-  $("#source-pill").textContent = cached ? "Cache local" : state.growthPayload ? "SSOT ao vivo" : "Snapshot";
-  $("#source-pill").className = `status-pill ${cached ? "warn" : state.growthPayload ? "ok" : "warn"}`;
-  $("#validation-title").textContent = cached ? "Ultima leitura carregada" : state.growthPayload ? "SSOT atualizado" : "SSOT ao vivo indisponivel";
+  $("#source-status").textContent = staleSource ? `Atualizacao pendente: esperado ate ${dayLabel(expectedDate)}` : cached ? "SSOT em cache; validando atualizacao" : state.growthPayload ? "Leitura SSOT conectada" : "Snapshot de canais";
+  $("#source-pill").textContent = staleSource ? "Base atrasada" : cached ? "Cache local" : state.growthPayload ? "SSOT conectado" : "Snapshot";
+  $("#source-pill").className = `status-pill ${staleSource || cached ? "warn" : state.growthPayload ? "ok" : "warn"}`;
+  $("#validation-title").textContent = staleSource ? "Atualizacao pendente" : cached ? "Ultima leitura carregada" : state.growthPayload ? "Leitura SSOT carregada" : "SSOT ao vivo indisponivel";
   $("#validation-summary").textContent = state.growthPayload
     ? `${liveChannelRows.length.toLocaleString("pt-BR")} linhas de canais ${cached ? "em cache" : "ao vivo"}; ultimo dado em ${liveMaxDate ? dayLabel(liveMaxDate) : "data nao informada"}. ${state.growthViews.length} visoes growth carregadas.`
     : `A leitura ao vivo falhou. Exibindo o snapshot de ${commercial?.extracted_at || "data nao informada"}; atualize novamente antes de decidir.`;
-  $("#validation-banner").className = `validation-banner ${state.growthPayload ? cached ? "warn" : "valid" : "error"}`;
+  $("#validation-banner").className = `validation-banner ${state.growthPayload ? staleSource || cached ? "warn" : "valid" : "error"}`;
   renderAll();
 }
 
 function setupEvents() {
-  $("#reload-data").onclick = loadData;
+  $("#reload-data").onclick = () => window.PanoramaRefresh ? window.PanoramaRefresh.request() : loadData();
   $("#clear-filters").onclick = () => { state.selectedChannel = ""; state.selectedModel = ""; state.selectedColor = ""; state.selectedSize = ""; state.productSearch = ""; state.chartChannels = []; state.chartFilter = ""; state.explorerSearch = ""; $("#explorer-search").value = ""; renderAll(); };
   $("#period-preset").onchange = (event) => { applyPeriodPreset(event.target.value); $("#date-start").value = state.start; $("#date-end").value = state.end; renderAll(); };
   $("#date-start").onchange = (event) => { state.start = event.target.value; $("#period-preset").value = "custom"; applyComparison(); suggestGranularityForWindow(); renderAll(); };
@@ -522,29 +531,37 @@ function setupEvents() {
   $("#explorer-sort").onchange = (event) => { state.explorerSort = event.target.value; state.explorerSortDirection = "desc"; renderExplorer(); };
   $("#explorer-search").oninput = (event) => { state.explorerSearch = event.target.value; renderExplorer(); };
 }
-async function loadData() {
-  showLoadingScreen();
+async function loadData({ background = false } = {}) {
+  if (!background) showLoadingScreen();
   $("#source-status").textContent = "Carregando SSOT";
   $("#source-pill").textContent = "Validando fonte";
   $("#source-pill").className = "status-pill pending";
   let cachedGrowth = null;
   try {
-    setLoadingStep("01", "Verificando a ultima leitura", 22);
+    const [localGrowth, commercial] = await Promise.all([
+      loadJson('data/ssot-growth-views.json', 5000).catch(() => null),
+      loadJson('data/ssot-commercial-channels.json', 10000).catch(() => null),
+    ]);
+    if (localGrowth?.ok && Array.isArray(localGrowth.data)) {
+      hydrateData(commercial, localGrowth, null, false);
+      return;
+    }
+    setLoadingStep("01", "Verificando a ultima leitura");
     cachedGrowth = await readGrowthCache();
     const cacheIsAlreadyDisplayed = cachedGrowth?.generatedAt && cachedGrowth.generatedAt === state.growthPayload?.generatedAt;
     if (cachedGrowth?.ok && Array.isArray(cachedGrowth.data) && !cacheIsAlreadyDisplayed) {
-      setLoadingStep("02", "Atualizando dados do periodo", 48);
-      hydrateData(null, cachedGrowth, null, true);
+      setLoadingStep("02", "Atualizando dados do periodo");
+      hydrateData(commercial, cachedGrowth, null, true);
     }
-    setLoadingStep("02", "Atualizando dados do periodo", cachedGrowth ? 58 : 42);
+    setLoadingStep("02", "Atualizando dados do periodo");
     const growth = await loadGrowthNetwork();
     if (growth?.ok && Array.isArray(growth.data)) {
-      setLoadingStep("03", "Organizando indicadores", 84);
-      hydrateData(null, growth, null, false);
+      setLoadingStep("03", "Organizando indicadores");
+      hydrateData(commercial, growth, null, false);
       return;
     }
-    const commercial = await loadJson("data/ssot-commercial-channels.json");
-    setLoadingStep("03", "Aplicando leitura de contingencia", 84);
+    if (!commercial) throw new Error('Snapshot comercial indisponivel');
+    setLoadingStep("03", "Aplicando leitura de contingencia");
     hydrateData(commercial, null, null, false);
   } catch (error) {
     if (cachedGrowth?.ok && Array.isArray(cachedGrowth.data)) {
@@ -556,7 +573,7 @@ async function loadData() {
     } else {
       try {
         const commercial = await loadJson("data/ssot-commercial-channels.json");
-        setLoadingStep("03", "Aplicando leitura de contingencia", 84);
+        setLoadingStep("03", "Aplicando leitura de contingencia");
         hydrateData(commercial, null, null, false);
       } catch (fallbackError) {
         $("#source-status").textContent = "Fonte indisponivel";
@@ -568,6 +585,16 @@ async function loadData() {
       }
     }
   } finally {
-    hideLoadingScreen();
+    if (!background) hideLoadingScreen();
   }
+}
+if (typeof window !== 'undefined') {
+  let pendingGrowthRefresh = false;
+  const flushGrowthRefresh = () => {
+    if (!pendingGrowthRefresh || document.activeElement?.closest('#growth-workspace input, #growth-workspace select, #growth-workspace textarea')) return;
+    pendingGrowthRefresh = false;
+    loadData({ background: true });
+  };
+  window.addEventListener('panorama:data-refreshed', () => { pendingGrowthRefresh = true; flushGrowthRefresh(); });
+  document.addEventListener('focusout', () => setTimeout(flushGrowthRefresh, 0));
 }

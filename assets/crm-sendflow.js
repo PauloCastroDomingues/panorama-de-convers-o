@@ -23,7 +23,34 @@
   const matchesChannel = (value, channel) => (CHANNEL_KEYS[channel] || []).includes(key(value));
   const channelRows = (payload) => payload?.data?.find((item) => item.view === "channel")?.rows || payload?.rows || [];
   const hasChannel = (payload, channel) => channelRows(payload).some((row) => matchesChannel(row.canal_detalhe || row.canal, channel));
-  const availableDates = (payload) => [...new Set(channelRows(payload).filter((row) => Object.keys(CHANNEL_KEYS).some((channel) => matchesChannel(row.canal_detalhe || row.canal, channel))).map((row) => row.data || row.date).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date || "")))].sort();
+  const sourceDate = (row) => String(row.data || row.date || '').match(/^\d{4}-\d{2}-\d{2}(?=$|T|\s)/)?.[0] || null;
+  const availableDates = (payload, channel) => [...new Set(channelRows(payload).filter((row) => (channel ? [channel] : Object.keys(CHANNEL_KEYS)).some((id) => matchesChannel(row.canal_detalhe || row.canal, id))).map(sourceDate).filter(Boolean))].sort();
+  function latestCommercialSource(payloads, channel) {
+    return payloads.filter((payload) => hasChannel(payload, channel)).sort((a, b) => {
+      const dateOrder = (availableDates(b, channel).at(-1) || '').localeCompare(availableDates(a, channel).at(-1) || '');
+      return dateOrder || (Date.parse(b.extracted_at || b.generatedAt) || 0) - (Date.parse(a.extracted_at || a.generatedAt) || 0);
+    })[0] || null;
+  }
+  function validateCommercialSnapshot(payload) {
+    if (payload?.kind !== 'ssot_commercial_channel_daily_v1' || payload.source !== 'reise-ssot.mart_growth_us.aquisicao_por_canal_origem_daily_v'
+      || !Array.isArray(payload.rows) || !payload.rows.length || typeof payload.metadata?.definition !== 'string'
+      || !Number.isFinite(Date.parse(payload.extracted_at))) throw new Error('Extracao comercial SSOT invalida');
+    for (const row of payload.rows) {
+      const date = sourceDate(row);
+      if (!date || !row.canal || new Date(date).toISOString().slice(0, 10) !== date) throw new Error('Linha comercial SSOT invalida');
+      for (const field of ['sessoes', 'pedidos', 'receita']) {
+        if (row[field] !== null && number(row[field]) === null) throw new Error('Metrica comercial SSOT invalida');
+      }
+    }
+    return payload;
+  }
+  function freshness(payload, channel, now = new Date()) {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+    const target = new Date(Date.parse(`${today}T12:00:00Z`) - DAY).toISOString().slice(0, 10);
+    const latest = availableDates(payload, channel).at(-1) || null;
+    const result = commercial(payload, channel, target, target);
+    return { target, latest, status: !latest ? 'missing' : latest < target ? 'stale' : result.complete && result.revenueKnownDays === 1 ? 'current' : 'partial' };
+  }
 
   function validate(snapshot) {
     if (snapshot?.schemaVersion !== 1 || !snapshot.source?.coverage?.start || !snapshot.source?.coverage?.end) throw new Error("Contrato SendFlow invalido");
@@ -64,9 +91,9 @@
     const actions = snapshot.actions.filter((row) => inRange(row, start, end));
     const movement = snapshot.movement.filter((row) => inRange(row, start, end));
     const expected = dates(start, end).length;
-    const complete = start >= snapshot.source.coverage.start && end <= snapshot.source.coverage.end;
+    const complete = snapshot.source.coverageComplete !== false && start >= snapshot.source.coverage.start && end <= snapshot.source.coverage.end;
     const daily = dates(start < snapshot.source.coverage.start ? snapshot.source.coverage.start : start, end > snapshot.source.coverage.end ? snapshot.source.coverage.end : end).map((date) => ({
-      date, actions: actions.filter((row) => row.date === date).length, messages: messages.filter((row) => row.date === date).length,
+      date, actions: actions.filter((row) => row.date === date).length || (complete ? 0 : null), messages: messages.filter((row) => row.date === date).length || (complete ? 0 : null),
       recipients: total(messages.filter((row) => row.date === date), "recipients"), read: total(messages.filter((row) => row.date === date), "read"),
     }));
     const movementMetric = (metric) => ({ subtotal: total(movement, metric), knownDays: new Set(movement.filter((row) => number(row[metric]) !== null).map((row) => row.date)).size, expectedDays: expected });
@@ -84,15 +111,20 @@
   function commercial(payload, channel, start, end) {
     const view = payload?.data?.find((item) => item.view === "channel");
     const sourceRows = channelRows(payload);
+    // This versioned SSOT extract unions order-only origins with channel-level sessions.
+    const channelSessionLayout = payload?.kind === 'ssot_commercial_channel_daily_v1'
+      && payload.source === 'reise-ssot.mart_growth_us.aquisicao_por_canal_origem_daily_v'
+      && typeof payload.metadata?.definition === 'string';
     const byDate = new Map();
     for (const row of sourceRows) {
-      const date = row.data || row.date;
+      const date = sourceDate(row);
       if (!date || date < start || date > end || !matchesChannel(row.canal_detalhe || row.canal, channel)) continue;
       const target = byDate.get(date) || { date, sessions: null, orders: null, revenue: null, missing: new Set() };
       for (const [metric, field] of [["sessions", "sessoes"], ["orders", "pedidos"], ["revenue", "receita"]]) {
-        const value = number(row[field]);
-        if (value === null) target.missing.add(metric);
-        else target[metric] = (target[metric] ?? 0) + value;
+        const value = number(row[field] ?? row[metric] ?? (metric === 'orders' ? row.pedidos_total : metric === 'revenue' ? row.vendas ?? row.receita_total : null));
+        if (value === null) {
+          if (!(channelSessionLayout && metric === 'sessions')) target.missing.add(metric);
+        } else target[metric] = (target[metric] ?? 0) + value;
       }
       byDate.set(date, target);
     }
@@ -164,5 +196,5 @@
     return { ...channel, note: `${snapshot.source.releaseName}: ${activity.actions === null ? "sem cobertura de acoes" : `${activity.actions} acoes`} no recorte. Resultados comerciais pertencem ao canal inteiro; nao sao vendas atribuidas a esta campanha.`,
       sendflow: { source: snapshot.source, activity, comparison, commercial: channel.ssotCommercial, comparisonCommercial: channel.ssotComparison } };
   }
-  return { validate, summarize, commercial, buildChannel, hasChannel, withCommercial, aggregateCommercial, availableDates };
+  return { validate, summarize, commercial, buildChannel, hasChannel, withCommercial, aggregateCommercial, availableDates, latestCommercialSource, validateCommercialSnapshot, freshness };
 });
