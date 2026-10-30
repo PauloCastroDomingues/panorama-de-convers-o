@@ -41,13 +41,13 @@ class Sheets:
         from google_sheets_auth import load_credentials
         from google.auth.transport.requests import AuthorizedSession
         credentials = load_credentials()
-        self.session = AuthorizedSession(credentials)
+        self.session = AuthorizedSession(credentials, refresh_timeout=15)
         self.url = 'https://sheets.googleapis.com/v4/spreadsheets/' + sheet_id
         self.meta = self.get('', {'fields': 'properties(title,timeZone),sheets(properties)'} )
         self.tabs = {s['properties']['title']: s['properties'] for s in self.meta['sheets']}
 
     def get(self, suffix, params):
-        response = self.session.get(self.url + suffix, params=params, timeout=30)
+        response = self.session.get(self.url + suffix, params=params, timeout=(2, 30))
         if response.status_code in (401, 403):
             raise ssot.RefreshError('sheet_read_access_required')
         if not response.ok:
@@ -182,7 +182,8 @@ def read_sendflow():
 def read_whatsapp():
     import requests
     response = requests.get('https://docs.google.com/spreadsheets/d/' + WA_SHEET + '/export',
-                            params={'format': 'csv', 'gid': '404910707'}, timeout=30)
+                            params={'format': 'csv', 'gid': '404910707', '_': datetime.now(ssot.TIMEZONE).timestamp()},
+                            timeout=(2, 30))
     response.raise_for_status()
     text = response.content.decode('utf-8-sig')
     reader = csv.DictReader(io.StringIO(text))

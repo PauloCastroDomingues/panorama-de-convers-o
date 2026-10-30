@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "runId": "2026-10-29T11:49:51.427029-03:00",
-  "startedAt": "2026-10-29T11:49:51.427029-03:00",
-  "checkedAt": "2026-10-29T11:50:32.868439-03:00",
-  "finishedAt": "2026-10-29T11:50:32.868439-03:00",
-  "targetDate": "2026-10-28",
+  "runId": "2026-10-30T08:28:53.617762-03:00",
+  "startedAt": "2026-10-30T08:28:53.617762-03:00",
+  "checkedAt": "2026-10-30T08:30:55.843147-03:00",
+  "finishedAt": "2026-10-30T08:30:55.843147-03:00",
+  "targetDate": "2026-10-29",
   "status": "stale",
   "readOnly": true,
   "sources": [
@@ -12,38 +12,38 @@
       "id": "ssot",
       "label": "SSOT comercial",
       "status": "current",
-      "checkedAt": "2026-10-29T11:50:01.804010-03:00",
-      "targetDate": "2026-10-28",
-      "latestDate": "2026-10-28",
+      "checkedAt": "2026-10-30T08:29:26.268545-03:00",
+      "targetDate": "2026-10-29",
+      "latestDate": "2026-10-29",
       "channels": {
         "email": {
           "name": "E-mail",
-          "latestDate": "2026-10-28",
+          "latestDate": "2026-10-29",
           "metrics": {
             "sessoes": {
-              "latestDate": "2026-10-28",
-              "knownDays": 137,
-              "expectedDays": 666,
+              "latestDate": "2026-10-29",
+              "knownDays": 138,
+              "expectedDays": 667,
               "missingDays": 529,
-              "targetValue": 865,
+              "targetValue": 631,
               "coverageStatus": "partial",
               "status": "current"
             },
             "pedidos": {
-              "latestDate": "2026-10-28",
-              "knownDays": 265,
-              "expectedDays": 666,
+              "latestDate": "2026-10-29",
+              "knownDays": 266,
+              "expectedDays": 667,
               "missingDays": 401,
-              "targetValue": 12,
+              "targetValue": 8,
               "coverageStatus": "partial",
               "status": "current"
             },
             "receita": {
-              "latestDate": "2026-10-28",
-              "knownDays": 265,
-              "expectedDays": 666,
+              "latestDate": "2026-10-29",
+              "knownDays": 266,
+              "expectedDays": 667,
               "missingDays": 401,
-              "targetValue": "6918.39",
+              "targetValue": "4981.49",
               "coverageStatus": "partial",
               "status": "current"
             }
@@ -52,32 +52,32 @@
         },
         "whatsapp-oficial": {
           "name": "WhatsApp Oficial",
-          "latestDate": "2026-10-28",
+          "latestDate": "2026-10-29",
           "metrics": {
             "sessoes": {
-              "latestDate": "2026-10-28",
-              "knownDays": 275,
-              "expectedDays": 666,
+              "latestDate": "2026-10-29",
+              "knownDays": 276,
+              "expectedDays": 667,
               "missingDays": 391,
-              "targetValue": 554,
+              "targetValue": 474,
               "coverageStatus": "partial",
               "status": "current"
             },
             "pedidos": {
-              "latestDate": "2026-10-28",
-              "knownDays": 276,
-              "expectedDays": 666,
+              "latestDate": "2026-10-29",
+              "knownDays": 277,
+              "expectedDays": 667,
               "missingDays": 390,
-              "targetValue": 17,
+              "targetValue": 13,
               "coverageStatus": "partial",
               "status": "current"
             },
             "receita": {
-              "latestDate": "2026-10-28",
-              "knownDays": 276,
-              "expectedDays": 666,
+              "latestDate": "2026-10-29",
+              "knownDays": 277,
+              "expectedDays": 667,
               "missingDays": 390,
-              "targetValue": "11480.63",
+              "targetValue": "6980.38",
               "coverageStatus": "partial",
               "status": "current"
             }
@@ -86,32 +86,32 @@
         },
         "whatsapp-organico": {
           "name": "WhatsApp Organico",
-          "latestDate": "2026-10-28",
+          "latestDate": "2026-10-29",
           "metrics": {
             "sessoes": {
-              "latestDate": "2026-10-28",
-              "knownDays": 273,
-              "expectedDays": 666,
+              "latestDate": "2026-10-29",
+              "knownDays": 274,
+              "expectedDays": 667,
               "missingDays": 393,
-              "targetValue": 376,
+              "targetValue": 175,
               "coverageStatus": "partial",
               "status": "current"
             },
             "pedidos": {
-              "latestDate": "2026-10-28",
-              "knownDays": 274,
-              "expectedDays": 666,
+              "latestDate": "2026-10-29",
+              "knownDays": 275,
+              "expectedDays": 667,
               "missingDays": 392,
-              "targetValue": 9,
+              "targetValue": 1,
               "coverageStatus": "partial",
               "status": "current"
             },
             "receita": {
-              "latestDate": "2026-10-28",
-              "knownDays": 274,
-              "expectedDays": 666,
+              "latestDate": "2026-10-29",
+              "knownDays": 275,
+              "expectedDays": 667,
               "missingDays": 392,
-              "targetValue": "4699.61",
+              "targetValue": "210.61",
               "coverageStatus": "partial",
               "status": "current"
             }
@@ -120,58 +120,58 @@
         }
       },
       "error": null,
-      "lastSuccessfulReadAt": "2026-10-29T11:50:02.345991-03:00"
+      "lastSuccessfulReadAt": "2026-10-30T08:29:26.448511-03:00"
     },
     {
       "id": "growth",
       "label": "Visoes Growth",
       "status": "current",
-      "latestDate": "2026-10-28",
-      "checkedAt": "2026-10-29T11:50:22.298373-03:00",
+      "latestDate": "2026-10-29",
+      "checkedAt": "2026-10-30T08:30:06.400274-03:00",
       "views": [
         {
           "id": "channel",
           "label": "Canal",
           "status": "current",
-          "latestDate": "2026-10-28",
+          "latestDate": "2026-10-29",
           "error": null,
-          "rows": 3100,
+          "rows": 3143,
           "conversionAvailable": true
         },
         {
           "id": "campaign",
           "label": "Campanha",
           "status": "current",
-          "latestDate": "2026-10-28",
+          "latestDate": "2026-10-29",
           "error": null,
-          "rows": 8499,
+          "rows": 8581,
           "conversionAvailable": true
         },
         {
           "id": "ad_group",
           "label": "Grupo",
           "status": "current",
-          "latestDate": "2026-10-28",
+          "latestDate": "2026-10-29",
           "error": null,
-          "rows": 2851,
+          "rows": 2877,
           "conversionAvailable": false
         },
         {
           "id": "ad",
           "label": "Anuncio",
           "status": "current",
-          "latestDate": "2026-10-28",
+          "latestDate": "2026-10-29",
           "error": null,
-          "rows": 4081,
+          "rows": 4135,
           "conversionAvailable": false
         },
         {
           "id": "channel_product",
           "label": "Canal + produto",
           "status": "current",
-          "latestDate": "2026-10-28",
+          "latestDate": "2026-10-29",
           "error": null,
-          "rows": 10387,
+          "rows": 10469,
           "conversionAvailable": true
         },
         {
@@ -204,20 +204,20 @@
       ],
       "coverageComplete": false,
       "note": "Tres cruzamentos com produto sem fonte validada; grupo/anuncio sem sessoes.",
-      "lastSuccessfulReadAt": "2026-10-29T11:50:23.528376-03:00",
+      "lastSuccessfulReadAt": "2026-10-30T08:30:07.707490-03:00",
       "error": null
     },
     {
       "id": "whatsapp",
       "label": "WhatsApp Oficial",
-      "status": "current",
+      "status": "stale",
       "latestDate": "2026-10-28",
       "observedAt": null,
       "rows": 738,
       "coverageComplete": false,
       "note": "Ultima data com ativacao preenchida; dias sem disparo nao sao zeros inferidos.",
-      "checkedAt": "2026-10-29T11:50:26.601828-03:00",
-      "lastSuccessfulReadAt": "2026-10-29T11:50:26.602709-03:00",
+      "checkedAt": "2026-10-30T08:30:14.305320-03:00",
+      "lastSuccessfulReadAt": "2026-10-30T08:30:14.307575-03:00",
       "error": null
     },
     {
@@ -225,20 +225,20 @@
       "label": "RD Station",
       "status": "current",
       "error": null,
-      "checkedAt": "2026-10-29T11:50:29.560063-03:00",
-      "latestDate": "2026-10-28",
-      "observedAt": "2026-10-29T07:06:08.847-03:00",
-      "rows": 73,
+      "checkedAt": "2026-10-30T08:30:34.909489-03:00",
+      "latestDate": "2026-10-29",
+      "observedAt": "2026-10-30T07:03:42.600-03:00",
+      "rows": 75,
       "coverageComplete": false,
       "note": "Ultima coleta committed da planilha; a coleta no RD precisa alimentar esta origem.",
-      "lastSuccessfulReadAt": "2026-10-29T11:50:29.560745-03:00"
+      "lastSuccessfulReadAt": "2026-10-30T08:30:34.909967-03:00"
     },
     {
       "id": "sendflow",
       "label": "SendFlow",
       "status": "stale",
       "error": null,
-      "checkedAt": "2026-10-29T11:50:32.867783-03:00",
+      "checkedAt": "2026-10-30T08:30:55.841098-03:00",
       "latestDate": "2026-09-30",
       "observedAt": "2026-10-28T13:13:05.781Z",
       "rows": 197,
@@ -247,7 +247,7 @@
       ],
       "coverageComplete": false,
       "note": "Todas as campanhas da planilha; campanhas ausentes ainda dependem da coleta SendFlow.",
-      "lastSuccessfulReadAt": "2026-10-29T11:50:32.868363-03:00"
+      "lastSuccessfulReadAt": "2026-10-30T08:30:55.843005-03:00"
     }
   ],
   "excluded": [

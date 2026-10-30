@@ -104,6 +104,24 @@ def seed_previous(previous):
     return previous
 
 
+def preserve_history(key, view, previous, end):
+    rows = view['rows']
+    days = {row['data'] for row in rows}
+    boundary = ssot.START.isoformat()
+    # These two sources retain a complete rolling window of 120 calendar days.
+    # Archive only the expired prefix; gaps inside the live window still fail.
+    if key in ('campaign', 'channel_product') and days:
+        first, last = min(days), max(days)
+        if (len(days) == 120 and last == end.isoformat()
+                and (date.fromisoformat(last) - date.fromisoformat(first)).days == 119
+                and previous.get('source') == view.get('source')):
+            boundary = first
+            view['history'] = {'liveStart': first, 'liveEnd': last,
+                               'retainedBefore': boundary, 'mode': 'preserved_snapshot'}
+    return {**view, 'rows': rows + [row for row in previous.get('rows', [])
+                                  if row['data'] < boundary]}
+
+
 def run(end, commercial, output=OUTPUT, reader_factory=Reader, seed=seed_previous):
     original = output.read_bytes() if output.exists() else None
     old = json.loads(original) if original else {}
@@ -119,7 +137,7 @@ def run(end, commercial, output=OUTPUT, reader_factory=Reader, seed=seed_previou
             try:
                 view = channel_view(commercial) if key == 'channel' else {'view': key, 'rows': []} if unsupported else reader.read(key)
                 if key != 'channel' and not unsupported:
-                    view['rows'] += [row for row in previous.get(key, {}).get('rows', []) if row['data'] < ssot.START.isoformat()]
+                    view = preserve_history(key, view, previous.get(key, {}), end)
                 old_dates = {row['data'] for row in previous.get(key, {}).get('rows', [])}
                 if not old_dates <= {row['data'] for row in view['rows']}:
                     raise ssot.RefreshError('growth_history_regression')

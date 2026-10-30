@@ -1,5 +1,5 @@
 import copy
-from datetime import date
+from datetime import date, timedelta
 import json
 from pathlib import Path
 import tempfile
@@ -13,6 +13,12 @@ import refresh_crm_ssot as ssot
 
 
 class RefreshTests(unittest.TestCase):
+    def test_network_failure_is_not_a_local_file_error(self):
+        from requests.exceptions import HTTPError, ConnectTimeout
+        for error in (HTTPError('private response'), ConnectTimeout('private URL')):
+            self.assertEqual(ssot.safe_error(error), 'source_request_failed')
+        self.assertEqual(ssot.safe_error(OSError('private path')), 'local_io_failed')
+
     def test_all_collectors_run_even_after_failure(self):
         called = []
         def collector(key):
@@ -126,6 +132,33 @@ class RefreshTests(unittest.TestCase):
             with self.assertRaises(ssot.RefreshError):
                 operational.write_source('rd', lambda: (older, {'latestDate': '2026-10-27'}), date(2026, 10, 28), Path(folder))
             self.assertEqual(original, path.read_bytes())
+
+    def test_rolling_growth_preserves_expired_prefix_without_duplicates(self):
+        first = date(2026, 7, 2)
+        rows = [{'data': (first + timedelta(days=i)).isoformat(), 'pedidos': 2} for i in range(120)]
+        previous = {'source': 'same-source', 'rows': [
+            {'data': '2026-07-01', 'pedidos': 3}, {'data': '2026-07-02', 'pedidos': 1}]}
+        for key in ('campaign', 'channel_product'):
+            result = growth.preserve_history(key, {'source': 'same-source', 'rows': rows}, previous, date(2026, 10, 29))
+            self.assertEqual(len(result['rows']), 121)
+            self.assertEqual(sum(r['data'] == '2026-07-02' for r in result['rows']), 1)
+            self.assertEqual(result['rows'][0]['pedidos'], 2)
+            self.assertEqual(result['rows'][-1], previous['rows'][0])
+            self.assertEqual(result['history']['liveStart'], '2026-07-02')
+        self.assertEqual(len(rows), 120)
+
+    def test_rolling_growth_does_not_hide_truncation_gaps_or_source_change(self):
+        first = date(2026, 7, 2)
+        rows = [{'data': (first + timedelta(days=i)).isoformat()} for i in range(120)]
+        previous = {'source': 'same-source', 'rows': [{'data': '2026-07-01'}]}
+        cases = [(rows[1:], 'same-source', date(2026, 10, 29)),
+                 (rows[:30] + rows[31:], 'same-source', date(2026, 10, 29)),
+                 (rows, 'another-source', date(2026, 10, 29)),
+                 (rows, 'same-source', date(2026, 10, 30))]
+        for values, source, end in cases:
+            result = growth.preserve_history('campaign', {'source': source, 'rows': values}, previous, end)
+            self.assertNotIn('2026-07-01', {row['data'] for row in result['rows']})
+            self.assertNotIn('history', result)
 
 
 if __name__ == '__main__':

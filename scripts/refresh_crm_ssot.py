@@ -393,6 +393,8 @@ def atomic_json(path, payload, expected_bytes=None):
 def safe_error(error):
     if isinstance(error, RefreshError):
         return str(error)
+    if type(error).__module__.startswith(('requests.', 'urllib3.')):
+        return "source_request_failed"
     if isinstance(error, OSError):
         return "local_io_failed"
     if type(error).__module__.startswith("google.auth"):

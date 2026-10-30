@@ -7,7 +7,7 @@ Executar com `.venv\Scripts\python.exe scripts\refresh_all_data.py`.
 
 | Fonte | Leitura | Saida local |
 | --- | --- | --- |
-| Comercial SSOT | SELECT canonico, revisao dos ultimos 30 dias | ssot-commercial-channels.json |
+| Comercial SSOT | SELECT canonico, historico pago completo e ultimos 30 dias de CRM | ssot-commercial-channels.json |
 | Growth | SELECT de campanhas, produto/canal e UTM; canal canonico | ssot-growth-views.json |
 | WhatsApp Oficial | CSV da planilha original, sem copiar mensagens | crm-whatsapp-snapshot.json |
 | RD | Ultima coleta committed da planilha auxiliar, conta 832517 | crm-rd-snapshot.json |
@@ -32,8 +32,16 @@ unificadas simultaneas. Nenhum token e gravado em arquivos publicos.
 Growth preserva a ultima leitura por visao, incluindo o cache do bridge existente
 na migracao. Cruzamentos de produto sem fonte validada permanecem pendentes;
 grupo/anuncio UTM nao ganham sessoes artificiais. As consultas usam dry-run,
-limite de bytes e timeout. Os historicos comerciais anteriores a 30 dias nao
-sao recalculados; as linhas sao preservadas.
+limite de bytes e timeout. O historico comercial pago e relido desde 2025;
+o historico de CRM anterior a 30 dias e preservado.
+
+Campanha e canal/produto apresentam uma janela movel de 120 dias. Quando a
+mesma fonte retorna os 120 dias consecutivos ate D-1, preservamos apenas o
+prefixo anterior a essa janela no snapshot, com metadados de historico.
+O periodo sobreposto e substituido pela leitura atual. Lacunas internas,
+encolhimentos inesperados e mudancas de fonte continuam bloqueados.
+As requisicoes operacionais usam 2 segundos para cada tentativa de conexao
+e 30 segundos para leitura, evitando longas esperas por enderecos sem resposta.
 
 ## Localhost e agendamento
 

@@ -1,36 +1,36 @@
 {
-  "checkedAt": "2026-10-29T17:46:23.401117-03:00",
-  "targetDate": "2026-10-28",
-  "latestDate": "2026-10-28",
+  "checkedAt": "2026-10-30T08:29:26.268545-03:00",
+  "targetDate": "2026-10-29",
+  "latestDate": "2026-10-29",
   "channels": {
     "email": {
       "name": "E-mail",
-      "latestDate": "2026-10-28",
+      "latestDate": "2026-10-29",
       "metrics": {
         "sessoes": {
-          "latestDate": "2026-10-28",
-          "knownDays": 137,
-          "expectedDays": 666,
+          "latestDate": "2026-10-29",
+          "knownDays": 138,
+          "expectedDays": 667,
           "missingDays": 529,
-          "targetValue": 865,
+          "targetValue": 631,
           "coverageStatus": "partial",
           "status": "current"
         },
         "pedidos": {
-          "latestDate": "2026-10-28",
-          "knownDays": 265,
-          "expectedDays": 666,
+          "latestDate": "2026-10-29",
+          "knownDays": 266,
+          "expectedDays": 667,
           "missingDays": 401,
-          "targetValue": 12,
+          "targetValue": 8,
           "coverageStatus": "partial",
           "status": "current"
         },
         "receita": {
-          "latestDate": "2026-10-28",
-          "knownDays": 265,
-          "expectedDays": 666,
+          "latestDate": "2026-10-29",
+          "knownDays": 266,
+          "expectedDays": 667,
           "missingDays": 401,
-          "targetValue": "6918.39",
+          "targetValue": "4981.49",
           "coverageStatus": "partial",
           "status": "current"
         }
@@ -39,32 +39,32 @@
     },
     "whatsapp-oficial": {
       "name": "WhatsApp Oficial",
-      "latestDate": "2026-10-28",
+      "latestDate": "2026-10-29",
       "metrics": {
         "sessoes": {
-          "latestDate": "2026-10-28",
-          "knownDays": 275,
-          "expectedDays": 666,
+          "latestDate": "2026-10-29",
+          "knownDays": 276,
+          "expectedDays": 667,
           "missingDays": 391,
-          "targetValue": 554,
+          "targetValue": 474,
           "coverageStatus": "partial",
           "status": "current"
         },
         "pedidos": {
-          "latestDate": "2026-10-28",
-          "knownDays": 276,
-          "expectedDays": 666,
+          "latestDate": "2026-10-29",
+          "knownDays": 277,
+          "expectedDays": 667,
           "missingDays": 390,
-          "targetValue": 17,
+          "targetValue": 13,
           "coverageStatus": "partial",
           "status": "current"
         },
         "receita": {
-          "latestDate": "2026-10-28",
-          "knownDays": 276,
-          "expectedDays": 666,
+          "latestDate": "2026-10-29",
+          "knownDays": 277,
+          "expectedDays": 667,
           "missingDays": 390,
-          "targetValue": "11480.63",
+          "targetValue": "6980.38",
           "coverageStatus": "partial",
           "status": "current"
         }
@@ -73,32 +73,32 @@
     },
     "whatsapp-organico": {
       "name": "WhatsApp Organico",
-      "latestDate": "2026-10-28",
+      "latestDate": "2026-10-29",
       "metrics": {
         "sessoes": {
-          "latestDate": "2026-10-28",
-          "knownDays": 273,
-          "expectedDays": 666,
+          "latestDate": "2026-10-29",
+          "knownDays": 274,
+          "expectedDays": 667,
           "missingDays": 393,
-          "targetValue": 376,
+          "targetValue": 175,
           "coverageStatus": "partial",
           "status": "current"
         },
         "pedidos": {
-          "latestDate": "2026-10-28",
-          "knownDays": 274,
-          "expectedDays": 666,
+          "latestDate": "2026-10-29",
+          "knownDays": 275,
+          "expectedDays": 667,
           "missingDays": 392,
-          "targetValue": 9,
+          "targetValue": 1,
           "coverageStatus": "partial",
           "status": "current"
         },
         "receita": {
-          "latestDate": "2026-10-28",
-          "knownDays": 274,
-          "expectedDays": 666,
+          "latestDate": "2026-10-29",
+          "knownDays": 275,
+          "expectedDays": 667,
           "missingDays": 392,
-          "targetValue": "4699.61",
+          "targetValue": "210.61",
           "coverageStatus": "partial",
           "status": "current"
         }

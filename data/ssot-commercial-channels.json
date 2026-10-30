@@ -8,8 +8,8 @@
   },
   "timezone": "America/Sao_Paulo",
   "start": "2025-01-01",
-  "end": "2026-10-28",
-  "extracted_at": "2026-10-29T17:46:23.401117-03:00",
+  "end": "2026-10-29",
+  "extracted_at": "2026-10-30T08:29:26.268545-03:00",
   "rows": [
     {
       "data": "2025-01-01",
@@ -35590,16 +35590,6 @@
       "pedidos": 24,
       "receita": "16416.84",
       "investimento": null
-    },
-    {
-      "data": "2026-06-30",
-      "canal": "Meta ADS",
-      "canal_detalhe": "Meta Ads 1",
-      "origem": "Sem detalhamento de origem",
-      "sessoes": 5668,
-      "pedidos": 0,
-      "receita": "0",
-      "investimento": 21443.74875
     },
     {
       "data": "2026-06-30",
@@ -90189,7 +90179,7 @@
       "sessoes": 6768,
       "pedidos": 0,
       "receita": "0",
-      "investimento": 23085.9225
+      "investimento": 23090.83875
     },
     {
       "data": "2026-10-28",
@@ -90209,7 +90199,7 @@
       "sessoes": 1686,
       "pedidos": 0,
       "receita": "0",
-      "investimento": 4264.9425
+      "investimento": 4265.13375
     },
     {
       "data": "2026-10-28",
@@ -90580,9 +90570,529 @@
       "pedidos": 14,
       "receita": "9871.23",
       "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Afiliados",
+      "canal_detalhe": "Afiliados",
+      "origem": "Awin",
+      "sessoes": 31,
+      "pedidos": 10,
+      "receita": "5723.78",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Afiliados",
+      "canal_detalhe": "Afiliados",
+      "origem": "ui.awin.com",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Direto",
+      "canal_detalhe": "Direto",
+      "origem": "Direto / sem refer\u00eancia",
+      "sessoes": 2548,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Direto",
+      "canal_detalhe": "Direto",
+      "origem": "Flyer / QR code",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Direto",
+      "canal_detalhe": "Direto",
+      "origem": "Google",
+      "sessoes": 42,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Direto",
+      "canal_detalhe": "Direto",
+      "origem": "admin.shopify.com",
+      "sessoes": 9,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Direto",
+      "canal_detalhe": "Direto",
+      "origem": "minhaconta.reise.com.br",
+      "sessoes": 2,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Direto",
+      "canal_detalhe": "Direto",
+      "origem": "reise.com.br",
+      "sessoes": null,
+      "pedidos": 10,
+      "receita": "4111.2",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Direto",
+      "canal_detalhe": "Direto",
+      "origem": "usereise.com.br",
+      "sessoes": 11,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "E-mail",
+      "canal_detalhe": "E-mail",
+      "origem": "Google",
+      "sessoes": 6,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "E-mail",
+      "canal_detalhe": "E-mail",
+      "origem": "RD Station",
+      "sessoes": 573,
+      "pedidos": 4,
+      "receita": "1880.13",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "E-mail",
+      "canal_detalhe": "E-mail",
+      "origem": "Shopify Email",
+      "sessoes": 52,
+      "pedidos": 4,
+      "receita": "3101.36",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Google ADS",
+      "canal_detalhe": "Google ADS",
+      "origem": "Google",
+      "sessoes": 3263,
+      "pedidos": 31,
+      "receita": "16421.77",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Google ADS",
+      "canal_detalhe": "Google ADS",
+      "origem": "Sem detalhamento de origem",
+      "sessoes": null,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": 13334.61
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Meta ADS",
+      "canal_detalhe": "Meta Ads 1",
+      "origem": "Facebook",
+      "sessoes": null,
+      "pedidos": 31,
+      "receita": "20863.72",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Meta ADS",
+      "canal_detalhe": "Meta Ads 1",
+      "origem": "Sem detalhamento de origem",
+      "sessoes": 8246,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": 22152.02625
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Meta ADS",
+      "canal_detalhe": "Meta Ads 2",
+      "origem": "Facebook",
+      "sessoes": null,
+      "pedidos": 5,
+      "receita": "3636.2",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Meta ADS",
+      "canal_detalhe": "Meta Ads 2",
+      "origem": "Sem detalhamento de origem",
+      "sessoes": 2461,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": 3319.75125
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Not set",
+      "canal_detalhe": "Not set",
+      "origem": "Sem origem identificada",
+      "sessoes": null,
+      "pedidos": 1,
+      "receita": "659.6",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Org\u00e2nico",
+      "canal_detalhe": "Org\u00e2nico",
+      "origem": "Bing",
+      "sessoes": 18,
+      "pedidos": 2,
+      "receita": "807.41",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Org\u00e2nico",
+      "canal_detalhe": "Org\u00e2nico",
+      "origem": "Brave",
+      "sessoes": 7,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Org\u00e2nico",
+      "canal_detalhe": "Org\u00e2nico",
+      "origem": "Google",
+      "sessoes": 355,
+      "pedidos": 5,
+      "receita": "3249.74",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Org\u00e2nico",
+      "canal_detalhe": "Org\u00e2nico",
+      "origem": "Yahoo",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "7itm2mlxnm4pxaxr-74318971128.shopifypreview.com",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "Bit.ly",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "ChatGPT",
+      "sessoes": 16,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "Pagaleve",
+      "sessoes": 2,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "Pinterest",
+      "sessoes": 2,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "Sem origem identificada",
+      "sessoes": 402,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "cloudhumans",
+      "sessoes": 2,
+      "pedidos": 1,
+      "receita": "775.72",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "ntp.msn.com",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "pushnews",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "reddit.com",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "teams.public.onecdn.static.microsoft",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "threads",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Outros",
+      "canal_detalhe": "Outros",
+      "origem": "vision.dlordsexports.com",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Social",
+      "canal_detalhe": "Social",
+      "origem": "Facebook",
+      "sessoes": 34,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Social",
+      "canal_detalhe": "Social",
+      "origem": "Instagram",
+      "sessoes": 23,
+      "pedidos": 1,
+      "receita": "402.98",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Social",
+      "canal_detalhe": "Social",
+      "origem": "Instagram Linktree",
+      "sessoes": 295,
+      "pedidos": 4,
+      "receita": "2177.68",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Social",
+      "canal_detalhe": "Social",
+      "origem": "Instagram Shopping",
+      "sessoes": 32,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Social",
+      "canal_detalhe": "Social",
+      "origem": "Instagram Story",
+      "sessoes": 75,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Social",
+      "canal_detalhe": "Social",
+      "origem": "Link compartilhado",
+      "sessoes": 56,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Social",
+      "canal_detalhe": "Social",
+      "origem": "Linktree",
+      "sessoes": 58,
+      "pedidos": 1,
+      "receita": "508.27",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Social",
+      "canal_detalhe": "Social",
+      "origem": "TikTok",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Social",
+      "canal_detalhe": "Social",
+      "origem": "YouTube",
+      "sessoes": 2,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "Social",
+      "canal_detalhe": "Social",
+      "origem": "discount_shareable_link",
+      "sessoes": 1,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "WhatsApp N\u00e3o Oficial",
+      "canal_detalhe": "WhatsApp N\u00e3o Oficial",
+      "origem": "Sem detalhamento de origem",
+      "sessoes": 175,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "WhatsApp N\u00e3o Oficial",
+      "canal_detalhe": "WhatsApp N\u00e3o Oficial",
+      "origem": "WhatsApp Grupos VIP",
+      "sessoes": null,
+      "pedidos": 1,
+      "receita": "210.61",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "WhatsApp Oficial",
+      "canal_detalhe": "WhatsApp Oficial",
+      "origem": "Martz",
+      "sessoes": null,
+      "pedidos": 3,
+      "receita": "2145.31",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "WhatsApp Oficial",
+      "canal_detalhe": "WhatsApp Oficial",
+      "origem": "Nextags",
+      "sessoes": null,
+      "pedidos": 1,
+      "receita": "461.98",
+      "investimento": null
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "WhatsApp Oficial",
+      "canal_detalhe": "WhatsApp Oficial",
+      "origem": "Sem detalhamento de origem",
+      "sessoes": 474,
+      "pedidos": 0,
+      "receita": "0",
+      "investimento": 1803.5212500000002
+    },
+    {
+      "data": "2026-10-29",
+      "canal": "WhatsApp Oficial",
+      "canal_detalhe": "WhatsApp Oficial",
+      "origem": "WhatsApp Disparos",
+      "sessoes": null,
+      "pedidos": 9,
+      "receita": "4373.09",
+      "investimento": null
     }
   ],
-  "row_count": 9057,
+  "row_count": 9108,
   "metadata": {
     "definition": "WITH orders_raw AS (\n  SELECT\n    data,\n    order_name,\n    total_amount,\n    LOWER(TRIM(COALESCE(last_source_description, utm_source, last_source, ''))) AS channel_key,\n    LOWER(TRIM(COALESCE(utm_source, ''))) AS source_key,\n    LOWER(TRIM(COALESCE(utm_medium, ''))) AS medium_key,\n    LOWER(TRIM(COALESCE(CAST(utm_campaign AS STRING), ''))) AS campaign_key\n  FROM `reise-ssot.mart_growth_us.shopify_order_utm_resolved_v`\n),\norders_classified AS (\n  SELECT *,\n    `reise-ssot.mart_growth_us.fn_canal_pedido`(channel_key, source_key, medium_key) AS canal,\n    `reise-ssot.mart_growth_us.fn_origem_marketing`(channel_key, source_key, medium_key) AS origem\n  FROM orders_raw\n),\norders_by_origin AS (\n  SELECT\n    data,\n    canal,\n    `reise-ssot.mart_growth_us.fn_conta_meta`(canal, campaign_key) AS canal_detalhe,\n    origem,\n    CAST(NULL AS INT64) AS sessoes,\n    COUNT(DISTINCT order_name) AS pedidos_total,\n    SUM(CAST(total_amount AS NUMERIC)) AS receita_total,\n    CAST(NULL AS FLOAT64) AS investimento\n  FROM orders_classified\n  GROUP BY 1, 2, 3, 4\n),\n-- Sess\u00f5es dos 5 canais org\u00e2nicos (Org\u00e2nico, Outros, Direto, E-mail,\n-- Social) v\u00eam da sess\u00e3o REAL do GA4 (ga4_user_sessions_daily_v, mesma\n-- fonte de sessoes_ga4 em aquisicao_por_canal8_daily), n\u00e3o mais do\n-- snapshot. Achado 2026-09-21: o snapshot n\u00e3o s\u00f3 perde medium (Instagram\n-- nunca virava Bio/Story), como SUBCONTA sess\u00e3o de forma sistem\u00e1tica em\n-- afiliados \u2014 Awin no dia 21/09 tinha s\u00f3 3 sess\u00f5es no snapshot contra 10\n-- reais no GA4, e as 5 vendas do dia bateram cada uma com uma sess\u00e3o GA4\n-- real (confirmado via ga_client_id, n\u00e3o s\u00f3 coincid\u00eancia de canal). Meta\n-- ADS/WhatsApp Oficial/N\u00e3o Oficial continuam de fora \u2014 a fonte deles\n-- genuinamente n\u00e3o tem granularidade de provedor (ver channel_only\n-- abaixo), problema estrutural diferente deste. Total desses 5 canais\n-- nesta view pode divergir do `sessoes` de aquisicao_por_canal8_daily\n-- (fontes diferentes) \u2014 aceito pelo racional de \"diferen\u00e7as de cobertura\n-- aparecem, n\u00e3o s\u00e3o distribu\u00eddas\" j\u00e1 documentado no cabe\u00e7alho.\nga4_organic_sessions_by_origin AS (\n  SELECT\n    data,\n    canal,\n    canal AS canal_detalhe,\n    `reise-ssot.mart_growth_us.fn_origem_marketing`(utm_source, utm_source, utm_medium) AS origem,\n    COUNT(*) AS sessoes,\n    0 AS pedidos_total,\n    CAST(0 AS NUMERIC) AS receita_total,\n    CAST(NULL AS FLOAT64) AS investimento\n  FROM `reise-ssot.mart_growth_us.ga4_user_sessions_daily_v`\n  -- 'Afiliados' (ADR-AQ-019): sess\u00e3o real do GA4 por origem (Awin etc.); o\n  -- snapshot subconta afiliado, e o canal n\u00e3o vem de nenhuma outra fonte aqui.\n  WHERE canal IN ('Org\u00e2nico', 'Outros', 'Direto', 'E-mail', 'Social', 'Afiliados')\n  GROUP BY 1, 2, 3, 4\n),\nchannel_only AS (\n  -- Meta: fonte oficial j\u00e1 separada por conta (sess\u00f5es GA4 da conta 2\n  -- subtra\u00eddas da conta 1; investimento j\u00e1 inclui o ajuste de +12,5%).\n  SELECT\n    data,\n    'Meta ADS' AS canal,\n    canal AS canal_detalhe,\n    'Sem detalhamento de origem' AS origem,\n    CAST(sessoes AS INT64) AS sessoes,\n    0 AS pedidos_total,\n    CAST(0 AS NUMERIC) AS receita_total,\n    CAST(investimento AS FLOAT64) AS investimento\n  FROM `reise-ssot.mart_growth_us.aquisicao_por_canal`\n  WHERE canal IN ('Meta Ads 1', 'Meta Ads 2')\n\n  UNION ALL\n\n  -- Demais canais: custo j\u00e1 classificado/ajustado por fn_canal_custo\n  -- no canal8; WhatsApp preserva a separa\u00e7\u00e3o de sess\u00f5es Oficial/VIP.\n  SELECT\n    data,\n    canal,\n    canal AS canal_detalhe,\n    'Sem detalhamento de origem' AS origem,\n    IF(canal IN ('WhatsApp Oficial', 'WhatsApp N\u00e3o Oficial'), CAST(sessoes AS INT64), NULL) AS sessoes,\n    0 AS pedidos_total,\n    CAST(0 AS NUMERIC) AS receita_total,\n    IF(COALESCE(investimento, 0) != 0, CAST(investimento AS FLOAT64), NULL) AS investimento\n  FROM `reise-ssot.mart_growth_us.aquisicao_por_canal8_daily`\n  WHERE canal != 'Meta ADS'\n    AND (canal IN ('WhatsApp Oficial', 'WhatsApp N\u00e3o Oficial') OR COALESCE(investimento, 0) != 0)\n),\nall_metrics AS (\n  SELECT * FROM orders_by_origin\n  UNION ALL\n  SELECT * FROM ga4_organic_sessions_by_origin\n  UNION ALL\n  SELECT * FROM channel_only\n)\nSELECT\n  data,\n  canal,\n  canal_detalhe,\n  -- Direto \u00e9 o fallback oficial para pedidos sem refer\u00eancia de entrada.\n  -- Unifica apenas os r\u00f3tulos de aus\u00eancia/acesso direto; preserva fontes\n  -- concretas que eventualmente existam neste canal, sem reclassific\u00e1-lo.\n  IF(canal = 'Direto' AND origem IN ('Acesso direto', 'Sem origem identificada'),\n     'Direto / sem refer\u00eancia', origem) AS origem,\n  SUM(sessoes) AS sessoes,\n  SUM(pedidos_total) AS pedidos_total,\n  SUM(receita_total) AS receita_total,\n  SUM(investimento) AS investimento\nFROM all_metrics\nGROUP BY 1, 2, 3, 4\nHAVING COALESCE(sessoes, 0) != 0\n    OR pedidos_total != 0\n    OR receita_total != 0\n    OR COALESCE(investimento, 0) != 0",
     "schema": {
@@ -90619,71 +91129,71 @@
         "cpa_pct": "FLOAT",
         "build_ts": "TIMESTAMP"
       },
-      "modified": "2026-10-29T20:24:31.889000+00:00",
+      "modified": "2026-10-30T11:24:22.634000+00:00",
       "merged_rows": 30,
       "added_rows": 0,
       "read_only": true,
-      "refresh_start": "2026-09-29"
+      "refresh_start": "2026-09-30"
     },
     "refresh": {
       "read_only": true,
       "maximum_total_bytes_billed": 805306368,
-      "total_bytes_billed": 182452224,
+      "total_bytes_billed": 179306496,
       "queries": {
         "commercial_daily": "SELECT data, canal, canal_detalhe, origem, sessoes,\n       pedidos_total AS pedidos, receita_total AS receita, investimento\nFROM `reise-ssot.mart_growth_us.aquisicao_por_canal_origem_daily_v`\nWHERE data BETWEEN @google_start_date AND @end_date\n  AND (data >= @start_date OR canal_detalhe IN ('Meta Ads 1', 'Meta Ads 2', 'Google ADS'))\nORDER BY data, canal, canal_detalhe, origem",
         "google_sessions": "SELECT data, sessoes\nFROM `reise-ssot.mart_growth_us.aquisicao_por_canal8_daily`\nWHERE data BETWEEN @google_start_date AND @end_date\n  AND canal = 'Google ADS'\nORDER BY data",
         "paid_channel_totals": "SELECT data, canal, canal AS canal_detalhe,\n       'Consolidado do canal SSOT' AS origem, sessoes,\n       pedidos_total AS pedidos, receita_total AS receita\nFROM `reise-ssot.mart_growth_us.aquisicao_por_canal8_daily`\nWHERE data BETWEEN @google_start_date AND @end_date\n  AND canal IN ('Meta ADS', 'Google ADS')\nORDER BY data, canal"
       },
-      "query_start": "2026-09-29",
-      "query_end": "2026-10-28",
+      "query_start": "2026-09-30",
+      "query_end": "2026-10-29",
       "google_query_start": "2025-01-01",
       "paid_history_start": "2025-01-01",
-      "replacement_start": "2026-09-29",
-      "replacement_end": "2026-10-28",
-      "preserved_rows": 7602,
-      "preserved_history_through": "2026-09-28",
-      "previous_snapshot_extracted_at": "2026-10-29T17:11:50.009269-03:00"
+      "replacement_start": "2026-09-30",
+      "replacement_end": "2026-10-29",
+      "preserved_rows": 7648,
+      "preserved_history_through": "2026-09-29",
+      "previous_snapshot_extracted_at": "2026-10-30T08:23:21.014538-03:00"
     }
   },
   "jobs": [
     {
       "query": "commercial_daily",
-      "job_id": "f6ec34c8-6a23-4545-96ec-bef798d863cb",
+      "job_id": "c56f6bd4-41eb-40f8-956c-173988b18f47",
       "location": "US",
-      "bytes_processed": 160572449,
-      "bytes_billed": 161480704,
+      "bytes_processed": 157746641,
+      "bytes_billed": 158334976,
       "cache_hit": false,
       "maximum_bytes_billed": 805306368
     },
     {
       "query": "google_sessions",
-      "job_id": "e775b459-7327-429f-901b-a31309500b7d",
+      "job_id": "d2e4326d-0de1-4292-b5c7-ed364898b317",
       "location": "US",
-      "bytes_processed": 82652,
+      "bytes_processed": 82954,
       "bytes_billed": 10485760,
       "cache_hit": false,
-      "maximum_bytes_billed": 643825664
+      "maximum_bytes_billed": 646971392
     },
     {
       "query": "paid_channel_totals",
-      "job_id": "96dbf866-1831-4855-bb32-7c5a5d11e605",
+      "job_id": "fdd0e7cb-f8c0-4e3e-9c38-3890c6e7f55d",
       "location": "US",
-      "bytes_processed": 154820,
+      "bytes_processed": 155386,
       "bytes_billed": 10485760,
       "cache_hit": false,
-      "maximum_bytes_billed": 633339904
+      "maximum_bytes_billed": 636485632
     }
   ],
   "estimates": {
-    "commercial_daily": 160572449,
-    "google_sessions": 82652,
-    "paid_channel_totals": 154820
+    "commercial_daily": 157746641,
+    "google_sessions": 82954,
+    "paid_channel_totals": 155386
   },
   "paid_channel_totals": {
     "source": "reise-ssot.mart_growth_us.aquisicao_por_canal_origem_daily_v",
     "grain": "data + canal",
     "start": "2025-01-01",
-    "end": "2026-10-28",
+    "end": "2026-10-29",
     "read_only": true,
     "mapping": "Pedidos e receita da visao por origem; sessoes somadas dessa visao, com complemento historico apenas quando ausentes; sem rateio por conta",
     "rows": [
@@ -96836,9 +97346,29 @@
         "pedidos": 45,
         "receita": "24635.50",
         "investimento": null
+      },
+      {
+        "data": "2026-10-29",
+        "canal": "Google ADS",
+        "canal_detalhe": "Google ADS",
+        "origem": "Consolidado do canal SSOT",
+        "sessoes": 3263,
+        "pedidos": 31,
+        "receita": "16421.77",
+        "investimento": null
+      },
+      {
+        "data": "2026-10-29",
+        "canal": "Meta ADS",
+        "canal_detalhe": "Meta ADS",
+        "origem": "Consolidado do canal SSOT",
+        "sessoes": 10707,
+        "pedidos": 36,
+        "receita": "24499.92",
+        "investimento": null
       }
     ],
     "session_history_source": "reise-ssot.mart_growth_us.aquisicao_por_canal8_daily",
-    "extracted_at": "2026-10-29T17:46:23.401117-03:00"
+    "extracted_at": "2026-10-30T08:29:26.268545-03:00"
   }
 }
