@@ -286,13 +286,16 @@ h3, #crm-workspace h3 { font: 700 17px/1.4 var(--body); }
 .filter-dialog-footer .filter-primary-button::before { display: none; }
 .filter-dialog-footer .text-button { border-color: transparent; }
 .data-loader { background: var(--bg); transition: opacity .16s ease, visibility .16s ease; }
-.data-loader-panel { width: min(260px, calc(100% - 40px)); padding: 0; border: 0; background: transparent; box-shadow: none; }
-.data-loader-logo { width: 148px; animation: none; margin-bottom: 26px; }
-.data-loader-message { min-height: 42px; margin: 18px 0 0; color: var(--muted); font: 13px/1.6 var(--body); }
-.data-loader-track { width: 148px; height: 2px; border-radius: 0; background: var(--line); }
-.data-loader-track span { width: 36%; box-shadow: none; animation: reise-loading 1.5s ease-in-out infinite; }
-.data-loader.is-complete .data-loader-track span { animation: none; }
-@keyframes reise-loading { from { transform: translateX(-110%); } to { transform: translateX(390%); } }
+.data-loader-panel { width: min(340px, calc(100% - 48px)); padding: 0; border: 0; background: transparent; box-shadow: none; }
+/* Viewport onto the original REISE lettering, excluding the crest and CULT. */
+.reise-loader-wordmark { position: relative; display: block; width: 176px; height: 52px; overflow: hidden; margin: 0 auto 24px; }
+.reise-loader-wordmark img { position: absolute; width: 636px; max-width: none; height: 192px; left: -235px; top: -70px; }
+.reise-loader-race { position: relative; width: 176px; height: 224px; overflow: hidden; margin: 0 auto; mask-image: linear-gradient(transparent, #000 12%, #000 88%, transparent); }
+.reise-loader-road { position: absolute; inset: -48px 0 0; background: url("reise-racing-track.svg") center top / 176px 48px repeat-y; animation: reise-track-run .48s linear infinite; }
+.reise-loader-car { position: absolute; z-index: 1; left: 40px; top: 16px; width: 96px; height: 192px; max-width: none; image-rendering: pixelated; }
+.data-loader-message { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.data-loader.is-complete .reise-loader-road { animation: none; }
+@keyframes reise-track-run { from { transform: translateY(0); } to { transform: translateY(48px); } }
 @keyframes reise-content-in { from { opacity: .4; } to { opacity: 1; } }
 @keyframes reise-chart-in { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes reise-drawer-in { from { opacity: .6; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
@@ -494,5 +497,5 @@ rect[data-chart-label]:is(:hover, :focus-visible) { opacity: 1; }
   button, input, select { transition: none; }
   :is(#base-refresh, #reload-data, #crm-refresh):disabled::before { animation: none; }
   .data-loader { transition: none; }
-  .data-loader-track span { animation: none; transform: none; }
+  .reise-loader-road { animation: none; transform: none; }
 }
