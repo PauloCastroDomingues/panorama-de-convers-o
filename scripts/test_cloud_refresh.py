@@ -25,6 +25,21 @@ def current_status():
 
 
 class CloudReleaseTests(unittest.TestCase):
+    def test_promotion_waits_for_matching_release_without_weakening_validation(self):
+        with patch('cloud_refresh.verify_release', side_effect=[ssot.RefreshError('release_status_mismatch'), None]) as verify:
+            with patch('cloud_refresh.time.sleep') as pause:
+                cloud.verify_promoted_release(None, Path('.'), pause=pause)
+        self.assertEqual(verify.call_count, 2)
+        pause.assert_called_once_with(10)
+
+    def test_promotion_mismatch_never_reports_success_after_retry_limit(self):
+        with patch('cloud_refresh.verify_release', side_effect=ssot.RefreshError('release_bundle_mismatch')) as verify:
+            with patch('cloud_refresh.time.sleep') as pause:
+                with self.assertRaisesRegex(ssot.RefreshError, 'release_bundle_mismatch'):
+                    cloud.verify_promoted_release(None, Path('.'), pause=pause)
+        self.assertEqual(verify.call_count, 6)
+        self.assertEqual(pause.call_count, 5)
+
     def test_authentication_uses_environment_without_forwarding_credentials(self):
         with patch.dict('cloud_refresh.os.environ', {'VERCEL_TOKEN': 'testtoken'}):
             with patch('cloud_refresh.shutil.which', return_value='vercel'):

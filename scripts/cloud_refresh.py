@@ -338,6 +338,20 @@ def verify_release(get, directory):
         raise ssot.RefreshError('release_html_missing')
 
 
+def verify_promoted_release(get, directory, pause=time.sleep):
+    # Domain propagation may briefly serve the prior deployment after promotion.
+    retryable = {'release_status_mismatch', 'release_snapshot_mismatch',
+                 'release_bundle_mismatch', 'release_html_missing'}
+    for attempt in range(6):
+        try:
+            verify_release(get, directory)
+            return
+        except ssot.RefreshError as error:
+            if str(error) not in retryable or attempt == 5:
+                raise
+            pause(10)
+
+
 def publish_candidate(stage, directory, baseline, get, run_cli=cli):
     def unchanged():
         if get('data/data-refresh-status.json') != baseline['status'] or get('') != baseline['index']:
@@ -352,7 +366,7 @@ def publish_candidate(stage, directory, baseline, get, run_cli=cli):
     verify_release(lambda path: run_cli('curl', url + '/' + path, cwd=stage), directory)
     unchanged()
     run_cli('promote', url, '--yes', cwd=stage)
-    verify_release(get, directory)
+    verify_promoted_release(get, directory)
 
 
 def main():
