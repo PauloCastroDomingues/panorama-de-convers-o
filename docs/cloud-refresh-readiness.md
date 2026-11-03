@@ -1,5 +1,29 @@
 # Atualizacao coordenada na nuvem
 
+## Regra atual: fontes independentes
+
+Em 03/11 o usuario determinou que a atualizacao para D-1 nao deve esperar pelo
+SendFlow. O modo `--independent-sources` substitui a trava global para publicacao:
+
+- Cada fonte validada avanca. Fonte recusada mantem os bytes da versao anterior,
+  suas datas reais e `retained=true`; nao ganha carimbo artificial de atualidade.
+- Growth publica canal, campanha e canal + produto quando validos e mantem os
+  grupos/cruzamentos sem catalogo com aviso e datas antigas por visao.
+- O painel recebe um pacote atomico, mas com estados independentes por fonte.
+  `partial` e um resultado publicavel e explicito, nao uma declaracao de completude.
+- Contratos invalidos, data-alvo incorreta ou nenhuma fonte aprovada bloqueiam
+  a publicacao. Nenhuma metrica comercial e substituida por fonte operacional.
+- Fuso America/Sao_Paulo; alvo sempre D-1, nao dados ainda abertos de hoje.
+- Sem dependencia do computador local. Workflow `refresh-data.yml` publicado;
+  segredo VERCEL_TOKEN confirmado no ambiente em 03/11/2026 as 13:37 BRT.
+- Validacao sem publicar: execucao 41676703932 terminou com success, com fontes
+  atuais ate 02/11 e SendFlow preservado em 30/09. As ressalvas Growth permanecem.
+- Teste de tela com metadados simulados: 1440, 820, 390 e 320 px, sem erros JS,
+  sem escrita nas fontes e sem leituras avulsas fora do pacote.
+
+Os registros abaixo documentam a fase anterior. A exigencia de esperar todas as
+fontes foi substituida pela regra acima, por solicitacao explicita do usuario.
+
 Estado conferido em 03/11/2026, as 13:21 BRT: o diagnostico de coleta completa
 esta publicado e executado no GitHub. A identidade federada e a coleta real
 funcionaram sem computador local. Publicacao e agenda continuam desativadas.

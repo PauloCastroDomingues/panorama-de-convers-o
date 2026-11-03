@@ -314,11 +314,11 @@ def cli(*args, cwd):
     if not executable:
         raise ssot.RefreshError('vercel_cli_required')
     authentication = ['--token', os.environ['VERCEL_TOKEN']] if os.environ.get('VERCEL_TOKEN') else []
-    result = subprocess.run([executable, *args, '--scope', TEAM, *authentication], cwd=cwd,
+    result = subprocess.run([executable, *args, '--scope', TEAM, '--non-interactive', *authentication], cwd=cwd,
                             capture_output=True, timeout=600)
     if result.returncode:
         # CLI stderr may contain authorization details. Do not export it to artifacts.
-        raise ssot.RefreshError('vercel_cloud_command_failed')
+        raise ssot.RefreshError('vercel_cloud_' + args[0] + '_failed')
     return result.stdout
 
 
@@ -341,7 +341,8 @@ def publish_candidate(stage, directory, baseline, get, run_cli=cli):
         if get('data/data-refresh-status.json') != baseline['status'] or get('') != baseline['index']:
             raise ssot.RefreshError('production_changed_before_promotion')
     unchanged()
-    deployment = json.loads(run_cli('deploy', '--prod', '--skip-domain', '--yes', '--json', cwd=stage))['deployment']
+    response = json.loads(run_cli('deploy', '--prod', '--skip-domain', '--yes', '--json', cwd=stage))
+    deployment = response.get('deployment', response)
     url = deployment['url']
     if deployment['readyState'] != 'READY' or not re.fullmatch(r'https://panorama-de-conversao-[a-z0-9]+-reise-team\.vercel\.app', url):
         raise ssot.RefreshError('unexpected_cloud_deployment')

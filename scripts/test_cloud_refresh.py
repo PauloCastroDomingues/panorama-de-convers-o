@@ -351,6 +351,14 @@ class CloudReleaseTests(unittest.TestCase):
             cloud.publish_candidate(Path('.'), Path('.'), {'status': b'old', 'index': b'old'}, lambda _: b'old', run_cli)
         self.assertEqual(calls, ['deploy', 'verify', 'promote', 'verify'])
 
+    def test_flat_cli_json_is_supported_without_skipping_verification(self):
+        result = {'url': 'https://panorama-de-conversao-test123-reise-team.vercel.app', 'readyState': 'READY'}
+        with patch('cloud_refresh.verify_release') as verify:
+            with patch('cloud_refresh.cli', return_value=json.dumps(result)) as run_cli:
+                cloud.publish_candidate(Path('.'), Path('.'), {'status': b'old', 'index': b'old'}, lambda _: b'old', run_cli)
+        self.assertEqual([call.args[0] for call in run_cli.call_args_list], ['deploy', 'promote'])
+        self.assertEqual(verify.call_count, 2)
+
     def test_cloud_auth_never_falls_back_to_personal_oauth(self):
         from google.oauth2.credentials import Credentials
         with patch.dict('os.environ', {'PANORAMA_SHEETS_AUTH': 'workload_identity'}):
