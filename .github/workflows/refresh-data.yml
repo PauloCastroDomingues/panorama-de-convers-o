@@ -1,0 +1,82 @@
+name: Panorama - independent source refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish validated sources while retaining delayed sources
+        type: boolean
+        default: false
+  schedule:
+    # UTC: 08:17, 12:17, 16:17 and 20:17 in Sao Paulo. Execution may be delayed.
+    - cron: '17 11,15,19,23 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: panorama-production-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.PANORAMA_CLOUD_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: panorama-data
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Install reviewed collector dependencies
+        run: |
+          pip install -r scripts/requirements-cloud.txt
+          npm install --global vercel@65.3.1
+      - name: Test before accessing credentials
+        run: |
+          python -m unittest discover -s scripts -p 'test_cloud_refresh.py'
+          python -m unittest discover -s scripts -p 'test_refresh*.py'
+          python -m unittest discover -s scripts -p 'test_growth_observed_bridge.py'
+          node scripts/test_release_contract.cjs
+          node scripts/test_release_data.cjs
+      - name: Check fixed identity configuration
+        env:
+          PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+        run: |
+          test "$SERVICE_ACCOUNT" = 'panorama-data-reader@reise-ssot.iam.gserviceaccount.com'
+          test "$PROVIDER" = 'projects/482129139926/locations/global/workloadIdentityPools/panorama-github/providers/github'
+          test "$GITHUB_REPOSITORY_ID" = '1434889171'
+          test "$GITHUB_REPOSITORY_OWNER_ID" = '153780526'
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: reise-ssot
+          create_credentials_file: true
+      - name: Refresh sources and publish validated data
+        env:
+          PANORAMA_SHEETS_AUTH: workload_identity
+          PANORAMA_CATALOG_BUCKET: ${{ vars.PANORAMA_CATALOG_BUCKET }}
+          VERCEL_TOKEN: ${{ (github.event_name == 'schedule' || inputs.publish) && secrets.VERCEL_TOKEN || '' }}
+          PUBLISH: ${{ github.event_name == 'schedule' || inputs.publish }}
+        run: |
+          if [ "$PUBLISH" = "true" ]; then
+            test -n "$VERCEL_TOKEN"
+            python scripts/cloud_refresh.py --independent-sources --publish
+          else
+            python scripts/cloud_refresh.py --independent-sources
+          fi
+      - name: Report failed cycle
+        if: failure()
+        run: |
+          echo 'Falha na atualizacao. Consulte a etapa e o resumo por fonte; nao considerar todas as fontes atuais.' >> "$GITHUB_STEP_SUMMARY"

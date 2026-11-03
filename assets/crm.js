@@ -369,7 +369,7 @@
     const comparisonText = comparison.records.length && comparison.withinQueryWindow
       ? `Comparativo observado: ${comparison.records.length} campanhas; ${comparison.countIssues} com ressalvas. Cobertura nao homologada; sem sinal de desempenho.`
       : "Sem extracao RD validada para o comparativo selecionado. Isso nao significa ausencia de envios.";
-    const readLabel = snapshot.readMode === "live_sheet" ? "Base auxiliar conectada" : snapshot.readMode === "cached_sheet" ? "Ultima leitura valida" : "Snapshot local";
+    const readLabel = snapshot.readMode === "cloud_release" ? "Lote publicado" : snapshot.readMode === "live_sheet" ? "Base auxiliar conectada" : snapshot.readMode === "cached_sheet" ? "Ultima leitura valida" : "Snapshot local";
     return `<div class="crm-rd-report"><div class="crm-sendflow-source"><div><p class="eyebrow">E-mail | RD Station</p><h3>Campanhas e engajamento</h3><p>${readLabel}. Coleta de ${clock}. Envios de ${sourceDateLabel(snapshot.period.start)} a ${sourceDateLabel(snapshot.period.end)}; contadores observados por campanha.</p>${snapshot.readWarning ? `<p class="crm-rd-read-warning">${esc(snapshot.readWarning)}</p>` : ""}</div><span class="status-pill warn">Piloto | taxas provisorias</span></div>
       <div class="crm-sendflow-kpis"><article class="kpi"><span>Campanhas observadas</span><strong>${current.records.length}</strong><small>No recorte selecionado</small></article><article class="kpi"><span>Contadores consistentes</span><strong>${current.records.length - current.countIssues}</strong><small>Nao representa homologacao</small></article><article class="kpi"><span>Revisar contadores</span><strong>${current.countIssues}</strong><small>Zeros com atividade registrada</small></article><article class="kpi"><span>Cliques informados</span><strong>${current.receivedTotals.clicked === null ? "Sem coleta" : int(current.receivedTotals.clicked)}</strong><small>Subtotal recebido, nao audiencia unica</small></article></div>
       <p class="crm-sendflow-warning">${current.records.length ? `${current.countIssues} campanhas com ressalvas no recorte. Zeros recebidos preservados; taxas afetadas fora da leitura de desempenho.` : "O recorte nao possui registros nesta extracao; o resultado comercial continua separado no SSOT."} Cobertura total e equivalencia das contagens unicas no MCP ainda nao homologadas.</p>
@@ -391,6 +391,15 @@
     };
     const updateTable = () => { $crm("#crm-rd-table-root").innerHTML = renderRdTable(channel); bindTable(); };
     $crm("#crm-rd-search").addEventListener("input", (event) => { crmState.rdSearch = event.target.value; crmState.rdPage = 0; updateTable(); });
+    window.ReiseSearch?.attach($crm('#crm-rd-search'), {
+      options: query => {
+        const terms = rdSearchKey(query).split(/\s+/).filter(Boolean);
+        return channel.rd.current.records.filter(row => terms.every(term => rdSearchKey(`${row.name} ${row.campaignId}`).includes(term)))
+          .filter(row => crmState.rdIssueFilter === 'all' || (crmState.rdIssueFilter === 'review' ? row.countIssues.length > 0 : row.countIssues.length === 0))
+          .map(row => ({ value: row.campaignId, label: `${row.name || 'Campanha sem nome'} / ${row.campaignId}`, inputValue: String(row.campaignId) }));
+      },
+      select: item => { crmState.rdSearch = item.inputValue; crmState.rdPage = 0; updateTable(); },
+    });
     $crm("#crm-rd-quality").addEventListener("change", (event) => { crmState.rdIssueFilter = event.target.value; crmState.rdPage = 0; updateTable(); });
     $crm("[data-rd-pilot]").addEventListener("click", () => {
       crmState.start = channel.rd.snapshot.period.start; crmState.end = channel.rd.snapshot.period.end; crmState.periodPreset = "custom"; crmState.rdPage = 0;
@@ -581,6 +590,7 @@
     });
   };
   const readSendflow = async () => {
+    if (window.PanoramaRelease?.enabled) return CrmSendFlow.validate(await window.PanoramaRelease.read('crm-sendflow-snapshot.json'));
     const packagedRequest = fetch("data/crm-sendflow-snapshot.json", { cache: 'no-store', signal: AbortSignal.timeout(12000) })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Snapshot SendFlow: HTTP ${response.status}`);
@@ -624,6 +634,7 @@
     throw new Error('Nenhuma leitura SendFlow valida disponivel');
   };
   const readRd = async () => {
+    if (window.PanoramaRelease?.enabled) return { ...CrmRd.normalizeSnapshot(CrmRd.sanitizeSnapshot(await window.PanoramaRelease.read('crm-rd-snapshot.json'))), readMode: 'cloud_release', readWarning: '' };
     let endpoint = "", accountId = "", warning = "";
     const packagedRequest = fetch("data/crm-rd-snapshot.json", { cache: "no-store", signal: AbortSignal.timeout(8000) }).then(async (response) => {
       if (!response.ok) throw new Error(`Snapshot RD: HTTP ${response.status}`);
@@ -675,6 +686,7 @@
   };
   let refreshing = false;
   const readWhatsApp = async () => {
+    if (window.PanoramaRelease?.enabled) return consolidateWhatsAppRows((await window.PanoramaRelease.read('crm-whatsapp-snapshot.json')).rows);
     try {
       const response = await fetch('data/crm-whatsapp-snapshot.json', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
       if (response.ok) {
@@ -706,6 +718,7 @@
     syncCrmPeriodControls(); rebuildCrmData();
   };
   const readCommercialSnapshot = async () => {
+    if (window.PanoramaRelease?.enabled) return window.PanoramaRelease.read('ssot-commercial-channels.json');
     const response = await fetch('data/ssot-commercial-channels.json', { cache: 'no-store', signal: AbortSignal.timeout(15000) });
     if (!response.ok) throw new Error('Falha ao ler a extracao SSOT');
     return CrmSendFlow.validateCommercialSnapshot(await response.json());

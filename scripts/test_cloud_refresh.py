@@ -17,13 +17,84 @@ def current_status():
              for key in cloud.growth.LABELS if key not in ('ad', 'ad_product')]
     return {'status': 'current', 'runId': 'test', 'readOnly': True, 'targetDate': '2026-10-29',
             'startedAt': '2026-10-30T07:55:00-03:00', 'finishedAt': '2026-10-30T08:00:00-03:00',
-            'sources': [{'id': key, 'status': 'current', 'latestDate': '2026-10-29',
+            'sources': [{'id': key, 'label': key, 'status': 'current', 'latestDate': '2026-10-29',
                          **({'observedAt': '2026-10-30T07:00:00-03:00', 'collectionId': 'test',
                              'coveredThrough': '2026-10-29'} if key in ('rd', 'sendflow') else {}),
                          **({'views': views, 'coveredThrough': '2026-10-29'} if key == 'growth' else {})} for key in cloud.refresh.SOURCES]}
 
 
 class CloudReleaseTests(unittest.TestCase):
+    def independent_fixture(self, directory):
+        status = current_status()
+        previous = copy.deepcopy(status)
+        previous['sources'][-1].update(latestDate='2026-09-30', status='stale')
+        for field in ('collectionId', 'coveredThrough', 'observedAt'):
+            previous['sources'][-1].pop(field)
+        snapshots = {name: b'{"preserved":true}' for name in cloud.SNAPSHOTS}
+        snapshots['data-refresh-status.json'] = json.dumps(previous).encode()
+        for name, value in snapshots.items():
+            (directory / name).write_bytes(value)
+        (directory / cloud.SNAPSHOTS[0]).write_text('{"extracted_at":"2026-10-30T08:00:00-03:00"}')
+        (directory / cloud.SNAPSHOTS[1]).write_text(json.dumps({'data': [
+            {'view': 'channel', 'generatedAt': '2026-10-30T08:00:00-03:00'}]}))
+        return status, {'status': snapshots['data-refresh-status.json'], 'snapshots': snapshots}
+
+    def test_sendflow_does_not_block_valid_sources_or_receive_fake_new_date(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            status, baseline = self.independent_fixture(directory)
+            status['sources'][-1].update(status='stale', latestDate='2026-09-30', collectionId=None)
+            (directory / 'crm-sendflow-snapshot.json').write_bytes(b'{"unvalidated":true}')
+            with patch('cloud_refresh.ssot.yesterday', return_value=date(2026, 10, 29)):
+                result = cloud.reconcile_available(directory, status, baseline)
+            self.assertEqual(result['acceptedSources'], ['ssot', 'growth', 'whatsapp', 'rd'])
+            self.assertEqual(result['status'], 'partial')
+            sf = result['sources'][-1]
+            self.assertTrue(sf['retained'])
+            self.assertEqual(sf['latestDate'], '2026-09-30')
+            self.assertNotIn('collectionId', sf)
+            self.assertEqual((directory / 'crm-sendflow-snapshot.json').read_bytes(), baseline['snapshots']['crm-sendflow-snapshot.json'])
+
+    def test_partial_growth_keeps_fresh_channel_and_reports_old_groups(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            status, baseline = self.independent_fixture(directory)
+            growth = status['sources'][1]
+            growth['status'] = 'error'
+            growth['views'][2].update(status='error', error='growth_identity_catalog_missing', coveredThrough='2026-10-28')
+            status['preparationErrors'] = ['cloud_catalog_bucket_required']
+            with patch('cloud_refresh.ssot.yesterday', return_value=date(2026, 10, 29)):
+                result = cloud.reconcile_available(directory, status, baseline)
+            self.assertEqual(result['sources'][1]['status'], 'partial')
+            self.assertTrue(result['sources'][1]['views'][2]['retained'])
+            self.assertFalse(result['sources'][1]['views'][0]['retained'])
+            self.assertEqual(result['publicationBlockers'], [])
+            self.assertIn('preparation:cloud_catalog_bucket_required', result['sourceWarnings'])
+
+    def test_no_healthy_source_never_publishes_a_new_timestamp_only(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            status, baseline = self.independent_fixture(directory)
+            for source in status['sources']:
+                source.update(status='error', error='source_request_failed')
+            with patch('cloud_refresh.ssot.yesterday', return_value=date(2026, 10, 29)):
+                with self.assertRaisesRegex(ssot.RefreshError, 'no_valid_source'):
+                    cloud.reconcile_available(directory, status, baseline)
+
+    def test_new_rd_without_committed_collection_is_retained(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            status, baseline = self.independent_fixture(directory)
+            status['sources'][3]['collectionId'] = None
+            with patch('cloud_refresh.ssot.yesterday', return_value=date(2026, 10, 29)):
+                result = cloud.reconcile_available(directory, status, baseline)
+            self.assertTrue(result['sources'][3]['retained'])
+            self.assertNotIn('rd', result['acceptedSources'])
+
+    def test_partial_seal_rejects_unreconciled_cycle(self):
+        with self.assertRaisesRegex(ssot.RefreshError, 'not_reconciled'):
+            cloud.seal_available(Path('.'), current_status())
+
     def test_missing_catalog_does_not_cancel_other_collectors(self):
         sources = {row['id']: row for row in current_status()['sources']}
         collectors = {key: lambda key=key: {key: sources[key]} for key in sources}

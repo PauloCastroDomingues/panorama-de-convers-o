@@ -13,7 +13,14 @@
     const fail = () => { throw new Error('Lote publicado incompleto ou invalido'); };
     if (bundle?.schemaVersion !== 1 || !bundle.releaseId || files.some(name => !bundle.files?.[name])) fail();
     const status = bundle.files['data-refresh-status.json'];
-    if (status.runId !== bundle.releaseId || status.release?.id !== bundle.releaseId || status.status !== 'current'
+    const independent = status.release?.mode === 'independent_sources';
+    if (independent && (status.publicationPolicy !== 'independent_sources'
+        || !Array.isArray(status.acceptedSources) || !status.acceptedSources.length
+        || new Set(status.acceptedSources).size !== status.acceptedSources.length
+        || status.acceptedSources.some(id => !sourceIds.includes(id))
+        || !Array.isArray(status.sourceWarnings))) fail();
+    if (status.runId !== bundle.releaseId || status.release?.id !== bundle.releaseId
+        || !(independent ? ['current', 'partial'] : ['current']).includes(status.status)
         || status.readOnly !== true || !date(status.targetDate) || !timestamp(status.finishedAt)
         || !timestamp(status.startedAt) || Date.parse(status.startedAt) > Date.parse(status.finishedAt)
         || !Array.isArray(status.publicationBlockers) || status.publicationBlockers.length
@@ -21,7 +28,21 @@
     const sources = new Map(status.sources.map(source => [source.id, source]));
     for (const id of sourceIds) {
       const source = sources.get(id);
-      if (!source || source.status !== 'current' || source.error) fail();
+      if (!source) fail();
+      if (independent) {
+        if (typeof source.retained !== 'boolean' || status.acceptedSources.includes(id) === source.retained) fail();
+        if (source.retained) {
+          if (!['stale', 'error'].includes(source.status)) fail();
+          continue;
+        }
+        if (id === 'growth' && source.status === 'partial') {
+          if (!Array.isArray(source.views) || !source.views.some(view => view.status === 'current')
+              || source.views.some(view => view.status === 'current'
+                && (!date(view.coveredThrough) || view.coveredThrough < status.targetDate))) fail();
+          continue;
+        }
+      }
+      if (source.status !== 'current' || source.error) fail();
       if (['rd', 'sendflow'].includes(id)) {
         const snapshot = bundle.files[`crm-${id}-snapshot.json`].source;
         if (!source.collectionId || source.collectionId !== snapshot.collectionId
@@ -37,6 +58,7 @@
         if (!date(covered) || covered < status.targetDate) fail();
       }
     }
+    if (independent && (status.sources.every(source => source.status === 'current') !== (status.status === 'current'))) fail();
     sendflow.validateCommercialSnapshot(bundle.files['ssot-commercial-channels.json']);
     sendflow.validate(bundle.files['crm-sendflow-snapshot.json']);
     rd.sanitizeSnapshot(bundle.files['crm-rd-snapshot.json']);

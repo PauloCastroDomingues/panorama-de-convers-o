@@ -24,25 +24,39 @@ function inFilterDraft(callback) {
 function refreshFilterSummary() {
   $("#filter-summary-period").textContent = formatWindow();
   $("#filter-summary-comparison").textContent = comparisonWindowLabel();
-  const channel = $("#global-channel-filter").selectedOptions[0]?.textContent || "Todos os canais pagos";
-  $("#filter-summary-scope").textContent = `${productFilterActive() ? analysisScopeLabel() : 'Todos os produtos'} / ${channel}`;
-  $("#filter-count").textContent = 1 + ['selectedChannel','selectedProduct','selectedModel','selectedColor','selectedSize','productSearch'].filter((key) => state[key]).length;
+  const channel = growthChannelLabel();
+  $("#filter-summary-scope").textContent = `${productFilterActive() ? analysisScopeLabel() : 'Todos os produtos'} / ${channel}${entityState.charts ? ' / Graficos A/B' : ''}`;
+  $("#filter-count").textContent = 1 + Number(Boolean(entityState.charts)) + ['selectedChannel','selectedProduct','selectedModel','selectedColor','selectedSize','productSearch'].filter((key) => state[key]).length;
 }
 function renderFilterDraft() {
   for (const input of filterForm.querySelectorAll('input[type="date"]')) input.setCustomValidity('');
   inFilterDraft(() => {
-    setupFilters();
+    setupFilters(true);
     $("#compare-enabled").checked = state.compareEnabled;
     for (const id of ['compare-mode','compare-start','compare-end']) $(`#${id}`).disabled = !state.compareEnabled;
     $("#period-preset").value = filterDraft.preset;
     $("#date-start").value = state.start; $("#date-end").value = state.end;
     $("#product-search").value = state.productSearch;
-    $("#filter-view").innerHTML = VIEWS.map((view) => `<option value="${view.key}">${view.short}</option>`).join("");
+    $("#filter-view").innerHTML = growthViewOptions();
     $("#filter-view").value = state.selectedView;
     $("#filter-metric").value = state.chartMetric;
     renderEntityComparison(true);
     for (const side of ['a','b']) $(`#entity-${side}-search`).value = entityState[side].query;
+    const issue = growthFilterIssue();
+    $("#growth-filter-warning").textContent = issue;
+    $("#growth-filter-warning").hidden = !issue;
+    $("#apply-filters").disabled = Boolean(issue);
   });
+  window.ReiseSearch?.refresh();
+}
+function growthFilterIssue() {
+  const availability = viewAvailability(state.selectedView);
+  if (!availability.available) return `${availability.reason} Ajuste o canal, o produto ou a visao.`;
+  for (const id of ['product-filter','product-model-filter','product-color-filter','product-size-filter']) {
+    const select = $(`#${id}`);
+    if (select.value && select.selectedOptions[0]?.disabled) return 'Selecao de produto fora do recorte. Ajuste ou limpe o filtro para continuar.';
+  }
+  return '';
 }
 function openGrowthFilters() {
   clearTimeout(analysisSearchTimer);
@@ -52,6 +66,7 @@ function openGrowthFilters() {
   if (!filterDialog.open) filterDialog.showModal();
 }
 function closeGrowthFilters() {
+  window.ReiseSearch?.close();
   clearTimeout(filterSearchTimer);
   filterDraft = null;
   filterDialog.close();
@@ -77,9 +92,14 @@ function handleFilterEdit(event) {
     if (key === 'selectedChannel') { filterDraft.values.chartFilter = node.value; filterDraft.values.chartChannels = []; }
   } else if (node.id === 'filter-metric') {
     filterDraft.values.chartMetric = node.value; filterDraft.values.rhythmMetric = node.value;
+  } else if (node.id === 'entity-charts') {
+    filterDraft.entities.charts = node.checked;
+  } else if (node.id === 'entity-scope') {
+    filterDraft.entities.scope = node.value;
   } else if (node.id.startsWith('entity-')) {
     const [,side,field] = node.id.split('-');
     filterDraft.entities[side][field === 'search' ? 'query' : field] = node.value;
+    if (field === 'key' && node.value) filterDraft.entities.charts = true;
     if (field === 'view') { filterDraft.entities[side].key = ''; filterDraft.entities[side].query = ''; }
   } else {
     inFilterDraft(() => {
@@ -104,6 +124,9 @@ filterForm.addEventListener('change', handleFilterEdit, true);
 filterForm.addEventListener('submit', (event) => {
   event.preventDefault();
   clearTimeout(filterSearchTimer);
+  let issue = '';
+  inFilterDraft(() => { issue = growthFilterIssue(); });
+  if (issue) { renderFilterDraft(); return; }
   const values = filterDraft.values;
   for (const [start,end,id] of [[values.start,values.end,'date-end'], [values.compareStart,values.compareEnd,'compare-end']]) {
     if (id === 'compare-end' && !values.compareEnabled) continue;
@@ -126,7 +149,8 @@ $("#clear-filters").onclick = () => {
   filterDraft.values.chartChannels = [];
   filterDraft.values.compareMode = 'previous';
   filterDraft.values.compareEnabled = true;
-  filterDraft.entities = { a:{view:'channel',key:'Meta Ads 1',query:''}, b:{view:'channel',key:'Google ADS',query:''} };
+  filterDraft.entities = { scope:'global', charts:false, a:{view:'channel',key:'Meta Ads 1',query:''}, b:{view:'channel',key:'Google ADS',query:''} };
+  filterDraft.values.selectedView = 'channel_product';
   filterDraft.preset = 'current-day';
   inFilterDraft(() => applyPeriodPreset('current-day'));
   renderFilterDraft();
@@ -143,3 +167,37 @@ comparisonDetails.innerHTML = '<summary>Comparar canais, produtos e combinacoes<
 comparisonDetails.append(comparisonPickers);
 $("#filter-entities-section").append(comparisonDetails);
 refreshFilterSummary();
+
+function growthSearchOptions(selectId, input) {
+  return Array.from($(`#${selectId}`).options).filter(option => option.value && !option.disabled)
+    .filter(option => fuzzyMatch(option.textContent, input.value))
+    .map(option => ({ value: option.value, label: option.textContent,
+      inputValue: option.value.startsWith(ENTITY_PRODUCT_SEARCH) ? input.value : option.textContent }));
+}
+window.ReiseSearch.attach($('#product-search'), {
+  options: () => growthSearchOptions('product-filter', $('#product-search')),
+  select: item => {
+    if (!filterDraft) return;
+    clearTimeout(filterSearchTimer);
+    Object.assign(filterDraft.values, { selectedProduct: item.value, productSearch: item.label, selectedModel: '', selectedColor: '', selectedSize: '' });
+    renderFilterDraft();
+  },
+});
+for (const side of ['a', 'b']) {
+  const input = $(`#entity-${side}-search`);
+  window.ReiseSearch.attach(input, {
+    options: () => growthSearchOptions(`entity-${side}-key`, input),
+    select: item => {
+      if (!filterDraft) return;
+      clearTimeout(filterSearchTimer);
+      Object.assign(filterDraft.entities[side], { key: item.value, query: item.inputValue });
+      filterDraft.entities.charts = true;
+      renderFilterDraft();
+    },
+  });
+}
+window.ReiseSearch.attach($('#explorer-search'), {
+  options: query => recordsForDisplay(VIEWS.find(view => view.key === state.selectedView)).records
+    .filter(row => fuzzyMatch(filterText(row), query)).map(row => ({ value: row.key, label: row.dimension })),
+  select: item => { state.explorerSearch = item.label; renderExplorer(); },
+});

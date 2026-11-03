@@ -115,7 +115,9 @@ function editDistance(left, right) {
 function fuzzyMatch(value, query) {
   const text = searchKey(value); const terms = searchKey(query).split(" ").filter(Boolean); if (!terms.length) return true;
   const words = text.split(" ").filter(Boolean);
-  return terms.every((term) => words.some((word) => word.includes(term) || term.includes(word) || (term.length >= 4 && editDistance(word, term) <= 2)));
+  // Model codes and sizes must not match shorter names or adjacent numbers.
+  return terms.every((term) => words.some((word) => /\d/.test(term) ? word === term
+    : word.includes(term) || (term.length >= 4 && word.length >= 4 && editDistance(word, term) <= 2)));
 }
 function productFilterLabel(value) { return cleanText(value).replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim() || "Nao informado"; }
 function displayChannel(value) { const key = fold(value); return { "google ads": "Google Ads", "meta ads 1": "Meta Ads 1", "meta ads 2": "Meta Ads 2", "whatsapp nao oficial": "WhatsApp Organico", "whatsapp organico": "WhatsApp Organico", "organico": "Organico" }[key] || cleanText(value); }
@@ -171,7 +173,52 @@ function normalizeRow(row) {
   const rawTime = row.data_hora || row.datetime || row.timestamp || row.session_ts || row.hora || row.hour;
   return { data: dateKey(rawDate), hora: hourKey(rawTime), period: row.period || "current", canal: canonicalChannel(row), origem: cleanText(row.origem || "Sem origem").trim() || "Sem origem", sessoes: number(row.sessoes ?? row.sessions), pedidos: number(row.pedidos ?? row.orders ?? row.conversoes), receita: number(row.receita ?? row.revenue), campaignId, campaignName, campaignKey: campaignId || campaignName, groupId, groupName, groupKey: groupId || groupName, adId, adName, adKey: adId || adName, productId, productName, productKey: productId || productName, productModel: attrs.model, productColor: attrs.color, productSize: attrs.size };
 }
-function normalizedRows(rows) { return (Array.isArray(rows) ? rows : []).map(normalizeRow).filter((row) => row.data); }
+function rowProvenance(row) {
+  const scope = row.provenanceScope;
+  if (!scope) return null;
+  const provisional = (scope === 'ad_group' || scope === 'ad') && row.identityValidated !== true;
+  const known = typeof row.is_estimado === 'boolean' && (scope !== 'campaign' || typeof row.sessoes_real === 'boolean');
+  return { rows: 1, estimated: row.is_estimado === true ? 1 : 0,
+    sessionUnconfirmed: scope === 'campaign' && row.sessoes_real === false ? 1 : 0,
+    unknown: !provisional && !known ? 1 : 0, provisional: provisional ? 1 : 0,
+    validated: row.identityValidated === true ? 1 : 0,
+    partialLinkage: row.partialLinkage === true ? 1 : 0,
+    productOrdersNonAdditive: row.productOrdersNonAdditive === true ? 1 : 0,
+    windows: row.validatedWindow ? [`${row.validatedWindow.start} a ${row.validatedWindow.end}`] : [],
+    methods: row.metodo_rateio ? [String(row.metodo_rateio)] : [] };
+}
+function summarizeProvenance(rows) {
+  const values = rows.map(row => row.provenance).filter(Boolean);
+  if (!values.length) return null;
+  const result = { methods: [...new Set(values.flatMap(value => value.methods || []))].slice(0, 3),
+    windows: [...new Set(values.flatMap(value => value.windows || []))] };
+  for (const key of ['rows', 'estimated', 'sessionUnconfirmed', 'unknown', 'provisional', 'validated', 'partialLinkage', 'productOrdersNonAdditive']) result[key] = values.reduce((total, value) => total + (value[key] || 0), 0);
+  return result;
+}
+function provenanceNote(record) {
+  const info = record?.provenance;
+  if (!info?.rows) return '';
+  const notes = ['Fonte: SSOT.'];
+  if (info.estimated) notes.push(`${info.estimated} de ${info.rows} registros com estimativa/rateio declarado na origem. O marcador se aplica ao registro; nao significa que todas as suas metricas sejam estimadas.`);
+  if (info.sessionUnconfirmed) notes.push(`${info.sessionUnconfirmed} registros com sessoes nao classificadas como reais pelo SSOT. O denominador pode incluir estimativa ou ausencia de vinculo; consulte o metodo.`);
+  if (info.provisional) notes.push('Agrupamento provisorio por UTM, sem vinculo homologado com grupo/criativo e sem sessoes neste grao.');
+  if (info.validated) notes.push('Vinculos de identidade por IDs conferidos. Catalogos de midia identificam entidades; pedidos e valores vem do SSOT, sem atribuicao causal comprovada.');
+  if (info.partialLinkage) notes.push('Cobertura parcial: somente pedidos com vinculo comprovado. Ausencias de vinculo nao sao zero. Sem sessoes ou conversao neste grao. Variacoes percentuais nao homologadas entre subconjuntos.');
+  if (info.productOrdersNonAdditive) notes.push('Pedidos identificados com produto de valor positivo apos desconto conhecido. Brindes e descontos ausentes ficam separados; receita por produto nao liberada. Um pedido pode conter varios produtos: nao somar como pedidos unicos.');
+  if (info.windows?.length) notes.push(`Janela conferida dos catalogos de IDs: ${info.windows.join(' / ')}. Fora dela, dados nao homologados. A janela nao comprova vigencia diaria do anuncio.`);
+  if (info.unknown) notes.push(`${info.unknown} registros sem metadados completos de procedencia nesta leitura. Nao classificados como observados ou estimados.`);
+  if (!info.validated && !info.estimated && !info.sessionUnconfirmed && !info.provisional && !info.unknown) notes.push('Sem estimativa declarada nos marcadores recebidos. Isso nao comprova atribuicao causal.');
+  if (info.methods.length) notes.push(`Metodos informados (ate 3): ${info.methods.join(' / ')}`);
+  notes.push('Valores preservados da fonte; sem substituicao por GA4.');
+  return notes.join('\n\n');
+}
+function provenanceMarkup(record, context = '') {
+  const note = provenanceNote(record);
+  if (!note) return '';
+  const label = `Procedencia dos dados${context ? `: ${context}` : ''}`;
+  return `<button type="button" class="source-info" data-source-note="${escapeHtml(note)}" aria-label="${escapeHtml(label)}" aria-haspopup="dialog" aria-expanded="false">${typeof CrmIcons === 'function' ? CrmIcons('Info') : 'i'}</button>`;
+}
+function normalizedRows(rows) { return (Array.isArray(rows) ? rows : []).map(row => ({ ...normalizeRow(row), provenance: rowProvenance(row) })).filter((row) => row.data); }
 function summarize(rows) {
   const cleanRows = Array.isArray(rows) ? rows : [];
   const orders = sum(cleanRows.map((row) => row.pedidos));
@@ -193,7 +240,7 @@ function summarize(rows) {
   const observedRate = !complete && onlyCalendarGaps && observedSessions > 0
     && observed.every(row => !incompleteDays.has(row.data))
     ? sum(observed.map(row => row.pedidos)) / observedSessions : null;
-  return { rows: cleanRows.length, pedidos: orders, sessoes: sessions, receita: revenue, rate, observedRate, expectedDays, observedDays, coverage, complete, status: complete ? "Completa" : coverage > 0 ? "Parcial" : "Ausente" };
+  return { rows: cleanRows.length, pedidos: orders, sessoes: sessions, receita: revenue, rate, observedRate, expectedDays, observedDays, coverage, complete, provenance: summarizeProvenance(cleanRows), status: complete ? "Completa" : coverage > 0 ? "Parcial" : "Ausente" };
 }
 function periodBounds(period) { return period === "compare" ? { start: state.compareStart, end: state.compareEnd } : { start: state.start, end: state.end }; }
 function inPeriod(row, period) { if (period === "compare" && state.compareEnabled === false) return false; const bounds = periodBounds(period); return Boolean(row.data && bounds.start && bounds.end && row.data >= bounds.start && row.data <= bounds.end); }
@@ -256,9 +303,9 @@ function consolidatedPaidHistory(period) {
   const rows = [...observations.values()];
   state.channelRowsCache.set(key, rows); return rows;
 }
-function scopeRows(scope, period) {
-  const rows = analysisSourceRows(period).filter((row) => scope.raw.includes(row.canal));
-  if (productFilterActive()) return rows;
+function scopeRows(scope, period, ignoreProduct = false) {
+  const rows = (ignoreProduct ? channelSourceRows(period) : analysisSourceRows(period)).filter((row) => scope.raw.includes(row.canal));
+  if (!ignoreProduct && productFilterActive()) return rows;
   const totals = consolidatedPaidHistory(period);
   if (totals === null) return rows;
   const meta = scope.raw.includes('Meta Ads 1') && scope.raw.includes('Meta Ads 2');
@@ -273,7 +320,12 @@ function displayScopesForFilter(filterKey) {
   const exact = PAID_CHANNEL_VIEWS.find((scope) => scope.key === filterKey);
   return exact ? [exact] : PAID_CHANNEL_VIEWS;
 }
-function selectedScopes() { return displayScopesForFilter(state.selectedChannel); }
+function selectedScopes() {
+  const scopes = displayScopesForFilter(state.selectedChannel);
+  if (!productFilterActive()) return scopes;
+  const channels = new Set(contextualProductRows('', false).map(row => row.canal));
+  return scopes.filter(scope => scope.raw.some(raw => channels.has(raw)));
+}
 function selectedMetricScopes() {
   const filter = CHANNEL_FILTERS.find((scope) => scope.key === state.selectedChannel);
   if (filter) return PAID_SOURCE_CHANNELS.filter((scope) => filter.raw.some((raw) => scope.raw.includes(raw)));
@@ -290,7 +342,9 @@ function allChannelGroups(period) { return channelGroups(period); }
 function viewEntry(viewKey) { return state.growthViewMap.get(viewKey) || null; }
 function normalizedViewRows(viewKey) {
   if (state.normalizedViewRows.has(viewKey)) return state.normalizedViewRows.get(viewKey);
-  const rows = normalizedRows(viewEntry(viewKey)?.rows || []);
+  const scope = ['campaign', 'channel_product', 'ad_group', 'ad', 'campaign_product', 'ad_group_product'].includes(viewKey) ? viewKey : null;
+  const entry = viewEntry(viewKey);
+  const rows = normalizedRows((entry?.rows || []).map(row => ({ ...row, provenanceScope: scope, validatedWindow: entry.validatedWindow })));
   state.normalizedViewRows.set(viewKey, rows); return rows;
 }
 function readiness(viewKey) {
@@ -300,12 +354,13 @@ function readiness(viewKey) {
   return state.growthPayload?.readiness?.find((item) => item.view === viewKey) || null;
 }
 function viewRows(view, period) {
-  const sourceKey = productFilterActive() ? ({ channel: "channel_product", campaign: "campaign_product", ad_group: "ad_group_product", ad: "ad_product" }[view.key] || view.key) : view.key;
-  const entry = viewEntry(sourceKey === "product" ? "channel_product" : sourceKey);
+  const sourceKey = sourceKeyForView(view.key);
+  const entry = viewEntry(sourceKey);
   if (!Array.isArray(entry?.rows)) return [];
-  return normalizedViewRows(sourceKey === "product" ? "channel_product" : sourceKey).filter((row) => {
+  return normalizedViewRows(sourceKey).filter((row) => {
     if (!isAnalysisRow(row)) return false;
-    if (row.data && !inPeriod(row, period)) return false;
+    if ((view.product || productFilterActive()) && !isMerchandiseProduct(row)) return false;
+    if (!inPeriod(row, period)) return false;
     if (!matchesSelectedChannel(row)) return false;
     if ((view.product || productFilterActive()) && !matchesProductFilter(row)) return false;
     return true;
@@ -384,7 +439,7 @@ function applyPeriodPreset(preset) {
   state.start = start; state.end = finish; applyComparison();
   suggestGranularityForWindow();
 }
-function comparisonWindowLabel() { return state.compareEnabled === false ? "Sem comparacao" : state.compareStart && state.compareEnd ? `Comparacao: ${dayLabel(state.compareStart)} a ${dayLabel(state.compareEnd)}` : "Comparacao nao definida"; }
+function comparisonWindowLabel() { return state.compareEnabled === false ? "Sem comparacao temporal" : state.compareStart && state.compareEnd ? `Comparacao: ${dayLabel(state.compareStart)} a ${dayLabel(state.compareEnd)}` : "Comparacao nao definida"; }
 function suggestedGranularity() {
   const days = dateSpan(state.start, state.end);
   if (days <= 1) return state.hourlyAvailable ? "hour" : "day";
@@ -401,15 +456,30 @@ function suggestGranularityForWindow() {
 function renderTemporalControls() {
   suggestGranularityForWindow();
 }
-function setupFilters() {
+function setupFilters(draft = false) {
   const channelSelect = $("#global-channel-filter"); const grouped = CHANNEL_FILTERS.filter((item) => item.key.startsWith("group-")); const individual = PAID_CHANNEL_VIEWS; channelSelect.innerHTML = `<option value="">Todos os canais pagos</option><optgroup label="Grupos de canal">${grouped.map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("")}</optgroup><optgroup label="Leituras declaradas">${individual.map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("")}</optgroup>`; channelSelect.value = state.selectedChannel; channelSelect.onchange = () => { state.selectedChannel = channelSelect.value; state.chartFilter = state.selectedChannel; state.chartChannels = selectedScopes().map((scope) => scope.key); renderAll(); };
   const compareMode = $("#compare-mode"); if (compareMode) { compareMode.value = state.compareMode; $("#compare-custom-fields")?.classList.toggle("is-hidden", state.compareMode !== "custom"); $("#compare-start").value = state.compareStart; $("#compare-end").value = state.compareEnd; $("#comparison-window").textContent = comparisonWindowLabel(); }
-  const level = $("#explorer-level"); level.innerHTML = VIEWS.map((view) => `<option value="${view.key}">${view.number} · ${view.short}</option>`).join(""); level.value = state.selectedView; level.onchange = () => { state.selectedView = level.value; renderExplorer(); };
+  configureChannelOptions(channelSelect);
+  if (!draft) {
+    const level = $("#explorer-level"); level.innerHTML = growthViewOptions(true); level.value = state.selectedView; level.onchange = () => { state.selectedView = level.value; renderAll(); };
+  }
+  for (const id of draft ? ['filter-metric'] : ['filter-metric', 'chart-metric', 'rhythm-metric']) {
+    const select = $(`#${id}`);
+    const productMetric = productFilterActive() || (entityState.charts && entitySelection('a').productGrain && entitySelection('b').productGrain);
+    for (const option of select.options) {
+      if (option.value === 'pedidos') option.textContent = productMetric ? 'Pedidos por produto' : 'Pedidos';
+      if (option.value === 'sessoes') option.textContent = productMetric ? 'Visitas ao produto' : 'Sessoes';
+    }
+  }
   filtersForProducts();
 }
 function metricValue(item, metric) { return metric === "rate" ? item.rate : item[metric]; }
 function metricText(value, metric) { return metric === "rate" ? fmtPercent(value) : metric === "receita" ? fmtMoney(value) : fmtNumber(value); }
-function metricLabel(metric) { return { pedidos: "pedidos", receita: "receita", sessoes: "sessoes", rate: "conversao" }[metric] || metric; }
+function metricLabel(metric) {
+  if (productFilterActive() && metric === 'sessoes') return 'visitas ao produto';
+  if (productFilterActive() && metric === 'pedidos') return 'pedidos por produto';
+  return { pedidos: "pedidos", receita: "receita", sessoes: "sessoes", rate: "conversao" }[metric] || metric;
+}
 function formatWindow() { return state.start ? `${dayLabel(state.start)} a ${dayLabel(state.end)}` : "Periodo nao definido"; }
 
 function periodBucket(date, granularity, row) {
@@ -483,11 +553,43 @@ function explorerCell(record, key) {
   return escapeHtml(record[key] || "Sem identificacao");
 }
 
+function viewQuality(view) {
+  const sourceKey = sourceKeyForView(view.key);
+  const declaration = readiness(sourceKey);
+  const source = declaration?.source || viewEntry(sourceKey)?.source || '';
+  const rows = period => sourceKey === 'channel' ? selectedPaidRows(period) : viewRows(view, period);
+  const current = rows('current'); const previous = rows('compare');
+  const observed = current.some(hasGrowthObservation);
+  const historical = previous.some(hasGrowthObservation);
+  const provisional = /provisorio|utm/i.test(declaration?.status || '');
+  const loaded = sourceKey === 'channel' ? state.rows.length || viewEntry(sourceKey)?.rows?.length : viewEntry(sourceKey)?.rows?.length;
+  const alternative = Boolean(state.alternativePayload?.views?.[sourceKey]);
+  if (!loaded) return { source: source || 'Sem fonte SSOT validada', status: 'Pendente', tone: 'pending',
+    note: `${declaration?.reason || 'Cruzamento SSOT nao validado.'}${alternative ? ' GA4 historico disponivel em arquivo, sem homologacao para os filtros atuais.' : ''}` };
+  if (!observed) return { source: source || 'SSOT', status: 'Sem dados no recorte', tone: 'warn',
+    note: historical ? 'Observacoes apenas no periodo comparado; atual indisponivel.' : 'Fonte carregada, sem observacoes para os filtros e datas selecionados.' };
+  const totals = summarize(current); const oldTotals = summarize(previous);
+  const comparison = state.compareEnabled === false ? '' : oldTotals.rate === null ? ' Comparacao sem base completa de conversao.' : ' Comparacao com denominador conhecido.';
+  return { source: source || 'SSOT', status: provisional ? 'SSOT provisorio / UTM' : totals.rate === null ? 'SSOT parcial' : 'SSOT no recorte',
+    tone: provisional || totals.rate === null ? 'warn' : 'ok',
+    note: (provisional ? 'Pedidos e receita por UTM; vinculo com grupo/criativo nao homologado. Sem conversao oficial.'
+      : totals.rate === null ? 'Indicadores conhecidos preservados; conversao sem base completa.'
+      : view.product || productFilterActive() ? 'Pedidos por produto / visitas ao produto; pedidos nao deduplicados entre produtos.'
+      : 'Pedidos / sessoes do SSOT no mesmo recorte.') + comparison + (totals.provenance ? ` ${provenanceNote(totals)}` : '') };
+}
 function renderQuality() {
-  const officialViews = VIEWS.filter((view) => view.key === "channel" || String(readiness(view.key)?.status || "").toLowerCase().includes("dispon")); const alternativeViews = VIEWS.filter((view) => !officialViews.includes(view) && state.alternativePayload?.views?.[view.key]); const pendingViews = VIEWS.filter((view) => !officialViews.includes(view) && !alternativeViews.includes(view)); $("#quality-count").textContent = `${officialViews.length} oficiais · ${alternativeViews.length} diagnosticos`;
-  const total = summarize(selectedPaidRows("current")); const cards = [{ type: officialViews.length ? "ok" : "warn", title: "Camada oficial", text: `${officialViews.length} visao(oes) com leitura SSOT.` }, { type: total.rate !== null ? "ok" : "warn", title: "Sessoes do canal", text: total.complete ? "Denominador completo para conversao." : total.coverage > 0 ? "Conversao calculada sobre sessoes conhecidas." : "Sem sessoes conhecidas no recorte." }, { type: alternativeViews.length ? "warn" : "pending", title: "Camada diagnostica", text: alternativeViews.length ? `${alternativeViews.length} visao(oes) usam GA4 e nao substituem SSOT.` : "Nenhuma alternativa carregada." }]; $("#quality-list").innerHTML = cards.map((item) => `<div class="quality-item ${item.type}"><i></i><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.text)}</span></div></div>`).join("");
-  const decisions = { channel: "Comparar canais e ritmo", campaign: "Comparar campanhas", ad_group: "Diagnostico GA4; nao conversao oficial", ad: "Diagnostico GA4; nao conversao oficial", channel_product: "Comparar produto por canal", campaign_product: "Diagnostico GA4; nao conversao oficial", ad_group_product: "Diagnostico GA4; nao conversao oficial", ad_product: "Diagnostico GA4; nao conversao oficial" };
-  $("#catalog-body").innerHTML = VIEWS.map((view) => { const official = view.key === "channel" || String(readiness(view.key)?.status || "").toLowerCase().includes("dispon"); const alternative = Boolean(state.alternativePayload?.views?.[view.key]); const status = official ? "SSOT disponivel" : alternative ? "Diagnostico GA4" : "Pendente"; return `<tr><td><strong>${view.number} · ${escapeHtml(view.short)}</strong></td><td>${official ? escapeHtml(readiness(view.key)?.source || "SSOT") : alternative ? "ga4-growth-alternative.json" : "Fonte nao encontrada"}</td><td class="${official ? "ok" : alternative ? "warn" : "pending"}">${status}</td><td>${escapeHtml(decisions[view.key])}</td></tr>`; }).join("");
+  const entries = VIEWS.map(view => ({ view, ...viewQuality(view) }));
+  const valid = entries.filter(item => item.tone === 'ok').length;
+  const partial = entries.filter(item => item.tone === 'warn').length;
+  $('#quality-count').textContent = `${valid} com base / ${partial} com ressalvas`;
+  const total = summarize(selectedPaidRows('current'));
+  const cards = [
+    { type: valid ? 'ok' : 'warn', title: 'Recorte SSOT', text: `${formatWindow()} / ${growthChannelLabel()}. ${valid} visoes com denominador conhecido.` },
+    { type: total.rate !== null ? 'ok' : 'warn', title: 'Conversao oficial', text: total.rate !== null ? 'Pedidos e sessoes conhecidos no mesmo recorte.' : 'Conversao indisponivel; indicadores conhecidos preservados, sem preencher ausencias.' },
+    { type: 'warn', title: 'Complemento GA4', text: 'Nao incorporado aos indicadores oficiais. Cruzamentos e cobertura temporal ainda precisam de homologacao.' },
+  ];
+  $('#quality-list').innerHTML = cards.map(item => `<div class="quality-item ${item.type}"><i></i><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.text)}</span></div></div>`).join('');
+  $('#catalog-body').innerHTML = entries.map(item => `<tr><td><strong>${item.view.number} / ${escapeHtml(item.view.short)}</strong></td><td>${escapeHtml(item.source)}</td><td class="${item.tone}">${escapeHtml(item.status)}</td><td>${escapeHtml(item.note)}</td></tr>`).join('');
 }
 
 function reorderGrowthSections() {
@@ -612,6 +714,11 @@ async function performLoadData({ background = false } = {}) {
   let cachedGrowth = null;
   let commercial = state.commercial;
   try {
+    if (window.PanoramaRelease?.enabled) {
+      const bundle = await window.PanoramaRelease.load();
+      hydrateData(bundle.files['ssot-commercial-channels.json'], bundle.files['ssot-growth-views.json'], null, false);
+      return;
+    }
     const [localGrowth, loadedCommercial] = await Promise.all([
       loadJson('data/ssot-growth-views.json', 5000).catch(() => null),
       loadJson('data/ssot-commercial-channels.json', 10000).catch(() => null),
@@ -641,6 +748,13 @@ async function performLoadData({ background = false } = {}) {
     setLoadingStep("03", "Aplicando leitura de contingencia");
     hydrateData(commercial, cachedGrowth, null, Boolean(cachedGrowth));
   } catch (error) {
+    if (window.PanoramaRelease?.enabled) {
+      $('#source-status').textContent = 'Lote publicado indisponivel';
+      $('#source-pill').textContent = 'Atualizacao pendente';
+      $('#source-pill').className = 'status-pill warn';
+      $('#validation-summary').textContent = error.message;
+      return;
+    }
     if (cachedGrowth?.ok && Array.isArray(cachedGrowth.data)) {
       $("#source-status").textContent = "SSOT em cache";
       $("#source-pill").textContent = "Cache local";

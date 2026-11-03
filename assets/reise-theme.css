@@ -288,14 +288,14 @@ h3, #crm-workspace h3 { font: 700 17px/1.4 var(--body); }
 .data-loader { background: var(--bg); transition: opacity .16s ease, visibility .16s ease; }
 .data-loader-panel { width: min(340px, calc(100% - 48px)); padding: 0; border: 0; background: transparent; box-shadow: none; }
 /* Viewport onto the original REISE lettering, excluding the crest and CULT. */
-.reise-loader-wordmark { position: relative; display: block; width: 176px; height: 52px; overflow: hidden; margin: 0 auto 24px; }
-.reise-loader-wordmark img { position: absolute; width: 636px; max-width: none; height: 192px; left: -235px; top: -70px; }
-.reise-loader-race { position: relative; width: 176px; height: 224px; overflow: hidden; margin: 0 auto; mask-image: linear-gradient(transparent, #000 12%, #000 88%, transparent); }
-.reise-loader-road { position: absolute; inset: -48px 0 0; background: url("reise-racing-track.svg") center top / 176px 48px repeat-y; animation: reise-track-run .48s linear infinite; }
-.reise-loader-car { position: absolute; z-index: 1; left: 40px; top: 16px; width: 96px; height: 192px; max-width: none; image-rendering: pixelated; }
+.reise-loader-wordmark { position: relative; display: block; width: 140.8px; height: 41.6px; overflow: hidden; margin: 0 auto 19px; }
+.reise-loader-wordmark img { position: absolute; width: 508.8px; max-width: none; height: 153.6px; left: -188px; top: -56px; }
+.reise-loader-race { position: relative; width: 88px; height: 112px; overflow: hidden; margin: 0 auto; mask-image: linear-gradient(transparent, #000 12%, #000 88%, transparent); }
+.reise-loader-road { position: absolute; inset: -24px 0 0; background: url("reise-racing-track.svg") center top / 88px 24px repeat-y; animation: reise-track-run .08s linear infinite; }
+.reise-loader-car { position: absolute; z-index: 1; left: 20px; top: 8px; width: 48px; height: 96px; max-width: none; image-rendering: pixelated; }
 .data-loader-message { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .data-loader.is-complete .reise-loader-road { animation: none; }
-@keyframes reise-track-run { from { transform: translateY(0); } to { transform: translateY(48px); } }
+@keyframes reise-track-run { from { transform: translateY(0); } to { transform: translateY(24px); } }
 @keyframes reise-content-in { from { opacity: .4; } to { opacity: 1; } }
 @keyframes reise-chart-in { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes reise-drawer-in { from { opacity: .6; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }

@@ -105,7 +105,7 @@ def download_baseline(destination, get):
     for name, content in contents.items():
         json.loads(content)
         (destination / name).write_bytes(content)
-    return {'status': before, 'index': index}
+    return {'status': before, 'index': index, 'snapshots': contents}
 
 
 def collect_operational(name, read, end, directory, attempts=3, pause=time.sleep):
@@ -175,7 +175,7 @@ def prepare_catalogs(directory):
 
 def diagnostic_report(status):
     """Only operational metadata goes to public workflow logs, never source rows."""
-    fields = ('id', 'status', 'latestDate', 'coveredThrough', 'rows', 'error')
+    fields = ('id', 'status', 'latestDate', 'coveredThrough', 'rows', 'error', 'retained')
     sources = []
     for record in status['sources']:
         source = {key: record[key] for key in fields if key in record}
@@ -185,9 +185,12 @@ def diagnostic_report(status):
             source['views'] = [{key: view[key] for key in fields if key in view}
                                for view in record.get('views', [])]
         sources.append(source)
+    independent = status.get('publicationPolicy') == 'independent_sources'
     return {'targetDate': status['targetDate'], 'checkedAt': status['finishedAt'],
             'readOnly': True, 'historicalCoverageComplete': False,
-            'sources': sources, 'publicationBlockers': blockers(status, ssot.yesterday())}
+            'status': status['status'], 'publicationPolicy': status.get('publicationPolicy', 'all_sources'),
+            'sourceWarnings': status.get('sourceWarnings', []),
+            'sources': sources, 'publicationBlockers': status['publicationBlockers'] if independent else blockers(status, ssot.yesterday())}
 
 
 def report_diagnostic(status):
@@ -197,8 +200,8 @@ def report_diagnostic(status):
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     if summary:
         with Path(summary).open('a', encoding='utf-8') as handle:
-            handle.write('## Coleta completa - somente leitura\n\n')
-            handle.write('Diagnostico sem publicacao. Dados de origem nao foram alterados.\n\n')
+            handle.write('## Conferencia das fontes - somente leitura\n\n')
+            handle.write('Resultado da coleta, anterior a qualquer publicacao. Dados de origem nao foram alterados.\n\n')
             handle.write('```json\n' + content + '\n```\n')
     return report
 
@@ -219,6 +222,67 @@ def seal(directory, status, expected_target=None):
         raise ssot.RefreshError('cloud_release_blocked: ' + ', '.join(reasons))
     files = {name: digest((directory / name).read_bytes()) for name in SNAPSHOTS if name != 'data-refresh-status.json'}
     status['release'] = {'id': status['runId'], 'files': files, 'mode': 'coordinated_cloud_release',
+                         'historicalCoverageComplete': False}
+    ssot.atomic_json(directory / 'data-refresh-status.json', status)
+    bundle = {'schemaVersion': 1, 'releaseId': status['runId'],
+              'files': {name: json.loads((directory / name).read_text(encoding='utf-8')) for name in SNAPSHOTS}}
+    ssot.atomic_json(directory / 'panorama-release.json', bundle)
+    validate_bundle(directory / 'panorama-release.json')
+
+
+def reconcile_available(directory, status, baseline):
+    """Accept validated sources independently; retain exact bytes for rejected sources."""
+    reasons = blockers(status, ssot.yesterday())
+    if any(reason.startswith(('cycle_', 'sources_')) for reason in reasons):
+        raise ssot.RefreshError('invalid_independent_cycle')
+    previous = {source['id']: source for source in json.loads(baseline['status'])['sources']}
+    files = {'ssot': SNAPSHOTS[0], 'growth': SNAPSHOTS[1],
+             **{key: f'crm-{key}-snapshot.json' for key in ('whatsapp', 'rd', 'sendflow')}}
+    accepted = []
+    for index, record in enumerate(status['sources']):
+        key = record['id']
+        eligible = record['status'] == 'current' and not any(reason.startswith(key + ':') for reason in reasons)
+        if key == 'growth' and 'ssot' not in accepted:
+            eligible = False
+        if key == 'growth' and 'ssot' in accepted:
+            payload = json.loads((directory / files[key]).read_text(encoding='utf-8'))
+            commercial = json.loads((directory / files['ssot']).read_text(encoding='utf-8'))
+            channel = next((view for view in payload.get('data', []) if view['view'] == 'channel'), {})
+            eligible = (bool(channel.get('generatedAt')) and channel.get('generatedAt') == commercial.get('extracted_at')
+                        and any(view['id'] == 'channel' and view['status'] == 'current'
+                                for view in record.get('views', [])))
+            if eligible:
+                record['status'] = 'current' if all(view['status'] in ('current', 'unavailable')
+                                                   for view in record['views']) else 'partial'
+                for view in record['views']:
+                    view['retained'] = view['status'] not in ('current', 'unavailable')
+        if eligible:
+            record['retained'] = False
+            record['lastSuccessfulReadAt'] = status['finishedAt']
+            accepted.append(key)
+        else:
+            (directory / files[key]).write_bytes(baseline['snapshots'][files[key]])
+            if key == 'ssot':
+                (directory / 'crm-refresh-status.json').write_bytes(baseline['snapshots']['crm-refresh-status.json'])
+            status['sources'][index] = {**previous[key], 'id': key, 'label': record['label'],
+                'status': 'error' if record.get('error') else 'stale',
+                'error': record.get('error'), 'checkedAt': status['finishedAt'], 'retained': True,
+                'retentionReason': 'Ultima versao validada preservada; coleta atual nao liberada.'}
+    if not accepted:
+        raise ssot.RefreshError('no_valid_source_to_publish')
+    status.update(publicationPolicy='independent_sources', acceptedSources=accepted,
+                  sourceWarnings=reasons, publicationBlockers=[],
+                  status='current' if all(row['status'] == 'current' for row in status['sources']) else 'partial')
+    ssot.atomic_json(directory / 'data-refresh-status.json', status)
+    return status
+
+
+def seal_available(directory, status):
+    if (status.get('publicationPolicy') != 'independent_sources' or not status.get('acceptedSources')
+            or status.get('publicationBlockers') or status.get('targetDate') != ssot.yesterday().isoformat()):
+        raise ssot.RefreshError('independent_release_not_reconciled')
+    files = {name: digest((directory / name).read_bytes()) for name in SNAPSHOTS if name != 'data-refresh-status.json'}
+    status['release'] = {'id': status['runId'], 'files': files, 'mode': 'independent_sources',
                          'historicalCoverageComplete': False}
     ssot.atomic_json(directory / 'data-refresh-status.json', status)
     bundle = {'schemaVersion': 1, 'releaseId': status['runId'],
@@ -249,7 +313,8 @@ def cli(*args, cwd):
     executable = shutil.which('vercel')
     if not executable:
         raise ssot.RefreshError('vercel_cli_required')
-    result = subprocess.run([executable, *args, '--scope', TEAM], cwd=cwd,
+    authentication = ['--token', os.environ['VERCEL_TOKEN']] if os.environ.get('VERCEL_TOKEN') else []
+    result = subprocess.run([executable, *args, '--scope', TEAM, *authentication], cwd=cwd,
                             capture_output=True, timeout=600)
     if result.returncode:
         # CLI stderr may contain authorization details. Do not export it to artifacts.
@@ -293,6 +358,7 @@ def main():
     mode.add_argument('--check-only', action='store_true', help='Read current status, without collecting or deploying.')
     mode.add_argument('--publish', action='store_true', help='Stage, verify and promote only a complete current cycle.')
     mode.add_argument('--diagnose', action='store_true', help='Collect every available source in isolation; never seal or deploy.')
+    parser.add_argument('--independent-sources', action='store_true', help='Publish valid sources without waiting for delayed providers.')
     args = parser.parse_args()
     if args.check_only:
         status = json.loads((ssot.ROOT / 'data/data-refresh-status.json').read_text(encoding='utf-8'))
@@ -317,10 +383,16 @@ def main():
         preparation_errors = prepare_catalogs(catalogs)
         baseline = download_baseline(directory, get)
         status = collect_candidate(ssot.yesterday(), directory, preparation_errors=preparation_errors)
-        report = report_diagnostic(status)
         if args.diagnose:
+            report = report_diagnostic(status)
             return 1 if report['publicationBlockers'] else 0
-        seal(directory, status, expected_target=ssot.yesterday())
+        if args.independent_sources:
+            reconcile_available(directory, status, baseline)
+            seal_available(directory, status)
+            report_diagnostic(status)
+        else:
+            report_diagnostic(status)
+            seal(directory, status, expected_target=ssot.yesterday())
         if not args.publish:
             return 0
         for name in ('assets', 'api'):

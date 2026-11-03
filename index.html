@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Painel de ritmo e performance comercial com dados SSOT.">
   <title>Reise | Performance comercial</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20261028-01">
+  <link rel="stylesheet" href="assets/styles.css?v=20261030-chart-visibility-01">
   <link rel="stylesheet" href="assets/crm-sendflow.css?v=20261028-04">
   <link rel="stylesheet" href="assets/crm-artifact.css?v=20261028-sheet-11">
   <link rel="stylesheet" href="assets/data-refresh.css?v=20261029-01">
-  <link rel="stylesheet" href="assets/reise-theme.css?v=20261030-pixel-loader-02">
+  <link rel="stylesheet" href="assets/reise-theme.css?v=20261030-compact-loader-06">
 </head>
 <body>
   <div id="data-loader" class="data-loader" role="status" aria-live="polite" aria-label="Atualizando dados do painel">
@@ -101,6 +101,7 @@
         <div class="control-group"><label for="product-color-filter">Cor</label><select id="product-color-filter"></select></div>
         <div class="control-group"><label for="product-size-filter">Tamanho</label><select id="product-size-filter"></select></div>
       </div>
+      <p id="growth-filter-warning" class="filter-context-warning" role="status" hidden></p>
     </section>
       <section class="filter-view-section"><h3>Visao e indicador</h3><div class="filter-row"><div class="control-group"><label for="filter-view">Visao</label><select id="filter-view"></select></div><div class="control-group"><label for="filter-metric">Indicador dos graficos</label><select id="filter-metric"><option value="pedidos">Pedidos</option><option value="sessoes">Visitas</option><option value="receita">Receita</option><option value="rate">Conversao</option></select></div></div></section>
       <section id="filter-entities-section"></section>
@@ -149,7 +150,7 @@
 
     <section id="evolucao" class="report-section">
       <div class="section-heading"><span class="section-number">04</span><div><p class="eyebrow">Evolucao</p><h2>Como os canais se movem</h2><p class="section-intro">Escolha o indicador e os canais; a escala permanece comparavel entre os periodos.</p></div></div>
-      <div class="chart-tools"><label for="chart-channel-filter">Grupo de canais</label><select id="chart-channel-filter"></select><label for="chart-metric">Indicador</label><select id="chart-metric"><option value="pedidos">Pedidos</option><option value="receita">Receita</option><option value="sessoes">Sessoes</option><option value="rate">Conversao</option></select><span id="chart-window" class="muted-note">&mdash;</span></div>
+      <div class="chart-tools"><span id="chart-scope" class="muted-note"></span><label for="chart-metric">Indicador</label><select id="chart-metric"><option value="pedidos">Pedidos</option><option value="receita">Receita</option><option value="sessoes">Sessoes</option><option value="rate">Conversao</option></select><span id="chart-window" class="muted-note">&mdash;</span></div>
       <div id="line-chart" class="chart" aria-label="Grafico de evolucao por canal"><div class="empty-state">Carregando evolucao.</div></div>
       <p id="chart-note" class="chart-note"></p>
     </section>
@@ -162,6 +163,8 @@
       <details id="entity-comparison" class="entity-comparison">
         <summary>Comparar canais, produtos e combinacoes</summary>
         <div class="comparison-pickers">
+          <label class="entity-charts-toggle"><input id="entity-charts" type="checkbox">Comparar A/B nos graficos</label>
+          <div class="control-group entity-scope-control"><label for="entity-scope">Recorte A/B</label><select id="entity-scope"><option value="global">Filtros globais</option><option value="independent">Selecoes independentes</option></select></div>
           <fieldset><legend>Selecao A</legend><div class="control-group"><label for="entity-a-view">Visao</label><select id="entity-a-view"></select></div><div class="control-group"><label for="entity-a-search">Pesquisar</label><input id="entity-a-search" type="search" placeholder="Produto, canal ou campanha"></div><div class="control-group"><label for="entity-a-key">Selecao</label><select id="entity-a-key"></select></div></fieldset>
           <fieldset><legend>Selecao B</legend><div class="control-group"><label for="entity-b-view">Visao</label><select id="entity-b-view"></select></div><div class="control-group"><label for="entity-b-search">Pesquisar</label><input id="entity-b-search" type="search" placeholder="Produto, canal ou campanha"></div><div class="control-group"><label for="entity-b-key">Selecao</label><select id="entity-b-key"></select></div></fieldset>
         </div>
@@ -242,20 +245,25 @@
     <details class="crm-source-details"><summary>Conferencia das fontes e cobertura SSOT</summary><section id="crm-ssot-reconciliation" class="crm-reconciliation" hidden aria-live="polite"></section></details>
     <footer><strong>Regra CRM:</strong> pedidos, receita, sessões e conversão vêm do SSOT. Ativação operacional e metas do artefato são leituras separadas, sem alterar as fontes.</footer>
   </main>
-  <script src="assets/chart-interactions.js?v=20261029-ui-02"></script>
-  <script src="assets/performance-delta.js?v=20261029-01"></script>
-  <script src="assets/data-refresh.js?v=20261029-ui-02"></script>
-  <script src="assets/app.js?v=20261029-reconciled-01"></script>
-  <script src="assets/growth-analysis.js?v=20261029-reconciled-01"></script>
-  <script src="assets/growth-filters.js?v=20261029-reconciled-01"></script>
   <script src="assets/crm-sendflow.js?v=20261029-01"></script>
   <script src="assets/crm-email.js?v=20261028-01"></script>
   <script src="assets/crm-rd.js?v=20261028-03"></script>
-  <script src="assets/crm-icons.js?v=20261028-01"></script>
+  <script src="assets/release-mode.js?v=20261030-cloud-01"></script>
+  <script src="assets/release-contract.js?v=20261103-independent-01"></script>
+  <script src="assets/release-data.js?v=20261103-independent-01"></script>
+  <script src="assets/chart-interactions.js?v=20261029-ui-02"></script>
+  <script src="assets/performance-delta.js?v=20261029-01"></script>
+  <script src="assets/data-refresh.js?v=20261103-independent-01"></script>
+  <script src="assets/app.js?v=20261030-cloud-01"></script>
+  <script src="assets/growth-analysis.js?v=20261030-chart-visibility-01"></script>
+  <script src="assets/search-suggestions.js?v=20261030-autocomplete-03"></script>
+  <script src="assets/growth-filters.js?v=20261030-growth-review-01"></script>
+  <script src="assets/crm-icons.js?v=20261030-provenance-01"></script>
+  <script src="assets/source-info.js?v=20261030-provenance-01"></script>
   <script src="assets/crm-whatsapp.js?v=20261028-01"></script>
   <script src="assets/crm-artifact.js?v=20261029-comparison-01"></script>
   <script src="assets/crm-funnel.js?v=20261029-decision-01"></script>
   <script src="assets/crm-decision.js?v=20261029-decision-01"></script>
-  <script src="assets/crm.js?v=20261029-reconciled-01"></script>
+  <script src="assets/crm.js?v=20261030-cloud-01"></script>
 </body>
 </html>

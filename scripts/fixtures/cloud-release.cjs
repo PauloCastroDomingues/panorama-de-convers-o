@@ -21,4 +21,19 @@ function bundle(id = 'one', finishedAt = '2026-11-03T12:00:00-03:00') {
       ...(['rd','sendflow'].includes(sourceId) ? {collectionId:id, coveredThrough:'2026-11-02', observedAt:'2026-11-03T07:00:00-03:00'} : {})}))};
   return {schemaVersion:1, releaseId:id, files:payloads};
 }
-module.exports = {bundle, names:files};
+function independentBundle(id = 'one', finishedAt) {
+  const value = bundle(id, finishedAt);
+  const status = value.files['data-refresh-status.json'];
+  Object.assign(status, {status:'partial', publicationPolicy:'independent_sources',
+    acceptedSources:['ssot','growth','whatsapp','rd'], sourceWarnings:['sendflow:before_target','growth:ad_group:not_current']});
+  status.release.mode = 'independent_sources';
+  for (const source of status.sources) source.retained = source.id === 'sendflow';
+  Object.assign(status.sources[4], {status:'stale',latestDate:'2026-09-30',collectionId:null,coveredThrough:null,observedAt:null});
+  value.files['crm-sendflow-snapshot.json'].source = structuredClone(sourceFiles['crm-sendflow-snapshot.json'].source);
+  Object.assign(status.sources[1], {status:'partial',coveredThrough:'2026-10-29',views:
+    ['channel','campaign','ad_group','channel_product','campaign_product','ad_group_product'].map(id => ({id,label:id,
+      status:id.includes('group') ? 'error' : 'current',retained:id.includes('group'),
+      coveredThrough:id.includes('group') ? '2026-10-29' : '2026-11-02'}))});
+  return value;
+}
+module.exports = {bundle, independentBundle, names:files};
