@@ -4,6 +4,7 @@ from decimal import Decimal
 import json
 
 import refresh_crm_ssot as ssot
+import growth_observed_bridge as bridge
 
 OUTPUT = ssot.ROOT / 'data/ssot-growth-views.json'
 MAX_BYTES = 1024 * 1024 * 1024
@@ -16,9 +17,23 @@ SOURCES = {
         'campanha_id': None, 'sessoes': None, 'pedidos': None, 'receita': None}),
     'channel_product': ('aquisicao_por_produto_canal_daily', {'data': 'DATE', 'canal': 'STRING',
         'produto': 'STRING', 'product_id': None, 'sessoes': None, 'pedidos': None, 'receita': None}),
-    'utm': ('shopify_order_utm_resolved_v', {'data': 'DATE', 'utm_source': 'STRING',
-        'utm_term': 'STRING', 'utm_content': 'STRING', 'order_name': None, 'total_amount': None}),
 }
+
+
+PROVENANCE_FIELDS = {'is_estimado': 'BOOLEAN', 'metodo_rateio': 'STRING',
+                     'sessoes_real': 'BOOLEAN', 'sessoes_last_click': 'INTEGER'}
+
+
+def provenance_columns(schema, key):
+    fields = PROVENANCE_FIELDS if key == 'campaign' else {
+        field: PROVENANCE_FIELDS[field] for field in ('is_estimado', 'metodo_rateio')}
+    columns = []
+    for field, kind in fields.items():
+        if field in schema and schema[field] != kind:
+            raise ssot.RefreshError('growth_provenance_schema_mismatch')
+        sql_type = {'BOOLEAN': 'BOOL', 'INTEGER': 'INT64'}.get(kind, kind)
+        columns.append(field if field in schema else f'CAST(NULL AS {sql_type}) AS {field}')
+    return ', '.join(columns)
 
 
 def serial(value):
@@ -44,24 +59,46 @@ class Reader:
         self.remaining = MAX_BYTES
         self.end = end
         self.jobs = []
+        self.observed = None
+        self.observed_error = None
+
+    def query(self, sql, region, params, label):
+        config = dict(use_legacy_sql=False, query_parameters=params, maximum_bytes_billed=self.remaining)
+        dry = self.client.query(sql, location=region, timeout=30,
+            job_config=self.bq.QueryJobConfig(**config, dry_run=True))
+        if dry.statement_type != 'SELECT' or dry.total_bytes_processed is None or dry.total_bytes_processed > self.remaining:
+            raise ssot.RefreshError('growth_budget_exceeded')
+        job = self.client.query(sql, location=region, timeout=30, job_config=self.bq.QueryJobConfig(**config))
+        try:
+            rows = [dict(row) for row in job.result(timeout=180)]
+        except TimeoutError:
+            job.cancel()
+            raise ssot.RefreshError('growth_query_timeout') from None
+        self.remaining -= job.total_bytes_billed or 0
+        self.jobs.append({'view': label, 'jobId': job.job_id, 'region': region,
+                          'bytesBilled': job.total_bytes_billed, 'readOnly': True})
+        return rows
 
     def read(self, key):
-        name, fields = SOURCES['utm' if key in ('ad_group', 'ad') else key]
+        if key in bridge.KEYS:
+            if self.observed_error:
+                raise self.observed_error
+            if self.observed is None:
+                try:
+                    self.observed = bridge.collect(self)
+                except Exception as exc:
+                    self.observed_error = exc
+                    raise
+            return self.observed[key]
+        name, fields = SOURCES[key]
         source = ssot.PROJECT + '.mart_growth_us.' + name
         table = self.client.get_table(source, timeout=30)
         schema = {field.name: field.field_type for field in table.schema}
         if table.location != ssot.LOCATION or any(field not in schema or (kind and schema[field] != kind) for field, kind in fields.items()):
             raise ssot.RefreshError('growth_schema_mismatch')
-        if key in ('ad_group', 'ad'):
-            dim, alias = ('utm_term', 'grupo_anuncio') if key == 'ad_group' else ('utm_content', 'anuncio')
-            sql = f'''SELECT data, utm_source AS origem, NULLIF(TRIM({dim}), '') AS {alias},
-                CAST(NULL AS INT64) AS sessoes, COUNT(DISTINCT order_name) AS pedidos,
-                SUM(total_amount) AS receita FROM `{source}`
-                WHERE data BETWEEN @start AND @end AND NULLIF(TRIM({dim}), '') IS NOT NULL
-                GROUP BY data, origem, {alias}'''
-        else:
-            dims = 'campanha, CAST(campanha_id AS STRING) AS campaign_id' if key == 'campaign' else 'produto, CAST(product_id AS STRING) AS product_id'
-            sql = f'SELECT data, canal, {dims}, sessoes, pedidos, receita FROM `{source}` WHERE data BETWEEN @start AND @end'
+        dims = 'campanha, CAST(campanha_id AS STRING) AS campaign_id' if key == 'campaign' else 'produto, CAST(product_id AS STRING) AS product_id'
+        provenance = provenance_columns(schema, key)
+        sql = f'SELECT data, canal, {dims}, sessoes, pedidos, receita, {provenance} FROM `{source}` WHERE data BETWEEN @start AND @end'
         params = [self.bq.ScalarQueryParameter('start', 'DATE', ssot.START), self.bq.ScalarQueryParameter('end', 'DATE', self.end)]
         config = dict(use_legacy_sql=False, query_parameters=params, maximum_bytes_billed=self.remaining)
         dry = self.client.query(sql, location=ssot.LOCATION, job_config=self.bq.QueryJobConfig(**config, dry_run=True))
@@ -132,25 +169,28 @@ def run(end, commercial, output=OUTPUT, reader_factory=Reader, seed=seed_previou
     try:
         for key, label in LABELS.items():
             error = None
-            unsupported = key.endswith('_product') and key != 'channel_product'
-            provisional = key in ('ad_group', 'ad')
+            unsupported = key in ('ad', 'ad_product')
+            observed = key in bridge.KEYS
             try:
                 view = channel_view(commercial) if key == 'channel' else {'view': key, 'rows': []} if unsupported else reader.read(key)
-                if key != 'channel' and not unsupported:
+                if key != 'channel' and not unsupported and not observed:
                     view = preserve_history(key, view, previous.get(key, {}), end)
                 old_dates = {row['data'] for row in previous.get(key, {}).get('rows', [])}
-                if not old_dates <= {row['data'] for row in view['rows']}:
+                if not unsupported and (not observed or previous.get(key, {}).get('contract') == bridge.CONTRACT) and not old_dates <= {row['data'] for row in view['rows']}:
                     raise ssot.RefreshError('growth_history_regression')
             except Exception as exc:
                 error = ssot.safe_error(exc)
                 view = previous.get(key, {'view': key, 'rows': []})
+                if observed and view.get('contract') != bridge.CONTRACT:
+                    view = {'view': key, 'rows': []}
             latest = max((row['data'] for row in view['rows']), default=None)
-            status = 'error' if error else 'unavailable' if unsupported else 'current' if latest == end.isoformat() else 'stale'
+            covered_end = view.get('validatedWindow', {}).get('end', latest)
+            status = 'error' if error else 'unavailable' if unsupported else 'current' if covered_end == end.isoformat() else 'stale'
             checks.append({'id': key, 'label': label, 'status': status, 'latestDate': latest,
-                           'error': error, 'rows': len(view['rows']), 'conversionAvailable': not (unsupported or provisional)})
-            readiness.append({'view': key, 'label': label, 'status': 'Pendente' if unsupported or not view['rows'] else 'Provisorio por UTM' if provisional else 'Disponivel (ultima leitura)' if error else 'Disponivel',
-                'source': view.get('source'), 'reason': 'Sem fonte SSOT validada neste grao.' if unsupported else
-                'UTM: pedidos e receita; sem denominador de sessoes neste grao.' if provisional else error})
+                           'coveredThrough': covered_end, 'error': error, 'rows': len(view['rows']), 'conversionAvailable': not (unsupported or observed)})
+            readiness.append({'view': key, 'label': label, 'status': 'Pendente' if unsupported or not view['rows'] else 'Parcial por IDs conferidos (ultima leitura)' if observed and error else 'Parcial por IDs conferidos' if observed else 'Disponivel (ultima leitura)' if error else 'Disponivel',
+                'source': view.get('source'), 'reason': 'Criativo sem vinculo comercial validado; utm_content nao comprova ID de anuncio.' if unsupported else
+                bridge.REASON if observed else error})
             views.append(view)
     finally:
         reader.close()
@@ -164,4 +204,28 @@ def run(end, commercial, output=OUTPUT, reader_factory=Reader, seed=seed_previou
     return {'status': 'error' if any(c['error'] for c in active) else 'stale' if any(c['status'] == 'stale' for c in active) else 'current',
             'latestDate': min((c['latestDate'] for c in active if c['latestDate']), default=None),
             'checkedAt': now, 'views': checks, 'coverageComplete': False,
-            'note': 'Tres cruzamentos com produto sem fonte validada; grupo/anuncio sem sessoes.'}
+            'note': 'Grupos e cruzamentos de produto com cobertura parcial por IDs; criativos pendentes. Sem sessoes nos novos graos.'}
+
+
+if __name__ == '__main__':
+    import argparse
+    from pathlib import Path
+    from refresh_all_data import refresh_lock, aggregate, OUTPUT as STATUS_OUTPUT
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--end', type=date.fromisoformat, default=ssot.yesterday())
+    parser.add_argument('--output', type=Path, default=OUTPUT)
+    args = parser.parse_args()
+    with refresh_lock(ssot.ROOT / '.local/data-refresh.lock'):
+        result = run(args.end, json.loads(ssot.OUTPUT.read_text(encoding='utf-8')), output=args.output)
+        if args.output.resolve() == OUTPUT.resolve() and STATUS_OUTPUT.exists():
+            original_status = STATUS_OUTPUT.read_bytes()
+            status = json.loads(original_status)
+            for source in status.get('sources', []):
+                if source['id'] == 'growth':
+                    source.update(result)
+                    if result['status'] != 'error':
+                        source.update(lastSuccessfulReadAt=result['checkedAt'], error=None)
+            status['status'] = aggregate(status['sources'])
+            ssot.atomic_json(STATUS_OUTPUT, status, original_status)
+    print(json.dumps(result, ensure_ascii=True))
+    raise SystemExit(1 if result['status'] == 'error' else 0)

@@ -120,7 +120,7 @@ class RefreshTests(unittest.TestCase):
             self.assertEqual(new['data'][1], old_view)
             self.assertEqual(len(new['data']), 8)
             self.assertEqual(status['status'], 'error')
-            self.assertEqual(sum(v['status'] == 'unavailable' for v in status['views']), 3)
+            self.assertEqual(sum(v['status'] == 'unavailable' for v in status['views']), 2)
 
     def test_rejects_older_operational_observation(self):
         previous = {'source': {'observedAt': '2026-10-29T10:00:00Z'}}

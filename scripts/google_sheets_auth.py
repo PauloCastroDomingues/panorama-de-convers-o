@@ -1,6 +1,7 @@
 """Separate Sheets OAuth from Cloud SDK ADC. Never broaden the SDK client scopes."""
 import argparse
 import json
+import os
 from pathlib import Path
 
 import refresh_crm_ssot as ssot
@@ -23,6 +24,13 @@ def validate_client(config):
 
 
 def load_credentials(path=TOKEN_PATH):
+    if os.environ.get('PANORAMA_SHEETS_AUTH') == 'workload_identity':
+        import google.auth
+        from google.auth import external_account, impersonated_credentials
+        credentials, _ = google.auth.default(scopes=[SCOPE])
+        if not isinstance(credentials, (external_account.Credentials, impersonated_credentials.Credentials)):
+            raise ssot.RefreshError('sheets_workload_identity_required')
+        return credentials
     from google.oauth2.credentials import Credentials
     from google.auth import _cloud_sdk
     if not path.is_file():

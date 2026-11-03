@@ -12,4 +12,6 @@ config.local.json
 output/
 node_modules/
 .env.*
+gha-creds-*.json
+data/*.tmp
 !.env.example

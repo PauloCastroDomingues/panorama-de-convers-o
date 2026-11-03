@@ -16,6 +16,14 @@ RD_FIELDS = ['campaign_id', 'campaign_name', 'send_at', 'contacts_count', 'email
     'email_opened_count', 'email_clicked_count', 'email_bounced_count', 'email_dropped_count',
     'email_unsubscribed_count', 'email_spam_reported_count']
 COLECTION_FIELDS = ['collection_id', 'account_id', 'observed_at', 'start_date', 'end_date', 'record_count', 'status']
+SF_COLLECTION_FIELDS = ['collection_id', 'observed_at', 'start_date', 'end_date',
+    'messages_count', 'actions_count', 'movement_count', 'release_ids', 'status']
+SF_TABLES = {
+    'messages': ('SF_MENSAGENS', 'M', ['releaseId', 'actionId', 'messageKey', 'messageIndex',
+        'sentAt', 'date', 'type', 'recipients', 'delivered', 'read', 'played', 'generatedAt']),
+    'actions': ('SF_ACOES', 'M', ['releaseId', 'actionId', 'sentAt', 'date', 'success', 'groups',
+        'messageCount', 'recipients', 'delivered', 'read', 'played', 'generatedAt']),
+    'movement': ('SF_MOVIMENTO', 'G', ['releaseId', 'date', 'originalDateKey', 'add', 'remove', 'clicks'])}
 
 
 def timestamp(value):
@@ -91,22 +99,36 @@ def validate_js(kind, payload):
         raise ssot.RefreshError('operational_contract_invalid')
 
 
+def latest_collection(book, tab, end_column, fields, account=None):
+    rows = [row for row in book.rows(tab, [('A', end_column)], fields)
+            if row['status'] == 'committed' and (account is None or row['account_id'] == account)]
+    if not rows:
+        raise ssot.RefreshError('no_committed_collection')
+    if any(not isinstance(row['collection_id'], str) or not row['collection_id'].strip() for row in rows):
+        raise ssot.RefreshError('collection_id_invalid')
+    if len({row['collection_id'] for row in rows}) != len(rows):
+        raise ssot.RefreshError('duplicate_collection')
+    rows.sort(key=lambda row: timestamp(row['observed_at']), reverse=True)
+    if len(rows) > 1 and timestamp(rows[0]['observed_at']) == timestamp(rows[1]['observed_at']):
+        raise ssot.RefreshError('ambiguous_latest_collection')
+    return rows[0]
+
+
+def collection_window(current):
+    start, end = ssot.iso_date(current['start_date']), ssot.iso_date(current['end_date'])
+    observed = timestamp(current['observed_at'])
+    if start > end or observed.astimezone(ssot.TIMEZONE).date().isoformat() <= end:
+        raise ssot.RefreshError('collection_period_not_closed')
+    if observed > datetime.now(ssot.TIMEZONE):
+        raise ssot.RefreshError('collection_timestamp_in_future')
+    return start, end
+
+
 def read_rd():
     book = Sheets(RD_SHEET)
     try:
-        collections = [row for row in book.rows('RD_COLETAS', [('A', 'G')], COLECTION_FIELDS)
-                       if row['account_id'] == '832517' and row['status'] == 'committed']
-        if not collections:
-            raise ssot.RefreshError('rd_no_committed_collection')
-        if len({row['collection_id'] for row in collections}) != len(collections):
-            raise ssot.RefreshError('rd_duplicate_collection')
-        collections.sort(key=lambda row: timestamp(row['observed_at']), reverse=True)
-        current = collections[0]
-        if len(collections) > 1 and timestamp(current['observed_at']) == timestamp(collections[1]['observed_at']):
-            raise ssot.RefreshError('rd_ambiguous_latest_collection')
-        start, end = ssot.iso_date(current['start_date']), ssot.iso_date(current['end_date'])
-        if start > end:
-            raise ssot.RefreshError('rd_invalid_period')
+        current = latest_collection(book, 'RD_COLETAS', 'G', COLECTION_FIELDS, '832517')
+        start, end = collection_window(current)
         rows = [r for r in book.rows('RD_CAMPANHAS', [('A', 'M')], ['collection_id', 'account_id'] + RD_FIELDS)
                 if r['collection_id'] == current['collection_id']]
         if len(rows) != counter(current['record_count']):
@@ -126,9 +148,14 @@ def read_rd():
         payload = {'schemaVersion': 1, 'source': {'name': 'RD Station Marketing', 'tool': 'emails_by_campaign_analytics',
             'accountId': '832517', 'observedAt': current['observed_at'], 'sourceUpdatedAt': None, 'start': start, 'end': end,
             'timeZone': 'America/Sao_Paulo', 'mode': 'auxiliary_sheet', 'scopeComplete': False, 'coverageEvidence': None,
+            'collectionId': current['collection_id'], 'coveredThrough': end,
             'uniqueCountsConfirmed': False, 'uniqueCountsEvidence': None}, 'campaigns': campaigns, 'outsideCampaigns': outside}
+        if current != latest_collection(book, 'RD_COLETAS', 'G', COLECTION_FIELDS, '832517'):
+            raise ssot.RefreshError('collection_changed_during_read')
         validate_js('rd', payload)
         return payload, {'latestDate': end, 'observedAt': current['observed_at'], 'rows': len(campaigns), 'coverageComplete': False,
+            'collectionId': current['collection_id'], 'coveredThrough': end,
+            'latestEventDate': max((timestamp(r['send_at']).astimezone(ssot.TIMEZONE).date().isoformat() for r in campaigns), default=None),
             'note': 'Ultima coleta committed da planilha; a coleta no RD precisa alimentar esta origem.'}
     finally:
         book.close()
@@ -137,6 +164,8 @@ def read_rd():
 def read_sendflow():
     book = Sheets(SF_SHEET)
     try:
+        if 'SF_COLETAS' in book.tabs:
+            return read_sendflow_collection(book)
         maps = {
             'messages': ('Mensagens', [('A', 'J'), ('S', 'W')], {'releaseId': 'release_id', 'actionId': 'action_id', 'messageKey': 'message_key',
                 'messageIndex': 'message_index', 'sentAt': 'sent_at_utc', 'date': 'data_brasilia', 'type': 'type', 'recipients': 'recipients',
@@ -177,6 +206,56 @@ def read_sendflow():
             'coverageComplete': False, 'note': 'Todas as campanhas da planilha; campanhas ausentes ainda dependem da coleta SendFlow.'}
     finally:
         book.close()
+
+
+def read_sendflow_collection(book):
+    """Immutable batches coexist with legacy tabs; only committed batches are consumed."""
+    current = latest_collection(book, 'SF_COLETAS', 'I', SF_COLLECTION_FIELDS)
+    start, end = collection_window(current)
+    try:
+        releases = json.loads(current['release_ids'])
+    except (ValueError, TypeError):
+        raise ssot.RefreshError('sendflow_release_scope_invalid') from None
+    if (not isinstance(releases, list) or not releases
+            or any(not isinstance(value, str) or not value.strip() for value in releases)
+            or len(set(releases)) != len(releases)):
+        raise ssot.RefreshError('sendflow_release_scope_invalid')
+    payload = {'schemaVersion': 1}
+    counts = {'messageIndex', 'recipients', 'delivered', 'read', 'played', 'groups', 'messageCount', 'add', 'remove', 'clicks'}
+    for key, (tab, last_column, fields) in SF_TABLES.items():
+        rows = [r for r in book.rows(tab, [('A', last_column)], ['collection_id'] + fields)
+                if r['collection_id'] == current['collection_id']]
+        if len(rows) != counter(current[key + '_count']):
+            raise ssot.RefreshError('sendflow_collection_incomplete')
+        records = []
+        for row in rows:
+            record = {field: counter(row[field]) if field in counts else row[field] for field in fields}
+            record['date'] = sheet_date(record['date'])
+            if record['releaseId'] not in releases or not start <= record['date'] <= end:
+                raise ssot.RefreshError('sendflow_row_outside_collection')
+            for field in ('actionId', 'messageKey'):
+                if field in record and (not isinstance(record[field], str) or not record[field]):
+                    raise ssot.RefreshError('sendflow_id_invalid')
+            if 'sentAt' in record and timestamp(record['sentAt']).astimezone(ssot.TIMEZONE).date().isoformat() != record['date']:
+                raise ssot.RefreshError('sendflow_event_date_mismatch')
+            if 'generatedAt' in record and timestamp(record['generatedAt']) > timestamp(current['observed_at']):
+                raise ssot.RefreshError('sendflow_row_after_collection')
+            records.append(record)
+        payload[key] = records
+    if current != latest_collection(book, 'SF_COLETAS', 'I', SF_COLLECTION_FIELDS):
+        raise ssot.RefreshError('collection_changed_during_read')
+    payload['source'] = {'spreadsheetId': SF_SHEET, 'name': book.meta['properties']['title'],
+        'releaseId': releases[0] if len(releases) == 1 else None, 'releaseIds': releases,
+        'releaseName': 'Campanhas presentes na base SendFlow', 'timeZone': 'America/Sao_Paulo',
+        'extractedAt': current['observed_at'], 'coverage': {'start': start, 'end': end},
+        'collectionId': current['collection_id'], 'coveredThrough': end,
+        'coverageComplete': False, 'scope': 'auxiliary_sheet', 'mode': 'committed_sheet', 'includesPersonalData': False}
+    validate_js('sendflow', payload)
+    latest = max((r['date'] for key in SF_TABLES for r in payload[key]), default=None)
+    return payload, {'latestDate': latest, 'latestEventDate': latest, 'coveredThrough': end,
+        'collectionId': current['collection_id'], 'observedAt': current['observed_at'],
+        'rows': len(payload['messages']), 'releases': releases, 'coverageComplete': False,
+        'note': 'Coleta concluida no escopo declarado; ultima ocorrencia e periodo consultado sao distintos.'}
 
 
 def read_whatsapp():
@@ -228,10 +307,11 @@ def write_source(name, read, end, data_dir=ssot.ROOT / 'data'):
             payload['source']['extractedAt'] = old_time
             status['observedAt'] = old_time
         if name == 'sendflow':
-            for table, key in [('messages', 'messageKey'), ('actions', 'actionId')]:
+            for table, key in [('messages', 'messageKey'), ('actions', 'actionId'), ('movement', 'date')]:
                 old_ids = {(r['releaseId'], r[key]) for r in previous[table]}
                 if not old_ids <= {(r['releaseId'], r[key]) for r in payload[table]}:
                     raise ssot.RefreshError('sendflow_history_regression')
     ssot.atomic_json(path, payload, original)
-    status.update(status='current' if status['latestDate'] >= end.isoformat() else 'stale', checkedAt=datetime.now(ssot.TIMEZONE).isoformat())
+    covered = status.get('coveredThrough') or status.get('latestDate') or ''
+    status.update(status='current' if covered >= end.isoformat() else 'stale', checkedAt=datetime.now(ssot.TIMEZONE).isoformat())
     return status
