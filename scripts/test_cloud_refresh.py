@@ -6,6 +6,7 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 import cloud_refresh as cloud
 import refresh_crm_ssot as ssot
@@ -24,6 +25,14 @@ def current_status():
 
 
 class CloudReleaseTests(unittest.TestCase):
+    def test_curl_does_not_receive_unsupported_noninteractive_option(self):
+        with patch('cloud_refresh.shutil.which', return_value='vercel'):
+            with patch('cloud_refresh.subprocess.run', return_value=SimpleNamespace(returncode=0, stdout=b'ok')) as run:
+                cloud.cli('curl', 'https://example.test/data.json', cwd=Path('.'))
+                self.assertNotIn('--non-interactive', run.call_args.args[0])
+                cloud.cli('deploy', '--yes', cwd=Path('.'))
+                self.assertIn('--non-interactive', run.call_args.args[0])
+
     def test_legacy_sendflow_does_not_delay_current_sources_with_repeated_reads(self):
         with patch('cloud_refresh.operational.write_source', return_value={'status': 'stale'}) as read:
             with patch('cloud_refresh.time.sleep') as pause:

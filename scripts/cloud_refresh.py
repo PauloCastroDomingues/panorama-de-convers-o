@@ -315,7 +315,8 @@ def cli(*args, cwd):
     if not executable:
         raise ssot.RefreshError('vercel_cli_required')
     authentication = ['--token', os.environ['VERCEL_TOKEN']] if os.environ.get('VERCEL_TOKEN') else []
-    result = subprocess.run([executable, *args, '--scope', TEAM, '--non-interactive', *authentication], cwd=cwd,
+    interaction = [] if args[0] == 'curl' else ['--non-interactive']
+    result = subprocess.run([executable, *args, '--scope', TEAM, *interaction, *authentication], cwd=cwd,
                             capture_output=True, timeout=600)
     if result.returncode:
         # CLI stderr may contain authorization details. Do not export it to artifacts.
