@@ -91,6 +91,20 @@ class AccessTests(unittest.TestCase):
         self.assertEqual(result['error'], 'request_failed_RuntimeError')
         self.assertNotIn('SECRET_CREDENTIAL', str(result))
 
+    def test_access_error_reports_only_allowlisted_resource_ids(self):
+        class Forbidden(Exception):
+            code = 403
+        error = Forbidden('Access Denied: Table reise-ssot:source.orders: SECRET_VALUE '
+                          'Table other-project:private.orders')
+        self.assertEqual(probe.denied_resources(error), ['reise-ssot:source.orders'])
+        self.assertEqual(probe.denied_resources(RuntimeError(str(error))), [])
+
+    def test_git_push_cannot_deploy_panel(self):
+        import json
+        path = Path(__file__).resolve().parents[1] / 'vercel.json'
+        config = json.loads(path.read_text(encoding='utf-8'))
+        self.assertIs(config['git']['deploymentEnabled'], False)
+
     def sheet(self, name, tabs):
         session = Mock()
         metadata = {'spreadsheetId': probe.SHEETS[name],

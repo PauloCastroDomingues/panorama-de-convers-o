@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 import json
 import os
+import re
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
@@ -57,6 +58,14 @@ def safe_error(error):
     return 'request_failed_' + type(error).__name__
 
 
+def denied_resources(error):
+    # Keep only resource identifiers, never the raw provider message or query.
+    if getattr(error, 'code', None) not in (401, 403):
+        return []
+    matches = re.findall(r'\b(?:Table|Routine)\s+(reise-ssot:[A-Za-z0-9_]+\.[A-Za-z0-9_]+)', str(error))
+    return sorted(set(matches))
+
+
 def probe_table(client, bq, definition, day, live=False):
     suffix, columns, dated = definition
     source = PROJECT + '.' + suffix
@@ -100,7 +109,8 @@ def probe_table(client, bq, definition, day, live=False):
                           bytesBilled=job.total_bytes_billed)
         return result
     except Exception as error:
-        return {'source': suffix, 'status': 'failed', 'stage': stage, 'error': safe_error(error)}
+        return {'source': suffix, 'status': 'failed', 'stage': stage, 'error': safe_error(error),
+                'deniedResources': denied_resources(error)}
 
 
 def get_sheet_json(session, url, params):
