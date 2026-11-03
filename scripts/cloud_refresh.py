@@ -314,10 +314,9 @@ def cli(*args, cwd):
     executable = shutil.which('vercel')
     if not executable:
         raise ssot.RefreshError('vercel_cli_required')
-    authentication = ['--token', os.environ['VERCEL_TOKEN']] if os.environ.get('VERCEL_TOKEN') else []
     interaction = [] if args[0] == 'curl' else ['--non-interactive']
-    # curl forwards trailing flags to the system executable, including --token.
-    result = subprocess.run([executable, '--scope', TEAM, *authentication, *interaction, *args], cwd=cwd,
+    # CLI reads VERCEL_TOKEN from its inherited environment. curl forwards --token.
+    result = subprocess.run([executable, '--scope', TEAM, *interaction, *args], cwd=cwd,
                             capture_output=True, timeout=600)
     if result.returncode:
         # CLI stderr may contain authorization details. Do not export it to artifacts.

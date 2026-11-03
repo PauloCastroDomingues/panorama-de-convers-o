@@ -25,13 +25,14 @@ def current_status():
 
 
 class CloudReleaseTests(unittest.TestCase):
-    def test_authentication_precedes_curl_to_avoid_forwarding_credentials(self):
+    def test_authentication_uses_environment_without_forwarding_credentials(self):
         with patch.dict('cloud_refresh.os.environ', {'VERCEL_TOKEN': 'testtoken'}):
             with patch('cloud_refresh.shutil.which', return_value='vercel'):
                 with patch('cloud_refresh.subprocess.run', return_value=SimpleNamespace(returncode=0, stdout=b'ok')) as run:
                     cloud.cli('curl', 'https://example.test/data.json', cwd=Path('.'))
         command = run.call_args.args[0]
-        self.assertLess(command.index('--token'), command.index('curl'))
+        self.assertNotIn('--token', command)
+        self.assertNotIn('testtoken', command)
         self.assertLess(command.index('--scope'), command.index('curl'))
         self.assertEqual(command[command.index('curl') + 1:], ['https://example.test/data.json'])
 
