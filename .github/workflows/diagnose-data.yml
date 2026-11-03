@@ -42,6 +42,7 @@ jobs:
           python -m unittest discover -s scripts -p 'test_cloud_refresh.py'
           python -m unittest discover -s scripts -p 'test_refresh*.py'
           python -m unittest discover -s scripts -p 'test_growth_observed_bridge.py'
+          node scripts/test_release_contract.cjs
       - name: Validate fixed workflow identity
         run: python -c "import os, sys; sys.path.insert(0, 'scripts'); from check_cloud_access import validate_config; validate_config(os.environ)"
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3

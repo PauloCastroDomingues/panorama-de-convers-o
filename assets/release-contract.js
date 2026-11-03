@@ -32,7 +32,10 @@
             || source.observedAt !== (id === 'rd' ? snapshot.observedAt : snapshot.extractedAt)
             || Date.parse(source.observedAt) > Date.parse(status.finishedAt)
             || Date.parse(source.observedAt) < Date.parse(`${source.coveredThrough}T00:00:00-03:00`) + 86400000) fail();
-      } else if (!date(source.latestDate) || source.latestDate < status.targetDate) fail();
+      } else {
+        const covered = id === 'growth' ? source.coveredThrough : source.latestDate;
+        if (!date(covered) || covered < status.targetDate) fail();
+      }
     }
     sendflow.validateCommercialSnapshot(bundle.files['ssot-commercial-channels.json']);
     sendflow.validate(bundle.files['crm-sendflow-snapshot.json']);

@@ -142,6 +142,28 @@ class BridgeTests(unittest.TestCase):
             self.assertTrue(all(v['status'] == 'stale' for v in observed))
             self.assertTrue(all(v['coveredThrough'] == '2026-10-29' for v in observed))
 
+    def test_no_events_on_last_day_does_not_reduce_validated_window(self):
+        built = self.build()
+        for view in built.values():
+            for row in view['rows']:
+                row['data'] = '2026-10-28'
+        class Reader:
+            jobs = []
+            def __init__(self, end): pass
+            def read(self, key):
+                return built[key] if key in bridge.KEYS else dict(view=key, rows=[
+                    dict(data='2026-10-29', pedidos=1, sessoes=None, receita=None)])
+            def close(self): pass
+        commercial = dict(source='ssot', rows=[], extracted_at='now')
+        with tempfile.TemporaryDirectory() as folder:
+            from unittest.mock import patch
+            with patch('refresh_growth.channel_view', return_value=dict(view='channel', rows=[dict(data='2026-10-29')])):
+                result = growth.run(date(2026, 10, 29), commercial,
+                    output=Path(folder)/'snapshot.json', reader_factory=Reader, seed=lambda old: old)
+        self.assertEqual(result['status'], 'current')
+        self.assertEqual(result['coveredThrough'], '2026-10-29')
+        self.assertEqual(result['latestDate'], '2026-10-28')
+
 
 if __name__ == '__main__':
     unittest.main()

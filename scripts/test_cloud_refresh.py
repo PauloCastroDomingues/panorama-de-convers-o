@@ -20,7 +20,7 @@ def current_status():
             'sources': [{'id': key, 'status': 'current', 'latestDate': '2026-10-29',
                          **({'observedAt': '2026-10-30T07:00:00-03:00', 'collectionId': 'test',
                              'coveredThrough': '2026-10-29'} if key in ('rd', 'sendflow') else {}),
-                         **({'views': views} if key == 'growth' else {})} for key in cloud.refresh.SOURCES]}
+                         **({'views': views, 'coveredThrough': '2026-10-29'} if key == 'growth' else {})} for key in cloud.refresh.SOURCES]}
 
 
 class CloudReleaseTests(unittest.TestCase):
@@ -31,6 +31,7 @@ class CloudReleaseTests(unittest.TestCase):
             status = cloud.collect_candidate(date(2026, 10, 29), Path(temp), collectors,
                                              ['cloud_catalog_bucket_required'])
             self.assertEqual(len(status['sources']), 5)
+            self.assertEqual(status['status'], 'partial')
             self.assertTrue(all(row['status'] == 'current' for row in status['sources']))
             self.assertIn('preparation:cloud_catalog_bucket_required', status['publicationBlockers'])
             with self.assertRaisesRegex(ssot.RefreshError, 'cloud_catalog_bucket_required'):
@@ -128,6 +129,13 @@ class CloudReleaseTests(unittest.TestCase):
         self.assertEqual(cloud.blockers(status), [])
         status['sources'].pop()
         self.assertIn('sources_incomplete', cloud.blockers(status))
+
+    def test_growth_without_events_on_last_day_uses_validated_coverage(self):
+        status = current_status()
+        status['sources'][1]['latestDate'] = '2026-10-28'
+        self.assertEqual(cloud.blockers(status), [])
+        status['sources'][1]['coveredThrough'] = '2026-10-28'
+        self.assertIn('growth:before_target', cloud.blockers(status))
 
     def test_stale_sendflow_prevents_seal(self):
         status = current_status()

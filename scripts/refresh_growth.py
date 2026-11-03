@@ -201,8 +201,10 @@ def run(end, commercial, output=OUTPUT, reader_factory=Reader, seed=seed_previou
     if all(any(view['view'] == key and view['rows'] for view in views) for key in ('campaign', 'channel_product')):
         ssot.atomic_json(output, payload, original)
     active = [check for check in checks if check['status'] != 'unavailable']
+    covered = [check.get('coveredThrough') for check in active]
     return {'status': 'error' if any(c['error'] for c in active) else 'stale' if any(c['status'] == 'stale' for c in active) else 'current',
             'latestDate': min((c['latestDate'] for c in active if c['latestDate']), default=None),
+            'coveredThrough': min(covered) if covered and all(covered) else None,
             'checkedAt': now, 'views': checks, 'coverageComplete': False,
             'note': 'Grupos e cruzamentos de produto com cobertura parcial por IDs; criativos pendentes. Sem sessoes nos novos graos.'}
 

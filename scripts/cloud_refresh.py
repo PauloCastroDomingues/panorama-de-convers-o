@@ -58,7 +58,7 @@ def blockers(status, expected_target=None):
         key = record.get('id', 'unknown')
         if record.get('status') != 'current' or record.get('error'):
             reasons.append(f'{key}:not_current')
-        covered = record.get('coveredThrough') if key in ('rd', 'sendflow') else record.get('latestDate')
+        covered = record.get('coveredThrough') if key in ('rd', 'sendflow', 'growth') else record.get('latestDate')
         if not covered or covered < (target or ''):
             reasons.append(f'{key}:before_target')
         if key in ('rd', 'sendflow') and not record.get('collectionId'):
@@ -157,7 +157,7 @@ def collect_candidate(end, directory, collectors=None, preparation_errors=()):
               'preparationErrors': list(preparation_errors),
               'sources': [{'id': key, 'label': label, **results.get(key, {'status': 'error', 'error': 'missing_result'})}
                           for key, label in refresh.SOURCES.items()]}
-    status['status'] = refresh.aggregate(status['sources'])
+    status['status'] = 'partial' if preparation_errors else refresh.aggregate(status['sources'])
     status['publicationBlockers'] = blockers(status)
     ssot.atomic_json(directory / 'data-refresh-status.json', status)
     return status
