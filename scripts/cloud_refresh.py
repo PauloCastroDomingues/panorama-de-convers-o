@@ -316,7 +316,8 @@ def cli(*args, cwd):
         raise ssot.RefreshError('vercel_cli_required')
     authentication = ['--token', os.environ['VERCEL_TOKEN']] if os.environ.get('VERCEL_TOKEN') else []
     interaction = [] if args[0] == 'curl' else ['--non-interactive']
-    result = subprocess.run([executable, *args, '--scope', TEAM, *interaction, *authentication], cwd=cwd,
+    # curl forwards trailing flags to the system executable, including --token.
+    result = subprocess.run([executable, '--scope', TEAM, *authentication, *interaction, *args], cwd=cwd,
                             capture_output=True, timeout=600)
     if result.returncode:
         # CLI stderr may contain authorization details. Do not export it to artifacts.
