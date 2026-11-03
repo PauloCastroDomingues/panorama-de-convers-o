@@ -115,7 +115,8 @@ def collect_operational(name, read, end, directory, attempts=3, pause=time.sleep
     for attempt in range(attempts):
         try:
             result = operational.write_source(name, read, end, data_dir=directory)
-            if result['status'] == 'current' or attempt == attempts - 1:
+            if (result['status'] == 'current' or attempt == attempts - 1
+                    or (name == 'sendflow' and not result.get('collectionId'))):
                 return result
         except Exception as error:
             if ssot.safe_error(error) not in retryable or attempt == attempts - 1:

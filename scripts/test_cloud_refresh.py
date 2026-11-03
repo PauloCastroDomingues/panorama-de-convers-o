@@ -24,6 +24,13 @@ def current_status():
 
 
 class CloudReleaseTests(unittest.TestCase):
+    def test_legacy_sendflow_does_not_delay_current_sources_with_repeated_reads(self):
+        with patch('cloud_refresh.operational.write_source', return_value={'status': 'stale'}) as read:
+            with patch('cloud_refresh.time.sleep') as pause:
+                self.assertEqual(cloud.collect_operational('sendflow', None, None, Path('.'), pause=pause)['status'], 'stale')
+        read.assert_called_once()
+        pause.assert_not_called()
+
     def independent_fixture(self, directory):
         status = current_status()
         previous = copy.deepcopy(status)
