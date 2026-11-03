@@ -1,5 +1,32 @@
 # Atualizacao coordenada na nuvem
 
+## Publicacao e agenda ativas - 03/11/2026
+
+- Execucao completa com sucesso, incluindo verificacao dos hashes antes e depois
+  da promocao: https://github.com/PauloCastroDomingues/panorama-de-convers-o/actions/runs/41680448485
+- Versao no dominio principal: `2026-11-03T14:04:22.667517-03:00`, alvo 02/11.
+  Publicacao confirmada as 14:05 BRT. SSOT, RD e WhatsApp Oficial atuais;
+  Growth canal/campanha/canal + produto ate 02/11. Grupo e cruzamentos sem
+  catalogo permanecem em 29/10, SendFlow em 30/09, todos explicitamente marcados.
+- Teste de navegador da versao real, sem interceptacao: 1440, 820 e 390 px,
+  Growth e CRM com dados, 9308 linhas comerciais, filtro final 02/11,
+  sem erros JavaScript, escritas ou overflow horizontal do documento.
+- `PANORAMA_CLOUD_ENABLED=true` confirmado via API GitHub as 14:05:54 BRT.
+  Agenda: 08:17, 12:17, 16:17 e 20:17 America/Sao_Paulo. O GitHub pode atrasar
+  a execucao; nao e atualizacao em tempo real nem garantia de pontualidade.
+- Tarefa Windows `Reise-Panorama-CRM-SSOT-ReadOnly` desativada apos validar a
+  execucao na nuvem. Atualizacao manual local continua disponivel.
+- VERCEL_TOKEN usado apenas no ambiente herdado da CLI, nunca nos argumentos
+  de curl nem nos logs. CLI 65.3.1 encaminha --token/--non-interactive ao curl;
+  testes cobrem a ausencia dessas opcoes. Verificacao pos-promocao aguarda
+  propagacao por ate seis tentativas, sem aceitar hashes divergentes.
+- 42 testes do publicador passaram; testes de coleta, contratos e carga atomica
+  tambem passaram no job. Nenhuma alteracao em dados ou permissoes do BigQuery.
+
+A rotina le as planilhas operacionais: nao substitui a coleta MCP -> Sheets.
+Datas antigas continuam visiveis se a origem nao atualizar. A validade do token
+Vercel deve ser acompanhada e renovada antes do vencimento definido pelo titular.
+
 ## Regra atual: fontes independentes
 
 Em 03/11 o usuario determinou que a atualizacao para D-1 nao deve esperar pelo
