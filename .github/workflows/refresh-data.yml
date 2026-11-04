@@ -8,8 +8,9 @@ on:
         type: boolean
         default: false
   schedule:
-    # UTC: 08:17, 12:17, 16:17 and 20:17 in Sao Paulo. Execution may be delayed.
-    - cron: '17 11,15,19,23 * * *'
+    # Hourly recovery checks, 08:17-20:17 Sao Paulo. GitHub may delay or drop runs.
+    # Collect every four hours, or sooner when core data is behind D-1.
+    - cron: '17 11-23 * * *'
 
 permissions:
   contents: read
@@ -19,8 +20,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  refresh:
+  freshness:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.PANORAMA_CLOUD_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      refresh: ${{ steps.check.outputs.refresh }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Test freshness rules without credentials
+        run: python3 -m unittest discover -s scripts -p 'test_refresh_freshness.py'
+      - name: Check published data before collecting
+        id: check
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          if [ "$FORCE" = "true" ]; then
+            python3 scripts/check_data_freshness.py --force
+          else
+            python3 scripts/check_data_freshness.py
+          fi
+  refresh:
+    needs: freshness
+    if: needs.freshness.outputs.refresh == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     environment: panorama-data
@@ -76,7 +100,11 @@ jobs:
           else
             python scripts/cloud_refresh.py --independent-sources
           fi
+      - name: Verify published core data reaches yesterday
+        if: github.event_name == 'schedule' || inputs.publish
+        run: python scripts/check_data_freshness.py --verify
       - name: Report failed cycle
         if: failure()
         run: |
-          echo 'Falha na atualizacao. Consulte a etapa e o resumo por fonte; nao considerar todas as fontes atuais.' >> "$GITHUB_STEP_SUMMARY"
+          echo '::error::Atualizacao nao confirmada ate D-1. Consulte as fontes atrasadas no resumo; fontes validas podem ter sido publicadas.'
+          echo 'Falha na atualizacao ou na verificacao de D-1. A proxima verificacao horaria tentara recuperar fontes essenciais atrasadas. Consulte o resumo por fonte.' >> "$GITHUB_STEP_SUMMARY"
