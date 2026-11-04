@@ -22,6 +22,20 @@ das consultas ao SSOT. Falha ao verificar o limite bloqueia a coleta. Validar a
 origem da requisicao evita chamadas de outros sites no navegador, mas nao autentica
 visitantes nem substitui controle de acesso; esta e uma escolha explicita do MVP.
 
+## Validacao em producao sem chave
+
+Publicado e validado em 04/11/2026. Um clique real iniciou a execucao
+`41912009893`, concluida com sucesso, sem dialogo nem cabecalho de chave.
+O painel carregou o lote `2026-11-04T18:01:38.135136-03:00` e mostrou
+04/11/2026 as 18:01:55 (Brasilia). O recorte continua fechado em 03/11 (D-1).
+
+Uma segunda solicitacao durante a coleta reutilizou a mesma execucao.
+Apos a conclusao, outra solicitacao retornou `cooldown: true`, sem iniciar
+coleta, com `Retry-After: 467`. RD, SendFlow e WhatsApp operacional mantiveram
+os mesmos hashes e horarios de leitura/verificacao. Nenhum erro de navegador.
+`PANORAMA_REFRESH_KEY` foi removida do ambiente Production do Vercel;
+`PANORAMA_GITHUB_REFRESH_TOKEN` permanece somente no servidor.
+
 ## Historico da primeira ativacao
 
 Ativado em 04/11/2026. O clique real no navegador iniciou a execucao
