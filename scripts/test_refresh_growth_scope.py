@@ -2,6 +2,7 @@ from datetime import date
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch, Mock
 
@@ -35,11 +36,37 @@ class GrowthScopeTests(unittest.TestCase):
             previous = json.loads(baseline['status'])
             with patch.object(cloud.ssot, 'yesterday', return_value=date(2026, 10, 29)):
                 result = cloud.reconcile_available(directory, status, baseline)
-            self.assertEqual(result['acceptedSources'], ['ssot', 'growth'])
-            self.assertEqual(result['sources'][2:], previous['sources'][2:])
+            self.assertEqual(result['acceptedSources'], ['ssot', 'growth', 'whatsapp', 'rd'])
+            for row, old in zip(result['sources'][2:], previous['sources'][2:]):
+                self.assertEqual(row, {**old, 'retained': old['status'] != 'current'})
+                self.assertNotIn('lastSuccessfulReadAt', row)
             for name in ('whatsapp', 'rd', 'sendflow'):
                 filename = f'crm-{name}-snapshot.json'
                 self.assertEqual((directory / filename).read_bytes(), baseline['snapshots'][filename])
+
+    def test_growth_scope_seals_against_real_release_contract(self):
+        # Exercise the actual JS contract in CI, without contacting any source.
+        root = cloud.ssot.ROOT
+        fixture = subprocess.run(['node', '-e',
+            "process.stdout.write(JSON.stringify(require('./scripts/fixtures/cloud-release.cjs').independentBundle()))"],
+            cwd=root, capture_output=True, check=True, timeout=30)
+        bundle = json.loads(fixture.stdout)
+        stamp = bundle['files']['data-refresh-status.json']['finishedAt']
+        bundle['files']['ssot-commercial-channels.json']['extracted_at'] = stamp
+        for view in bundle['files']['ssot-growth-views.json']['data']:
+            if view['view'] == 'channel':
+                view['generatedAt'] = stamp
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            snapshots = {name: json.dumps(bundle['files'][name]).encode() for name in cloud.SNAPSHOTS}
+            for name, contents in snapshots.items():
+                (directory / name).write_bytes(contents)
+            status = json.loads(snapshots['data-refresh-status.json'])
+            status['requestedSources'] = ['ssot', 'growth']
+            baseline = {'status': snapshots['data-refresh-status.json'], 'snapshots': snapshots}
+            with patch.object(cloud.ssot, 'yesterday', return_value=date.fromisoformat(status['targetDate'])):
+                cloud.reconcile_available(directory, status, baseline)
+                cloud.seal_available(directory, status)
 
     def test_local_growth_runs_dependency_first_without_operational_calls(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -252,7 +252,13 @@ def reconcile_available(directory, status, baseline):
         key = record['id']
         if key not in status.get('requestedSources', refresh.SOURCES):
             (directory / files[key]).write_bytes(baseline['snapshots'][files[key]])
-            status['sources'][index] = previous[key]
+            # Approval for the bundle is not a new collection: keep original read timestamps.
+            reusable = previous[key]['status'] == 'current' and not any(reason.startswith(key + ':') for reason in reasons)
+            status['sources'][index] = {**previous[key], 'retained': not reusable}
+            if reusable:
+                accepted.append(key)
+            elif previous[key]['status'] not in ('stale', 'error'):
+                status['sources'][index]['status'] = 'stale'
             continue
         eligible = record['status'] == 'current' and not any(reason.startswith(key + ':') for reason in reasons)
         if key == 'growth' and 'ssot' not in accepted:
