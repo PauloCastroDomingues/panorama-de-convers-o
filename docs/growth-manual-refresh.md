@@ -8,7 +8,21 @@ O botao solicita o escopo `growth`: SSOT comercial (dependencia de canais) e
 Growth. RD, SendFlow e WhatsApp operacional nao sao coletados nem recebem nova
 data de leitura. O coletor continua somente leitura no SSOT.
 
-## Validacao em producao
+## Operacao sem chave
+
+Por solicitacao do usuario, o botao nao pede senha ou chave. O token GitHub
+continua exclusivamente no servidor. Qualquer visitante do painel pode pedir
+uma coleta, sujeita a intervalo global minimo de 10 minutos entre tentativas.
+Execucoes em andamento sao acompanhadas, sem iniciar outra. Durante o intervalo,
+o painel apenas carrega o ultimo lote e informa quando sera permitida nova coleta.
+
+O limite consulta o historico persistente do GitHub, inclusive falhas. Uma segunda
+verificacao na fila serializada do workflow bloqueia disparos simultaneos antes
+das consultas ao SSOT. Falha ao verificar o limite bloqueia a coleta. Validar a
+origem da requisicao evita chamadas de outros sites no navegador, mas nao autentica
+visitantes nem substitui controle de acesso; esta e uma escolha explicita do MVP.
+
+## Historico da primeira ativacao
 
 Ativado em 04/11/2026. O clique real no navegador iniciou a execucao
 `41910062903`, concluida com sucesso. O painel carregou o lote
@@ -21,9 +35,8 @@ Ativado em 04/11/2026. O clique real no navegador iniciou a execucao
   29/10/2026, com a ressalva `growth_identity_catalog_missing`.
 - RD, SendFlow e WhatsApp operacional: hashes dos arquivos, horarios de
   leitura bem-sucedida e horarios de verificacao permaneceram identicos.
-- POST sem chave: HTTP 401. Nenhuma credencial foi exibida no chat ou no Git.
-- A chave do operador esta no arquivo privado do Windows
-  `%LOCALAPPDATA%/ReisePanorama/growth-refresh-key.txt`, fora do OneDrive e do Git.
+- Na primeira versao, POST sem chave retornava HTTP 401. Essa exigencia foi
+  substituida pelo controle de intervalo acima. A chave local nao e mais usada.
 
 A primeira execucao (`41909446147`) foi bloqueada pelo contrato do lote, sem
 publicar dados. A correcao inclui teste que sela um lote Growth com o contrato
@@ -38,12 +51,9 @@ validas; nao significa que todas foram novamente consultadas.
    token GitHub fine-grained limitado ao repositorio
    `PauloCastroDomingues/panorama-de-convers-o`, permissao Actions: write.
    Nao usar o token de publicacao Vercel nem enviar credenciais pelo chat.
-3. Guardar `PANORAMA_REFRESH_KEY` no Vercel: chave aleatoria longa, no minimo
-   32 caracteres, compartilhada somente com os operadores autorizados do MVP.
-   A chave e pedida em campo de senha e fica apenas na memoria da aba, nunca
-   em localStorage, logs ou codigo. O token GitHub nunca vai ao navegador.
-4. Fazer novo deploy para disponibilizar as variaveis. Validar um clique
-   autorizado, a execucao Actions, a nova publicacao e a data da visao.
+3. `PANORAMA_REFRESH_KEY` nao e mais necessario. O token GitHub nunca vai ao navegador.
+4. Fazer novo deploy para disponibilizar as variaveis. Validar um clique,
+   a execucao Actions, a nova publicacao, a data da visao e o limite entre tentativas.
 
 Referencia: https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event
 

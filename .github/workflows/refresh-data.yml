@@ -26,6 +26,9 @@ concurrency:
 
 jobs:
   freshness:
+    permissions:
+      contents: read
+      actions: read
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.PANORAMA_CLOUD_ENABLED == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -36,13 +39,19 @@ jobs:
         with:
           persist-credentials: false
       - name: Test freshness rules without credentials
-        run: python3 -m unittest discover -s scripts -p 'test_refresh_freshness.py'
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_refresh_freshness.py'
+          python3 -m unittest discover -s scripts -p 'test_refresh_manual_cooldown.py'
       - name: Check published data before collecting
         id: check
         env:
           FORCE: ${{ github.event_name == 'workflow_dispatch' }}
+          REFRESH_SCOPE: ${{ inputs.scope || 'all' }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$FORCE" = "true" ]; then
+          if [ "$FORCE" = "true" ] && [ "$REFRESH_SCOPE" = "growth" ]; then
+            python3 scripts/check_data_freshness.py --force --manual
+          elif [ "$FORCE" = "true" ]; then
             python3 scripts/check_data_freshness.py --force
           else
             python3 scripts/check_data_freshness.py

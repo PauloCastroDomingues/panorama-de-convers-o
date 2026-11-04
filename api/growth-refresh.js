@@ -1,6 +1,6 @@
-const {timingSafeEqual} = require('node:crypto');
 const REPO = 'PauloCastroDomingues/panorama-de-convers-o';
 const WORKFLOW = 'refresh-data.yml';
+const COOLDOWN_MS = 10 * 60 * 1000;
 const active = run => run.status !== 'completed';
 const publicRun = run => ({id:run.id, status:run.status, conclusion:run.conclusion || null});
 
@@ -11,12 +11,8 @@ module.exports = async function handler(request, response) {
     return response.status(405).json({error:'method_not_allowed'});
   }
   const token = process.env.PANORAMA_GITHUB_REFRESH_TOKEN;
-  const secret = process.env.PANORAMA_REFRESH_KEY;
-  if (!token || !secret || secret.length < 32) return response.status(503).json({error:'refresh_not_configured'});
+  if (!token) return response.status(503).json({error:'refresh_not_configured'});
   if (request.method === 'GET' && !request.query?.runId) return response.status(200).json({available:true});
-  const key = Buffer.from(String(request.headers['x-panorama-refresh-key'] || ''));
-  const expected = Buffer.from(secret);
-  if (key.length !== expected.length || !timingSafeEqual(key, expected)) return response.status(401).json({error:'refresh_authorization_required'});
   if (request.method === 'POST') {
     const origins = ['https://panorama-de-conversao.vercel.app'];
     if (process.env.VERCEL_URL) origins.push('https://' + process.env.VERCEL_URL);
@@ -44,6 +40,16 @@ module.exports = async function handler(request, response) {
     const list = await github(`workflows/${WORKFLOW}/runs?branch=main&per_page=10`);
     const running = list.workflow_runs.find(active);
     if (running) return response.status(202).json({started:false, run:publicRun(running)});
+    const latest = Math.max(0, ...list.workflow_runs.map(run => {
+      const instant = Date.parse(run.created_at);
+      if (!Number.isFinite(instant)) throw new Error('invalid_run_timestamp');
+      return instant;
+    }));
+    const retryAfter = Math.ceil((latest + COOLDOWN_MS - Date.now()) / 1000);
+    if (retryAfter > 0) {
+      response.setHeader('Retry-After', String(retryAfter));
+      return response.status(200).json({started:false, cooldown:true, retryAfter});
+    }
     // Credentials stay server-side; repository, branch and operation cannot be supplied by visitors.
     const result = await github(`workflows/${WORKFLOW}/dispatches`, {
       method:'POST', body:JSON.stringify({ref:'main', inputs:{publish:true, scope:'growth'}, return_run_details:true})

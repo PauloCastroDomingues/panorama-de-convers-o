@@ -10,6 +10,17 @@ from zoneinfo import ZoneInfo
 STATUS_URL = 'https://panorama-de-conversao.vercel.app/data/data-refresh-status.json'
 CORE_SOURCES = ('ssot', 'whatsapp', 'rd')
 CORE_VIEWS = ('channel', 'campaign', 'channel_product')
+MANUAL_COOLDOWN_SECONDS = 600
+
+
+def manual_refresh_allowed(runs, current_id, now):
+    # The workflow concurrency lock serializes this check, even for simultaneous visitors.
+    previous = [run for run in runs if int(run['id']) < int(current_id)
+                and run.get('conclusion') != 'cancelled']
+    if not previous:
+        return True
+    latest = max(datetime.fromisoformat(run['created_at'].replace('Z', '+00:00')) for run in previous)
+    return (now - latest).total_seconds() >= MANUAL_COOLDOWN_SECONDS
 
 
 def current(record, target):
@@ -59,6 +70,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--force', action='store_true')
     parser.add_argument('--verify', action='store_true')
+    parser.add_argument('--manual', action='store_true', help='Apply the global manual collection cooldown.')
     args = parser.parse_args()
     try:
         request = Request(STATUS_URL, headers={'Cache-Control': 'no-cache'})
@@ -70,6 +82,19 @@ def main():
         result = {'coreCurrent': False, 'refreshRequired': True, 'overdue': ['status_unavailable']}
     if args.force:
         result['refreshRequired'] = True
+    if args.manual:
+        try:
+            request = Request('https://api.github.com/repos/PauloCastroDomingues/panorama-de-convers-o/actions/workflows/refresh-data.yml/runs?branch=main&per_page=100',
+                              headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                                       'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2026-03-10'})
+            with urlopen(request, timeout=30) as response:
+                runs = json.load(response)['workflow_runs']
+            allowed = manual_refresh_allowed(runs, os.environ['GITHUB_RUN_ID'], datetime.now(ZoneInfo('America/Sao_Paulo')))
+            result['refreshRequired'] = allowed
+            result['manualCooldown'] = not allowed
+        except Exception:
+            report({'refreshRequired': False, 'error': 'manual_cooldown_unverified'})
+            return 1
     report(result)
     output = os.environ.get('GITHUB_OUTPUT')
     if output:

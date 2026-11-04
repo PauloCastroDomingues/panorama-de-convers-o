@@ -8,13 +8,14 @@ const {chromium}=require('C:/Users/reise/.cache/codex-runtimes/codex-primary-run
   try {
     const page=await browser.newPage({viewport:{width:1440,height:1000}});
     page.on('pageerror',error=>errors.push(error.message));
-    let configured=false, polls=0, conclusion='success';
+    let configured=false, polls=0, conclusion='success', cooldown=false;
     // Simulated dispatch only: no GitHub mutation or real SSOT query.
     await page.route('**/api/growth-refresh*',async route=>{
       const request=route.request();
       if (!configured) return route.fulfill({status:503,json:{error:'refresh_not_configured'}});
       if(request.method()==='POST') {
         posts.push(request.headers());
+        if(cooldown) return route.fulfill({json:{started:false,cooldown:true,retryAfter:120}});
         return route.fulfill({status:202,json:{started:true,run:{id:42,status:'queued'}}});
       }
       if(request.url().includes('runId=')) {
@@ -40,12 +41,12 @@ const {chromium}=require('C:/Users/reise/.cache/codex-runtimes/codex-primary-run
     }
     configured=true;
     await page.locator('#reload-data').click();
-    await page.locator('#growth-refresh-key').fill('test-only-key-not-a-real-secret');
-    await page.locator('.growth-refresh-auth button[value="confirm"]').click();
     await page.waitForFunction(()=>document.querySelector('#growth-refresh-feedback').textContent.includes('solicitada'));
     assert.equal(await page.locator('#reload-data').isDisabled(),true);
     assert.equal(posts.length,1);
     assert.equal(posts[0]['x-panorama-refresh'],'1');
+    assert.equal(posts[0]['x-panorama-refresh-key'],undefined);
+    assert.equal(await page.locator('#growth-refresh-key').count(),0);
     await page.waitForFunction(()=>!document.querySelector('#reload-data').disabled,{},{timeout:30000});
     assert.match(await page.locator('#growth-refresh-feedback').innerText(),/Sem nova coleta valida/);
     assert.ok((await page.locator('#growth-updated-at').innerText()).includes(expected));
@@ -53,6 +54,10 @@ const {chromium}=require('C:/Users/reise/.cache/codex-runtimes/codex-primary-run
     await page.locator('#reload-data').click();
     await page.waitForFunction(()=>!document.querySelector('#reload-data').disabled,{},{timeout:30000});
     assert.match(await page.locator('#growth-refresh-feedback').innerText(),/nao concluiu com sucesso/);
+    cooldown=true;
+    await page.locator('#reload-data').click();
+    await page.waitForFunction(()=>!document.querySelector('#reload-data').disabled,{},{timeout:30000});
+    assert.match(await page.locator('#growth-refresh-feedback').innerText(),/Nova coleta disponivel em 2 min/);
     await page.locator('#explorer-level').selectOption('ad_group');
     const retained=await page.evaluate(()=>viewEntry('ad_group').generatedAt);
     assert.ok((await page.locator('#growth-updated-at').innerText()).includes(new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'medium'}).format(new Date(retained))));
