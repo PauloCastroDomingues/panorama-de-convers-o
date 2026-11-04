@@ -35,6 +35,8 @@ const VIEWS = [
   { number: "06", key: "campaign_product", title: "Campanha + produto", short: "Campanha + produto", question: "Quais produtos cada campanha gera?", grain: "periodo + campanha + produto", product: true },
   { number: "07", key: "ad_group_product", title: "Grupo + produto", short: "Grupo + produto", question: "Quais grupos contribuem para cada produto?", grain: "periodo + grupo + produto", product: true },
   { number: "08", key: "ad_product", title: "Criativo + produto", short: "Criativo + produto", question: "Quais criativos geram cada produto?", grain: "periodo + anuncio + produto", product: true },
+  { number: "09", key: "line", title: "Performance por linha", short: "Linha", question: "Como cada linha performa nos canais selecionados?", grain: "periodo + linha", product: true },
+  { number: "10", key: "channel_line", title: "Canal + linha", short: "Canal + linha", question: "Como cada linha performa em cada canal?", grain: "periodo + canal + linha", product: true },
 ];
 const state = {
   rows: [],
@@ -57,6 +59,8 @@ const state = {
   productSearch: "",
   selectedModel: "",
   selectedProduct: "",
+  selectedProductType: "",
+  selectedProductLine: "",
   selectedColor: "",
   selectedSize: "",
   selectedView: "product",
@@ -145,6 +149,32 @@ function isMerchandiseProduct(row) {
   const name = cleanText(row.productName || row.product || row.produto || row.product_name || row.produto_nome || "");
   return Boolean(name && !NON_PRODUCT_PATTERN.test(fold(name)));
 }
+const PRODUCT_TYPES = ["Tenis", "Mochilas", "Acessorios", "Vestuario", "Perfumes", "Kits", "Chinelos", "Sem classificacao"];
+const NAMED_PRODUCT_LINES = ["Ambition", "Barcelona", "Manhattan", "Minimal", "Munich", "Madrid", "Milao", "NYC",
+  "Dublin", "Stuttgart", "Workplace", "Zurich", "Monaco", "Brooklyn", "Denver", "Alcantara", "Velour",
+  "Nord", "Vancouver", "Silverstone", "Suzuka", "Serie 1", "R8"];
+const PRODUCT_LINES = ["RS", "GT", "Avant", "Phantom", "Knit", "911", "Macan", ...NAMED_PRODUCT_LINES, "Sem classificacao"];
+function productLineLabel(line) { return line === "Sem classificacao" ? "Sem linha no nome" : line; }
+function productClassification(name) {
+  const text = searchKey(name);
+  // Name-based taxonomy: GT/Avant take precedence over RS; Carrera belongs to 911.
+  const type = /\btenis\b/.test(text) ? "Tenis"
+    : /\bmochila\b/.test(text) ? "Mochilas"
+    : /\b(calca|camiseta)\b/.test(text) ? "Vestuario"
+    : /\bperfume\b/.test(text) ? "Perfumes"
+    : /\bchinelo\b/.test(text) ? "Chinelos"
+    : /\bkit executivo\b/.test(text) ? "Kits"
+    : /\b(carteira|case|cinto|desk pad|impermeabilizante|meia|cadarcos|limpa e hidrata|limpador|renovador|mala|necessaire|organizador|porta objetos|porta passaporte|gift bag|sneaker bag|relogio|oculos)\b/.test(text) ? "Acessorios" : "Sem classificacao";
+  const line = /\bgt\b/.test(text) ? "GT"
+    : /\bavant\b/.test(text) ? "Avant"
+    : /\bphantom\b/.test(text) ? "Phantom"
+    : /\bknit\b/.test(text) ? "Knit"
+    : /\b911\b/.test(text) ? "911"
+    : /\bmacan\b/.test(text) ? "Macan"
+    : /\brs(?:\d+|x)?\b/.test(text) ? "RS"
+    : NAMED_PRODUCT_LINES.find(value => (' ' + text + ' ').includes(' ' + searchKey(value) + ' ')) || "Sem classificacao";
+  return { productType: type, productLine: line };
+}
 function productAttributes(row) {
   const name = cleanText(row.product || row.produto || row.product_name || row.produto_nome || "");
   const explicitModel = cleanText(row.model || row.modelo || row.product_model || "");
@@ -171,7 +201,7 @@ function normalizeRow(row) {
   const productName = cleanText(row.product || row.produto || row.product_name || row.produto_nome || "");
   const rawDate = row.data || row.date || row.event_date;
   const rawTime = row.data_hora || row.datetime || row.timestamp || row.session_ts || row.hora || row.hour;
-  return { data: dateKey(rawDate), hora: hourKey(rawTime), period: row.period || "current", canal: canonicalChannel(row), origem: cleanText(row.origem || "Sem origem").trim() || "Sem origem", sessoes: number(row.sessoes ?? row.sessions), pedidos: number(row.pedidos ?? row.orders ?? row.conversoes), receita: number(row.receita ?? row.revenue), campaignId, campaignName, campaignKey: campaignId || campaignName, groupId, groupName, groupKey: groupId || groupName, adId, adName, adKey: adId || adName, productId, productName, productKey: productId || productName, productModel: attrs.model, productColor: attrs.color, productSize: attrs.size };
+  return { data: dateKey(rawDate), hora: hourKey(rawTime), period: row.period || "current", canal: canonicalChannel(row), origem: cleanText(row.origem || "Sem origem").trim() || "Sem origem", sessoes: number(row.sessoes ?? row.sessions), pedidos: number(row.pedidos ?? row.orders ?? row.conversoes), receita: number(row.receita ?? row.revenue), campaignId, campaignName, campaignKey: campaignId || campaignName, groupId, groupName, groupKey: groupId || groupName, adId, adName, adKey: adId || adName, productId, productName, productKey: productId || productName, productModel: attrs.model, productColor: attrs.color, productSize: attrs.size, ...productClassification(productName) };
 }
 function rowProvenance(row) {
   const scope = row.provenanceScope;
@@ -348,7 +378,7 @@ function normalizedViewRows(viewKey) {
   state.normalizedViewRows.set(viewKey, rows); return rows;
 }
 function readiness(viewKey) {
-  if (viewKey === "product") return readiness("channel_product");
+  if (["product", "line", "channel_line"].includes(viewKey)) return readiness("channel_product");
   if (viewKey === "channel" && viewEntry("channel")) return state.growthPayload?.readiness?.find((item) => item.view === viewKey) || { view: "channel", status: "Disponivel", source: viewEntry("channel").source || "SSOT" };
   if (viewKey === "channel" && state.rows.length) return { view: "channel", status: "Disponivel", source: state.commercial?.source || "SSOT comercial de canais" };
   return state.growthPayload?.readiness?.find((item) => item.view === viewKey) || null;
@@ -372,7 +402,8 @@ function dimensionKey(view, row) {
   const ad = row.adKey || row.adName || "(criativo nao informado)";
   const product = row.productKey || row.productName || "(produto nao informado)";
   const channel = row.canal || "(canal nao informado)";
-  const keys = { product: [product], channel: [channel], campaign: [platform(row), campaign], ad_group: [platform(row), campaign, group], ad: [platform(row), campaign, group, ad], channel_product: [channel, product], campaign_product: [platform(row), campaign, product], ad_group_product: [platform(row), campaign, group, product], ad_product: [platform(row), campaign, group, ad, product] };
+  const line = row.productLine || "Sem classificacao";
+  const keys = { line: [line], channel_line: [channel, line], product: [product], channel: [channel], campaign: [platform(row), campaign], ad_group: [platform(row), campaign, group], ad: [platform(row), campaign, group, ad], channel_product: [channel, product], campaign_product: [platform(row), campaign, product], ad_group_product: [platform(row), campaign, group, product], ad_product: [platform(row), campaign, group, ad, product] };
   return keys[view.key].join("|");
 }
 
@@ -380,7 +411,9 @@ function groups(view, period) {
   if (view.key === "channel") return allChannelGroups(period);
   const grouped = new Map();
   viewRows(view, period).forEach((row) => { const key = dimensionKey(view, row); if (!grouped.has(key)) grouped.set(key, { rows: [], first: row }); grouped.get(key).rows.push(row); });
-  return [...grouped.values()].map((item) => ({ ...dimensions(view, item.first), key: dimensionKey(view, item.first), ...summarize(item.rows) })).sort((a, b) => (b.pedidos || 0) - (a.pedidos || 0) || a.dimension.localeCompare(b.dimension, "pt-BR"));
+  return [...grouped.values()].map((item) => ({ ...dimensions(view, item.first), key: dimensionKey(view, item.first), ...summarize(item.rows),
+    ...(['line', 'channel_line'].includes(view.key) ? { products: [...new Set(item.rows.map(row => row.productName))].sort((a,b)=>a.localeCompare(b,'pt-BR')) } : {}) }))
+    .sort((a, b) => (b.pedidos || 0) - (a.pedidos || 0) || a.dimension.localeCompare(b.dimension, "pt-BR"));
 }
 function delta(current, compare) { return current?.rate !== null && current?.rate !== undefined && compare?.rate !== null && compare?.rate !== undefined ? current.rate - compare.rate : null; }
 function relativeDelta(current, compare) { return current !== null && compare !== null && compare !== 0 ? current / compare - 1 : null; }
@@ -419,12 +452,32 @@ function shiftDate(value, days) { const date = toDate(value); date.setDate(date.
 function shiftYear(value, years) { const date = toDate(value); date.setFullYear(date.getFullYear() + years); return isoDate(date); }
 function dateSpan(start, end) { return start && end ? Math.round((toDate(end) - toDate(start)) / 86400000) + 1 : 0; }
 function availableEnd() { return state.availableEnd || state.end || isoDate(new Date()); }
+function growthToday(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const value = type => parts.find(part => part.type === type).value;
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
+function calendarPeriod(preset, today = growthToday()) {
+  const date = new Date(`${today}T12:00:00Z`);
+  const relative = days => { const shifted = new Date(date); shifted.setUTCDate(shifted.getUTCDate() + days); return isoDate(shifted); };
+  const monthDay = (offset, day) => isoDate(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offset, day, 12)));
+  const yesterday = relative(-1);
+  if (preset === 'today') return [today, today];
+  if (preset === 'yesterday') return [yesterday, yesterday];
+  if (preset === 'last-7' || preset === 'last-30') return [relative(preset === 'last-7' ? -7 : -30), yesterday];
+  if (preset === 'mtd') return date.getUTCDate() === 1 ? null : [monthDay(0, 1), yesterday];
+  if (preset === 'last-month') return [monthDay(-1, 1), monthDay(0, 0)];
+  return null;
+}
 function applyComparison() {
   if (!state.start || !state.end || state.compareMode === "custom") return;
   if (state.compareMode === "year-ago") { state.compareStart = shiftYear(state.start, -1); state.compareEnd = shiftYear(state.end, -1); return; }
   const days = dateSpan(state.start, state.end); state.compareEnd = shiftDate(state.start, -1); state.compareStart = shiftDate(state.compareEnd, -(days - 1));
 }
 function applyPeriodPreset(preset) {
+  const calendar = calendarPeriod(preset);
+  if (calendar) { [state.start, state.end] = calendar; applyComparison(); suggestGranularityForWindow(); return; }
+  if (preset === 'mtd') return;
   const end = availableEnd(); if (!end || preset === "custom") return;
   const date = toDate(end); let start = end; let finish = end;
   if (preset === "previous-day") start = finish = shiftDate(end, -1);

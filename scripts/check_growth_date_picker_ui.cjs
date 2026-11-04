@@ -1,0 +1,84 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const {chromium} = require('C:/Users/reise/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+(async () => {
+  const browser = await chromium.launch({headless: true, channel: 'chrome'});
+  try {
+    const page = await browser.newPage({viewport: {width: 1440, height: 1000}, timezoneId: 'America/Sao_Paulo', locale: 'pt-BR'});
+    await page.clock.setFixedTime(new Date('2026-11-04T15:00:00Z'));
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    fs.mkdirSync('output/date-picker', {recursive: true});
+    await page.goto('http://127.0.0.1:8025/');
+    await page.waitForFunction(() => state.growthPayload?.ok && !document.body.classList.contains('is-loading'), null, {timeout:60000}).catch(async error => {
+      console.error({errors, body: (await page.locator('body').innerText()).slice(0, 1800)});
+      await page.screenshot({path:'output/date-picker/load-error.png'});
+      throw error;
+    });
+    const original = await page.evaluate(() => snapshotFilters().values);
+    const values = () => page.evaluate(() => [filterDraft.values.start, filterDraft.values.end]);
+    await page.locator('#open-filters').click();
+    assert.equal(await page.locator('.flatpickr-calendar').count(), 1);
+    await page.locator('[data-period="last-7"]').click();
+    assert.deepEqual(await values(), ['2026-10-28', '2026-11-03']);
+    assert.deepEqual(await page.evaluate(() => snapshotFilters().values), original, 'Draft must not change the dashboard');
+    await page.locator('[data-period="last-month"]').click();
+    assert.deepEqual(await values(), ['2026-10-01', '2026-10-31']);
+    const day = value => page.locator(`.flatpickr-day[data-date="${value}"]:not(.prevMonthDay):not(.nextMonthDay)`);
+    await day('2026-10-03').click();
+    await day('2026-10-10').click();
+    assert.deepEqual(await values(), ['2026-10-03', '2026-10-10']);
+    assert.equal(await page.locator('#period-preset').inputValue(), 'custom');
+    await page.locator('#date-start').fill('2026-09-30');
+    await page.locator('#date-end').fill('2026-10-02');
+    await page.locator('#date-end').press('Tab');
+    assert.deepEqual(await values(), ['2026-09-30', '2026-10-02']);
+    await page.locator('#compare-mode').selectOption('custom');
+    await page.locator('#compare-start').fill('2026-09-01');
+    await page.locator('#compare-end').fill('2026-09-08');
+    await page.locator('[data-period="mtd"]').click();
+    assert.deepEqual(await page.evaluate(() => [filterDraft.values.compareStart, filterDraft.values.compareEnd]), ['2026-09-01', '2026-09-08']);
+    await page.locator('#compare-enabled').uncheck();
+    assert.equal(await page.locator('.period-comparison .comparison-control').isVisible(), false);
+    await page.locator('#cancel-filters').click();
+    assert.deepEqual(await page.evaluate(() => snapshotFilters().values), original);
+    await page.locator('#open-filters').click();
+    await page.locator('[data-period="mtd"]').click();
+    await page.locator('#compare-mode').selectOption('previous');
+    assert.deepEqual(await values(), ['2026-11-01', '2026-11-03']);
+    const months = async () => (await page.locator('.cur-month').allTextContents()).map(text => text.trim());
+    assert.deepEqual(await months(), ['Outubro', 'Novembro']);
+    await page.locator('.flatpickr-prev-month').focus();
+    await page.keyboard.press('Enter');
+    assert.deepEqual(await months(), ['Setembro', 'Outubro']);
+    await page.locator('.flatpickr-next-month').click();
+    assert.deepEqual(await months(), ['Outubro', 'Novembro']);
+    for (const width of [1440, 900, 390, 320]) {
+      await page.setViewportSize({width, height:1000});
+      await page.waitForTimeout(250);
+      await page.locator('.filter-dialog-content').first().evaluate(el => el.scrollTop = 0);
+      const layout = await page.locator('#growth-filter-dialog').evaluate(dialog => {
+        const calendar = dialog.querySelector('.flatpickr-calendar').getBoundingClientRect();
+        const bounds = dialog.getBoundingClientRect();
+        return {overflow:dialog.scrollWidth > dialog.clientWidth, fits:calendar.left >= bounds.left && calendar.right <= bounds.right + 1};
+      });
+      assert.equal(layout.overflow, false, `Dialog overflow at ${width}`);
+      assert.equal(layout.fits, true, `Calendar outside dialog at ${width}`);
+      assert.equal(await page.locator('.dayContainer').count(), width <= 720 ? 1 : 2);
+      await page.screenshot({path:`output/date-picker/filters-${width}.png`});
+    }
+    await page.setViewportSize({width:1440, height:1000});
+    await page.locator('#global-channel-filter').selectOption('group-google');
+    await page.locator('#apply-filters').click();
+    assert.equal(await page.locator('#growth-filter-dialog').isVisible(), false);
+    assert.deepEqual(await page.evaluate(() => [state.start, state.end, state.selectedChannel]), ['2026-11-01','2026-11-03','group-google']);
+    await page.locator('#open-filters').click();
+    assert.deepEqual(await values(), ['2026-11-01','2026-11-03']);
+    await page.locator('#clear-filters').click();
+    assert.equal(await page.locator('#period-preset').inputValue(), 'current-day');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.evaluate(() => state.selectedChannel), 'group-google', 'Clear then cancel must preserve applied filters');
+    assert.deepEqual(errors, []);
+    console.log(JSON.stringify({ok:true, viewports:4, presets:true, calendarRange:true, manualDates:true, comparison:true, draft:true, errors}));
+  } finally {await browser.close();}
+})().catch(error => {console.error(error); process.exitCode = 1;});

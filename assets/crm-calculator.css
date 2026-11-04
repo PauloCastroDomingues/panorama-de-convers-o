@@ -1,0 +1,177 @@
+.crm-view-nav { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; border-bottom:1px solid var(--line); }
+.crm-view-nav > div { display:flex; gap:24px; }
+.crm-view-nav button { min-height:44px; padding:10px 0; border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; color:var(--muted); font:600 14px var(--data-font); }
+.crm-view-nav button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--orange); }
+.crm-view-nav > span { color:var(--muted); font:11px/1.5 var(--data-font); text-align:right; }
+#crm-realized-panel > footer { margin-top:32px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font:12px/1.7 var(--body); }
+#crm-workspace.is-simulating .crm-header-meta { display:none; }
+#crm-workspace.is-simulating { padding-top:18px; }
+#crm-workspace.is-simulating .crm-header { padding-bottom:12px; }
+#crm-workspace.is-simulating .crm-header > div:first-child { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px 18px; }
+#crm-workspace.is-simulating .crm-header .kicker { grid-column:1/-1; margin:0; }
+#crm-workspace.is-simulating .crm-header h1 { margin:0; font-size:23px; }
+#crm-workspace.is-simulating .crm-header .dek { margin:0; font:12px/1.5 var(--data-font); }
+#crm-workspace.is-simulating .crm-view-nav { margin-bottom:18px; }
+#sim-feedback { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+#crm-simulation-panel { font-family:var(--data-font); }
+#crm-simulation-panel .sim-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 0 20px; }
+#crm-simulation-panel .sim-heading h2 { font:600 24px/1.35 var(--data-font); margin:0; }
+.sim-label { color:#c6cfce; border:1px solid #46514d; padding:5px 8px; font-size:10px; border-radius:4px; flex-shrink:0; }
+.sim-toolbar { position:sticky; top:0; z-index:30; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:10px 0; background:var(--bg); border-block:1px solid var(--line); }
+.sim-channels { display:flex; gap:6px; }
+.sim-channels button { display:inline-flex; align-items:center; justify-content:center; gap:9px; min-height:40px; padding:8px 16px; font:500 13px var(--data-font); border:1px solid transparent; color:var(--muted); background:transparent; border-radius:5px; }
+.sim-channels button[aria-selected="true"] { color:#ffb68d; background:#34261e; border-color:#795039; }
+.sim-channels button:hover { color:var(--ink); background:#2b3033; }
+.sim-channels button[aria-selected="true"] .crm-icon { color:#ff9458; }
+.sim-actions { display:flex; gap:8px; }
+.sim-memory-toggle { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:36px; padding:6px 10px; border:1px solid var(--line-strong); border-radius:5px; background:transparent; color:var(--ink-soft); font:500 12px/1.5 var(--data-font); }
+.sim-memory-toggle:hover { background:var(--panel-soft); border-color:var(--muted); }
+.sim-memory-toggle[aria-expanded="true"] { border-color:var(--orange); }
+.sim-memory-toggle .crm-icon { flex-shrink:0; color:var(--orange); }
+.sim-memory-toggle:focus-visible { outline:2px solid var(--orange); outline-offset:3px; }
+.icon-command { position:relative; display:inline-grid; place-items:center; width:36px; height:36px; min-width:36px; padding:0; color:var(--ink-soft); border:1px solid var(--line-strong); background:transparent; border-radius:5px; }
+.icon-command:hover { background:var(--panel-soft); border-color:var(--muted); }
+.icon-command img { filter:brightness(0) invert(.8); }
+.icon-command[data-tooltip]::after { content:attr(data-tooltip); position:absolute; right:0; top:calc(100% + 8px); padding:6px 9px; width:max-content; max-width:170px; background:#101214; color:var(--ink); border:1px solid var(--line); border-radius:4px; font:11px/1.5 var(--data-font); opacity:0; pointer-events:none; z-index:5; }
+.icon-command:is(:hover,:focus-visible)::after { opacity:1; }
+.sim-layout { display:grid; grid-template-columns:344px minmax(0,1fr); gap:24px 36px; align-items:start; }
+.sim-layout.is-memory-collapsed { grid-template-columns:minmax(0,1fr); }
+.sim-layout.is-memory-collapsed .sim-results { position:static; }
+.sim-overview { grid-column:1/-1; padding-top:20px; }
+.sim-input-heading, .sim-result-heading, .sim-funnel-heading { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px; }
+#crm-simulation-panel h3 { font:600 15px/1.5 var(--data-font); margin:0; }
+.sim-result-heading h3 span { color:var(--muted); font-weight:400; font-size:12px; margin-left:6px; }
+.sim-result-heading > span, .sim-funnel-heading > span { font:11px/1.5 var(--data-font); color:var(--muted); }
+.sim-kpis { display:grid; grid-template-columns:1.4fr 1fr 1fr .9fr; margin-top:14px; border-bottom:1px solid var(--line); padding:4px 0 22px; }
+.sim-kpi { min-width:0; padding:0 28px; border-right:1px solid var(--line); display:grid; gap:8px; align-content:start; }
+.sim-kpi:first-child { padding-left:0; }
+.sim-kpi:last-child { padding-right:0; border:0; }
+.sim-kpi > span { font-size:12px; color:var(--muted); }
+.sim-kpi strong { font:500 30px/1.25 var(--data-font); overflow-wrap:anywhere; }
+.sim-kpi:first-child strong { color:#ff985c; font-weight:600; }
+.sim-kpi small { color:var(--muted); font-size:11px; line-height:1.5; }
+.sim-inputs { margin:0; padding:4px 0 16px; min-width:0; border:0; border-radius:0; background:transparent; }
+.sim-input-heading { padding-bottom:12px; border-bottom:1px solid var(--line); }
+#crm-simulation-panel .sim-input-heading h3 { font-size:13px; }
+.sim-input-heading > span { color:#bbcdc3; font:11px/1.5 var(--data-font); }
+.sim-input-group { min-width:0; margin:14px 0 0; padding:0 0 14px; border:0; border-bottom:1px solid var(--line); }
+.sim-input-group:last-child { border-bottom:0; padding-bottom:0; }
+.sim-input-group legend { padding:0 0 10px; color:#aab6be; font:600 10px/1.5 var(--data-font); }
+.sim-field-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
+.sim-field { min-width:0; font-variant-numeric:tabular-nums; }
+.sim-premise { display:grid; grid-template-columns:minmax(0,1fr) 112px; align-items:center; gap:4px 12px; }
+.sim-field-title { min-width:0; padding:0; }
+.sim-field-title label { display:block; margin:0; color:#dce2e5; font:500 12px/1.5 var(--data-font); }
+.sim-field-title small { display:block; margin-top:2px; color:#9eabb3; font:10px/1.5 var(--data-font); }
+.sim-derived { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:2px 6px; margin-top:5px; font:10px/1.5 var(--data-font); color:#aab6be; }
+.sim-derived output { color:#dde5e9; font-weight:500; white-space:nowrap; }
+.sim-derived[data-metric="revenue"] output { color:#ffb181; }
+.sim-loss-note { display:block; color:#93a1aa; font:10px/1.5 var(--data-font); margin-top:4px; }
+.sim-loss-note output { margin-left:4px; }
+.sim-input-wrap { position:relative; min-width:0; }
+.sim-input-wrap input { width:100%; height:36px; min-height:36px; padding:7px 32px 7px 8px; text-align:right; color:#f4f6f7; font:500 14px var(--data-font); appearance:textfield; -moz-appearance:textfield; background:#202629; border:1px solid #424d54; border-radius:4px; }
+.sim-input-wrap input:hover { background:#272f34; border-color:#677780; }
+.sim-input-wrap input:focus { background:#272f34; border-color:#e8996e; outline:2px solid #e8996e; outline-offset:2px; }
+.sim-input-wrap input::-webkit-inner-spin-button, .sim-input-wrap input::-webkit-outer-spin-button { appearance:none; margin:0; }
+.sim-input-wrap input::placeholder { font-size:10px; }
+.sim-input-wrap span { position:absolute; right:9px; top:50%; transform:translateY(-50%); font:10px var(--data-font); color:#afbbc3; pointer-events:none; }
+.sim-premise[data-metric="base"] .sim-input-wrap input { padding-right:10px; }
+.sim-premise[data-metric="base"] .sim-input-wrap span { display:none; }
+.sim-premise[data-metric="frequency"] .sim-input-wrap input { padding-right:40px; }
+.sim-field-error { grid-column:1/-1; color:var(--red); font:10px/1.5 var(--data-font); }
+.sim-input-wrap input[aria-invalid="true"] { border-color:var(--red); }
+.sim-results { --sim-type-label:14px; --sim-type-note:12px; --sim-type-value:24px; --sim-type-rate:18px; --sim-text-primary:#f1f3f4; --sim-text-secondary:#b6c0c6; --sim-text-accent:#ffb78b; position:sticky; top:88px; min-width:0; padding:4px 0; container-type:inline-size; }
+#crm-simulation-panel .sim-funnel-heading h3 { font:600 16px/1.5 var(--data-font); color:var(--sim-text-primary); }
+.sim-funnel-heading > span { font:400 var(--sim-type-note)/1.5 var(--data-font); color:var(--sim-text-secondary); }
+.sim-funnel-heading { padding:0 0 16px; border-bottom:1px solid var(--line); margin-bottom:24px; }
+.sim-funnel { list-style:none; display:grid; gap:5px; padding:0; margin:0; font-variant-numeric:tabular-nums; }
+.sim-funnel li { display:grid; grid-template-columns:minmax(240px,300px) minmax(0,1fr); gap:28px; align-items:center; min-height:68px; padding-block:4px; }
+.sim-stage-caption { display:flex; align-items:center; gap:12px; min-width:0; }
+.sim-stage-caption::after { content:''; flex:1; min-width:12px; height:1px; background:#303639; margin-left:4px; }
+.sim-stage-index { color:#a3afb7; font:500 var(--sim-type-note)/1.5 var(--data-font); width:18px; flex-shrink:0; }
+.sim-stage-label { display:grid; gap:4px; min-width:0; }
+.sim-stage-label > span { font:600 var(--sim-type-label)/1.5 var(--data-font); color:var(--sim-text-primary); }
+.sim-stage-label small { font:400 var(--sim-type-note)/1.5 var(--data-font); color:var(--sim-text-secondary); }
+.sim-stage-label [data-loss] { color:var(--sim-text-secondary); }
+.sim-stage-bar { position:relative; isolation:isolate; width:var(--stage-width); margin-inline:auto; min-height:50px; display:grid; place-items:center; padding:8px 8px; }
+.sim-stage-shape { position:absolute; inset:0; z-index:-1; background:#2c3134; border-top:1px solid #50595f; clip-path:polygon(0 0,100% 0,98% 100%,2% 100%); }
+.sim-stage-bar > strong { font:600 var(--sim-type-value)/1.35 var(--data-font); overflow-wrap:anywhere; max-width:100%; text-align:center; color:var(--sim-text-primary); }
+.sim-funnel .sim-rate-stage { min-height:68px; }
+.sim-rate-stage .sim-stage-bar { min-height:34px; padding-block:5px; }
+.sim-rate-stage .sim-stage-shape { background:#1e2326; border-top-color:#353d42; }
+.sim-rate-stage .sim-stage-bar > strong { font-size:var(--sim-type-rate); font-weight:600; color:var(--sim-text-accent); }
+.sim-funnel :is([data-stage="sessions"],[data-stage="orders"]) .sim-stage-shape { background:#343b3e; border-top-color:#9e643f; }
+.sim-funnel [data-stage="revenue"] .sim-stage-shape { background:var(--orange); border-top-color:var(--orange); }
+.sim-funnel [data-stage="revenue"] .sim-stage-bar strong { color:#17191b; }
+.sim-funnel [data-stage="revenue"] .sim-stage-label > span { color:var(--sim-text-accent); }
+.sim-funnel [data-stage="revenue"] .sim-stage-index { color:var(--orange); }
+.sim-funnel :is([data-stage="investment"],[data-stage="roas"]) .sim-stage-shape { background:#23282b; border-top-color:#434d53; }
+.sim-funnel li:hover .sim-stage-shape { filter:brightness(1.12); }
+.sim-funnel li:hover .sim-stage-caption::after { background:#765038; }
+.sim-source-warning { color:#d8bd86; font:var(--sim-type-note)/1.6 var(--data-font); margin:12px 0; }
+.sim-assumption { margin:24px 0 20px; padding:0 0 0 12px; border-left:2px solid #8d8063; color:var(--sim-text-secondary); font:var(--sim-type-note)/1.7 var(--data-font); }
+.sim-method { border-top:1px solid var(--line); }
+.sim-method > summary { padding:14px 0; color:#bac5cc; cursor:pointer; font:12px/1.5 var(--data-font); }
+.sim-method p, .sim-method a { color:var(--muted); font:12px/1.7 var(--data-font); }
+.sim-method a { color:var(--ink-soft); text-underline-offset:3px; }
+.sim-method p { margin-bottom:10px; }
+@media (min-width:1600px) {
+  .sim-layout { grid-template-columns:360px minmax(0,1fr); gap:24px 48px; }
+}
+@media (max-width:1100px) {
+  .sim-layout { grid-template-columns:304px minmax(0,1fr); gap:24px; }
+  .sim-inputs { padding:4px 0 12px; }
+  .sim-kpi { padding-inline:18px; }
+  .sim-kpi strong { font-size:26px; }
+  .sim-funnel li { grid-template-columns:minmax(180px,.8fr) minmax(0,1.2fr); gap:16px; }
+  .sim-stage-caption::after { display:none; }
+}
+@media (max-width:800px) {
+  .crm-view-nav > span { max-width:130px; font-size:10px; }
+  .crm-view-nav > div { gap:20px; }
+  .sim-layout { grid-template-columns:minmax(0,1fr); gap:24px; }
+  .sim-kpis { grid-template-columns:1fr 1fr; gap:20px 0; }
+  .sim-kpi:nth-child(2n) { padding-right:0; border-right:0; }
+  .sim-kpi:nth-child(3) { padding-left:0; }
+  .sim-results { position:static; padding:0; }
+  .sim-channels { flex:1; gap:2px; }
+  .sim-channels button { flex:1; padding:8px 10px; }
+  .sim-channels .crm-icon { display:none; }
+  .sim-toolbar { gap:8px; }
+  .sim-actions { gap:4px; }
+  .sim-input-wrap input { height:44px; min-height:44px; }
+  #crm-simulation-panel .sim-heading h2 { font-size:20px; }
+}
+@media (max-width:420px) {
+  #crm-workspace.is-simulating .crm-header > div:first-child { gap:4px 12px; }
+  #crm-workspace.is-simulating .crm-header .dek { font-size:11px; }
+  .sim-toolbar { flex-wrap:wrap; }
+  .sim-channels { flex-basis:100%; }
+  .sim-actions { margin-left:auto; }
+  .sim-heading { flex-wrap:wrap; }
+  .sim-inputs { padding:4px 0 10px; }
+  .sim-field-title label { font-size:12px; }
+  .sim-field-title small { font-size:10px; }
+  .sim-input-wrap input { font-size:14px; padding-left:10px; padding-right:32px; }
+  .sim-premise[data-metric="base"] .sim-input-wrap input { padding-right:10px; }
+  .sim-premise[data-metric="base"] .sim-input-wrap span { display:none; }
+  .sim-premise[data-metric="frequency"] .sim-input-wrap input { padding-right:40px; }
+  .sim-derived { flex-wrap:wrap; gap:2px 8px; }
+  .sim-kpi strong { font-size:23px; }
+  .sim-kpi small { font-size:10px; }
+  .sim-kpi { padding-inline:12px; }
+}
+@container (max-width:560px) {
+  .sim-funnel { gap:18px; }
+  .sim-funnel li { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .sim-stage-caption { align-items:baseline; gap:10px; }
+  .sim-stage-caption::after { display:none; }
+  .sim-stage-label { gap:3px; }
+  .sim-stage-bar { width:max(var(--stage-width),72%); }
+}
+@media (max-height:760px) { .sim-results { position:static; } }
+@media (prefers-reduced-motion:no-preference) {
+  #crm-simulation-panel:not([hidden]) { animation:reise-enter .2s ease-out; }
+  .sim-stage-shape { transition:filter .16s ease; }
+  .sim-stage-caption::after { transition:background-color .16s ease; }
+}

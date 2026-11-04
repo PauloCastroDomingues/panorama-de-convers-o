@@ -13,10 +13,12 @@ const chartLayouts = new WeakMap();
 VIEWS.forEach((view, index) => { view.number = String(index + 1).padStart(2, "0"); });
 
 function productFilterActive() {
-  return Boolean(state.selectedProduct || state.selectedModel || state.selectedColor || state.selectedSize || state.productSearch);
+  return Boolean(state.selectedProduct || state.selectedProductType || state.selectedProductLine || state.selectedModel || state.selectedColor || state.selectedSize || state.productSearch);
 }
 function matchesProductFilter(row, exclude = "") {
   return (!state.selectedProduct || exclude === "productKey" || row.productKey === state.selectedProduct)
+    && (!state.selectedProductType || exclude === "productType" || row.productType === state.selectedProductType)
+    && (!state.selectedProductLine || exclude === "productLine" || row.productLine === state.selectedProductLine)
     && (!state.selectedModel || exclude === "productModel" || row.productModel === state.selectedModel)
     && (!state.selectedColor || exclude === "productColor" || row.productColor === state.selectedColor)
     && (!state.selectedSize || exclude === "productSize" || row.productSize === state.selectedSize)
@@ -58,7 +60,7 @@ function channelFilterIssue(key, productGrain = productFilterActive() || VIEWS.f
   return 'Sem observacoes de produto para este canal nos periodos selecionados.';
 }
 function sourceKeyForView(key, inherit = true) {
-  if (key === 'product') return 'channel_product';
+  if (['product', 'line', 'channel_line'].includes(key)) return 'channel_product';
   return inherit && productFilterActive()
     ? ({ channel: 'channel_product', campaign: 'campaign_product', ad_group: 'ad_group_product', ad: 'ad_product' }[key] || key)
     : key;
@@ -91,7 +93,7 @@ function analysisSourceRows(period) {
   if (period === 'compare' && state.compareEnabled === false) return [];
   const source = normalizedViewRows("channel_product");
   const key = JSON.stringify([state.start, state.end, state.compareStart, state.compareEnd, state.compareEnabled,
-    state.selectedProduct, state.selectedModel, state.selectedColor, state.selectedSize, state.productSearch]);
+    state.selectedProduct, state.selectedProductType, state.selectedProductLine, state.selectedModel, state.selectedColor, state.selectedSize, state.productSearch]);
   if (productScopeCache?.source !== source || productScopeCache.key !== key) {
     const rows = source.filter((row) => isAnalysisRow(row) && isMerchandiseProduct(row) && matchesProductFilter(row));
     productScopeCache = { source, key, current: rows.filter((row) => inPeriod(row, 'current')), compare: rows.filter((row) => inPeriod(row, 'compare')) };
@@ -99,6 +101,11 @@ function analysisSourceRows(period) {
   return productScopeCache[period];
 }
 function dimensions(view, row) {
+  const line = productLineLabel(row.productLine || "Sem classificacao");
+  if (view.key === 'line' || view.key === 'channel_line') {
+    const channel = view.key === 'channel_line' ? displayChannel(row.canal) : '';
+    return { dimension: [channel, line].filter(Boolean).join(' / '), channel, line, product: '', campaign: '', group: '', ad: '' };
+  }
   const product = row.productName || row.productKey || "";
   const campaign = row.campaignName || row.campaignKey || "";
   const group = row.groupName || row.groupKey || "";
@@ -110,6 +117,8 @@ function dimensions(view, row) {
 function filtersForProducts() {
   const catalog = productCatalog();
   const configs = [
+    ["product-type-filter", "selectedProductType", "Todos os tipos", "productType"],
+    ["product-line-filter", "selectedProductLine", "Todas as linhas", "productLine"],
     ["product-filter", "selectedProduct", "Todos os produtos", "productKey"],
     ["product-model-filter", "selectedModel", "Todos os modelos", "productModel"],
     ["product-color-filter", "selectedColor", "Todas as cores", "productColor"],
@@ -117,6 +126,7 @@ function filtersForProducts() {
   ];
   configs.forEach(([id, stateKey, empty, field]) => {
     const select = $(`#${id}`);
+    if (!select) return;
     const choices = new Map();
     contextualProductRows(field).forEach((row) => {
       const value = row[field];
@@ -126,7 +136,10 @@ function filtersForProducts() {
     const original = catalog.find(row => row[field] === selected);
     const missingSelection = selected && !choices.has(selected);
     const emptyLabel = !choices.size && field === 'productSize' ? 'Sem tamanho na fonte' : empty;
-    select.innerHTML = `<option value="">${emptyLabel}</option>${missingSelection ? `<option value="${escapeHtml(selected)}" disabled>${escapeHtml(field === 'productKey' ? original?.productName || selected : selected)} - fora do recorte</option>` : ''}${[...choices].sort((a, b) => a[1].localeCompare(b[1], "pt-BR")).map(([key, label]) => `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`).join("")}`;
+    const taxonomy = field === 'productType' ? PRODUCT_TYPES : field === 'productLine' ? PRODUCT_LINES : null;
+    select.innerHTML = taxonomy
+      ? `<option value="">${emptyLabel}</option>${taxonomy.map(value => `<option value="${value}" ${choices.has(value) ? '' : 'disabled'}>${field === 'productLine' ? productLineLabel(value) : value}${choices.has(value) ? '' : ' - sem registros no recorte'}</option>`).join('')}`
+      : `<option value="">${emptyLabel}</option>${missingSelection ? `<option value="${escapeHtml(selected)}" disabled>${escapeHtml(field === 'productKey' ? original?.productName || selected : selected)} - fora do recorte</option>` : ''}${[...choices].sort((a, b) => a[1].localeCompare(b[1], "pt-BR")).map(([key, label]) => `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`).join("")}`;
     select.value = selected;
     select.onchange = () => {
       state[stateKey] = select.value;
@@ -218,6 +231,7 @@ function recordsForDisplay(view) {
   });
   return { records, official: true, sourceLabel: "SSOT" };
 }
+const CONVERSION_SIGNAL_BAND = 0.002;
 function recordSemaphore(record) {
   if (record?.missingContext) return { tone: 'warn', label: record.missingContext.label, title: record.missingContext.detail };
   if (record?.periodGap || record?.compare?.periodGap) return { tone: 'warn', label: 'Periodo incompleto', title: record.periodGap || record.compare.periodGap };
@@ -227,8 +241,8 @@ function recordSemaphore(record) {
   const previous = record.compare;
   if (previous?.rate == null) return { tone: "neutral", label: "Sem historico", title: "Nao ha base comparavel para avaliar a variacao." };
   const change = record.rate - previous.rate;
-  if (change >= 0.002) return { tone: "good", label: "Avancou", title: "Conversao subiu pelo menos 0,20 p.p. no recorte; sinal descritivo, sem teste de significancia." };
-  if (change <= -0.002) return { tone: "bad", label: "Recuou", title: "Conversao caiu pelo menos 0,20 p.p. no recorte; sinal descritivo, sem teste de significancia." };
+  if (change >= CONVERSION_SIGNAL_BAND) return { tone: "good", label: "Avancou", title: "Conversao subiu pelo menos 0,20 p.p. no recorte; sinal descritivo, sem teste de significancia." };
+  if (change <= -CONVERSION_SIGNAL_BAND) return { tone: "bad", label: "Recuou", title: "Conversao caiu pelo menos 0,20 p.p. no recorte; sinal descritivo, sem teste de significancia." };
   return { tone: "neutral", label: "Estavel", title: "Variacao de conversao inferior a 0,20 p.p." };
 }
 function nextIndicator(record) {
@@ -309,7 +323,8 @@ function comparisonLabel(current, previous, format = "number") {
 function analysisScopeLabel() {
   if (!productFilterActive()) return "Canais pagos";
   const name = productCatalog().find((row) => row.productKey === state.selectedProduct)?.productName;
-  return name || [state.selectedModel, state.selectedColor, state.selectedSize, state.productSearch].filter(Boolean).join(" / ");
+  return [state.selectedProductType && `Tipo: ${state.selectedProductType}`, state.selectedProductLine && `Linha: ${productLineLabel(state.selectedProductLine)}`,
+    name || [state.selectedModel, state.selectedColor, state.selectedSize, state.productSearch].filter(Boolean).join(" / ")].filter(Boolean).join(" / ");
 }
 function renderSummary() {
   const totals = period => ({ ...summarize(selectedPaidRows(period)), periodGap: viewPeriodGap({key:'channel'}, period) });
@@ -586,17 +601,99 @@ function renderEntityRhythm() {
   });
 }
 function explorerColumns(view) {
-  const columns = { product: [["Produto", "product"]], channel: [["Canal", "channel"]], campaign: [["Campanha", "campaign"], ["Canal", "channel"]], ad_group: [["Grupo", "group"], ["Campanha", "campaign"]], ad: [["Criativo", "ad"], ["Campanha", "campaign"]], channel_product: [["Produto", "product"], ["Canal", "channel"]], campaign_product: [["Produto", "product"], ["Campanha", "campaign"], ["Canal", "channel"]], ad_group_product: [["Produto", "product"], ["Grupo", "group"]], ad_product: [["Produto", "product"], ["Criativo", "ad"]] };
+  const columns = { line: [["Linha", "line"]], channel_line: [["Linha", "line"], ["Canal", "channel"]], product: [["Produto", "product"]], channel: [["Canal", "channel"]], campaign: [["Campanha", "campaign"], ["Canal", "channel"]], ad_group: [["Grupo", "group"], ["Campanha", "campaign"]], ad: [["Criativo", "ad"], ["Campanha", "campaign"]], channel_product: [["Produto", "product"], ["Canal", "channel"]], campaign_product: [["Produto", "product"], ["Campanha", "campaign"], ["Canal", "channel"]], ad_group_product: [["Produto", "product"], ["Grupo", "group"]], ad_product: [["Produto", "product"], ["Criativo", "ad"]] };
   const productGrain = view.product || productFilterActive();
-  return [...columns[view.key], [productGrain ? "Pedidos por produto" : "Pedidos", "pedidos"], [productGrain ? "Visitas ao produto" : "Visitas", "sessoes"], ["Receita", "receita"], ["Conversao", "rate"], ["Sinal", "semaphore"], ["Proximo indicador", "nextIndicator"]];
+  const average = ['product', 'channel_product', 'line', 'channel_line'].includes(view.key) ? [['M&eacute;dia de convers&atilde;o', 'averageRate']] : [];
+  return [...columns[view.key], [productGrain ? "Pedidos por produto" : "Pedidos", "pedidos"], [productGrain ? "Visitas ao produto" : "Visitas", "sessoes"], ["Receita", "receita"], ["Conversao", "rate"], ...average, ["Sinal", "semaphore"], ["Proximo indicador", "nextIndicator"]];
+}
+function productConversionHistory(view) {
+  const grouped = new Map();
+  if (!['product', 'channel_product', 'line', 'channel_line'].includes(view.key)) return grouped;
+  for (const row of normalizedViewRows('channel_product')) {
+    if (!state.end || row.data > state.end || !isAnalysisRow(row) || !isMerchandiseProduct(row)
+        || !matchesSelectedChannel(row) || !matchesProductFilter(row)) continue;
+    const key = dimensionKey(view, row);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  }
+  return new Map([...grouped].map(([key, rows]) => {
+    const summary = summarize(rows);
+    const dates = rows.map(row => row.data).sort();
+    return [key, { ...summary, rate: summary.provenance?.partialLinkage ? null : summary.rate,
+      start: dates[0], end: dates.at(-1) }];
+  }));
+}
+function productAverageSignal(record) {
+  if (record.periodGap || record.missingContext || record.provenance?.partialLinkage
+      || record.conversionHistory?.provenance?.partialLinkage) {
+    return { tone: 'neutral', label: 'Base parcial', difference: null };
+  }
+  if (!Number.isFinite(record.rate) || !Number.isFinite(record.averageRate)) {
+    return { tone: 'neutral', label: 'Sem comparacao', difference: null };
+  }
+  const difference = record.rate - record.averageRate;
+  // Match the existing descriptive band; this is not statistical significance.
+  const edge = CONVERSION_SIGNAL_BAND - 1e-12;
+  if (difference >= edge) return { tone: 'good', label: 'Acima da media', difference };
+  if (difference <= -edge) return { tone: 'bad', label: 'Abaixo da media', difference };
+  return { tone: 'warn', label: 'Proximo da media', difference };
+}
+function productAverageCell(record, view) {
+  const history = record.conversionHistory;
+  const signal = productAverageSignal(record);
+  const scope = ['channel_product', 'channel_line'].includes(view.key) ? record.channel : growthChannelLabel();
+  const lineView = ['line', 'channel_line'].includes(view.key);
+  const subject = lineView ? 'dos produtos desta linha' : 'deste produto';
+  const label = Number.isFinite(record.averageRate) ? fmtPercent(record.averageRate)
+    : !history?.rows ? 'Sem historico' : history.sessoes === 0 ? 'Sem visitas' : 'Base incompleta';
+  const note = [
+    `${lineView ? 'Linha' : 'Produto'}: ${lineView ? record.line : record.product}. Canais: ${scope}.`,
+    `Media historica ponderada: soma dos pedidos ${subject} / soma das visitas ${subject}. Nao e uma media simples de porcentagens.`,
+    ...(lineView ? ['Linha identificada pelo nome do produto. Pedidos somados por produto; um pedido com varios produtos pode ser contado mais de uma vez. Nao representa pedidos unicos da linha.'] : []),
+    `Historico disponivel ate o fim do periodo selecionado (${dayLabel(state.end)}), incluindo o periodo atual. O inicio do filtro nao limita esta referencia.`,
+    history?.rows ? `Registros de ${dayLabel(history.start)} a ${dayLabel(history.end)}. Pedidos: ${Number.isFinite(history.pedidos) ? fmtNumber(history.pedidos) : 'nao informados'}. Visitas: ${Number.isFinite(history.sessoes) ? fmtNumber(history.sessoes) : 'nao informadas'}.` : `Sem registros historicos ${subject} nos canais selecionados.`,
+    'Somente canais de Growth. Outros nao entra no calculo. Historico carregado nao comprova cobertura desde o lancamento. Ausencia de dados nao e zero.',
+    `Semaforo: realizado menos media historica ${subject}, nos mesmos canais. Verde: pelo menos +0,20 p.p.; vermelho: no maximo -0,20 p.p.; amarelo: entre -0,20 e +0,20 p.p. Cinza: base sem comparacao segura. Faixa descritiva, nao um teste de significancia nem comprovacao de tendencia. Funciona mesmo com a comparacao temporal desligada.`,
+    `Realizado: ${Number.isFinite(record.rate) ? fmtPercent(record.rate) : 'nao calculavel'}. Sinal: ${signal.label}. ${record.periodGap || ''}`,
+    provenanceNote(history)
+  ].join('\n\n');
+  const difference = signal.difference === null ? '' : signal.difference === 0 ? '0,00 p.p.'
+    : PerformanceDelta.describe(record.rate, record.averageRate, { rate: true }).text;
+  return `<div class="average-kpi ${signal.tone}"><span class="product-average-value"><strong>${label}</strong><button type="button" class="source-info" data-source-note="${escapeHtml(note)}" aria-label="Base e semaforo da media de conversao de ${escapeHtml(lineView ? record.line : record.product)}" aria-haspopup="dialog" aria-expanded="false">${typeof CrmIcons === 'function' ? CrmIcons('Info') : 'i'}</button></span><span class="semaphore ${signal.tone}"><i aria-hidden="true"></i>${signal.label}</span>${difference ? `<small class="average-gap" aria-label="Realizado menos media: ${difference}">${difference}</small>` : ''}</div>`;
+}
+function lineProductsCell(record) {
+  const current = record.rows > 0;
+  const products = current ? record.products || [] : record.compare?.products || record.products || [];
+  return `<strong>${escapeHtml(record.line)}</strong>${products.length ? `<details class="line-products"><summary>${products.length} produto${products.length === 1 ? '' : 's'}${current ? '' : ' no comparado'}</summary><ul>${products.map(name => `<li>${escapeHtml(name)}</li>`).join('')}</ul></details>` : ''}`;
 }
 function renderExplorer() {
   const view = VIEWS.find((item) => item.key === state.selectedView) || VIEWS[0];
   let { records } = recordsForDisplay(view);
   if (state.explorerSearch) records = records.filter((row) => fuzzyMatch(filterText(row), state.explorerSearch));
+  if (['product', 'channel_product', 'line', 'channel_line'].includes(view.key)) {
+    const history = productConversionHistory(view);
+    records = records.map(row => ({ ...row, conversionHistory: history.get(row.key),
+      averageRate: history.get(row.key)?.rate ?? null }));
+  } else if (state.explorerSort === 'averageRate') {
+    state.explorerSort = 'pedidos';
+    state.explorerSortDirection = 'desc';
+  }
   const sorted = sortRecords(records, state.explorerSort, state.explorerSortDirection);
   const visible = sorted.slice(0, 50); const columns = explorerColumns(view);
-  $("#explorer-head").innerHTML = `<tr>${columns.map(([label,key]) => ['semaphore','nextIndicator'].includes(key) ? `<th>${label}</th>` : tableSortHeader(label, key, "explorer", state.explorerSort, state.explorerSortDirection)).join("")}</tr>`;
+  $("#explorer-head").innerHTML = `<tr>${columns.map(([label,key]) => {
+    const subtitle = key === 'rate' ? 'No periodo' : key === 'averageRate' ? 'Realizado vs. historico'
+      : key === 'semaphore' && state.compareEnabled !== false ? 'Vs. periodo anterior' : '';
+    const heading = ['semaphore','nextIndicator'].includes(key) ? `<th scope="col">${label}</th>`
+      : tableSortHeader(label, key, "explorer", state.explorerSort, state.explorerSortDirection);
+    return heading.replace('<th ', `<th data-column="${key}" `)
+      .replace('</th>', `${subtitle ? `<small class="column-context">${subtitle}</small>` : ''}</th>`);
+  }).join("")}</tr>`;
+  const sortSelect = $('#explorer-sort');
+  const averageOption = sortSelect.querySelector('[value="averageRate"]');
+  if (['product', 'channel_product', 'line', 'channel_line'].includes(view.key)) {
+    if (!averageOption) sortSelect.insertAdjacentHTML('beforeend', '<option value="averageRate">M&eacute;dia de convers&atilde;o</option>');
+  } else averageOption?.remove();
+  sortSelect.value = state.explorerSort;
   const availability = viewAvailability(view.key);
   const quality = viewQuality(view);
   $("#explorer-status").textContent = !availability.available ? 'Cruzamento indisponivel' : quality.status;
@@ -605,8 +702,10 @@ function renderExplorer() {
   const provenanceRows = sourceKeyForView(view.key) === 'channel' ? selectedPaidRows('current') : viewRows(view, 'current');
   $("#explorer-status").insertAdjacentHTML('beforeend', provenanceMarkup(summarize(provenanceRows), 'fonte desta visao'));
   if ($('#explorer-status .source-info')) $('#explorer-status').removeAttribute('title');
-  $("#explorer-count").textContent = `${records.length} resultados / ${visible.length} exibidos`;
+  $("#explorer-count").textContent = records.length > visible.length ? `${visible.length} de ${records.length} resultados` : `${records.length} resultado${records.length === 1 ? '' : 's'}`;
   $("#explorer-summary").innerHTML = `<span><strong>${escapeHtml(view.title)}</strong> / ${escapeHtml(analysisScopeLabel())}</span><span>Atual: ${formatWindow()} / ${comparisonWindowLabel()}</span>`;
+  if (['line', 'channel_line'].includes(view.key)) $("#explorer-summary").insertAdjacentHTML('beforeend',
+    '<span title="Linhas identificadas pelo nome. Um pedido com varios produtos pode aparecer mais de uma vez na soma.">Linha pelo nome / Pedidos somados por produto, nao unicos</span>');
   const gaps = [viewPeriodGap(view, 'current'), viewPeriodGap(view, 'compare')].filter(Boolean);
   const coverage = $('#explorer-coverage');
   coverage.hidden = !gaps.length;
@@ -616,7 +715,7 @@ function renderExplorer() {
     $('#explorer-status').className = 'status-pill warn';
   }
   const reason = availability.reason || 'Sem observacoes de pedidos, visitas ou receita para esta combinacao nos periodos selecionados.';
-  $("#explorer-body").innerHTML = visible.length ? visible.map((row) => `<tr>${columns.map(([,key]) => `<td>${['pedidos','sessoes','receita','rate'].includes(key) ? metricComparisonCell(row, key) : key === 'semaphore' ? semaphoreMarkup(row) : key === 'nextIndicator' ? `${escapeHtml(nextIndicator(row))}${row.missingContext ? `<small class="cell-note missing-detail">${escapeHtml(row.missingContext.detail)}</small>` : ''}` : escapeHtml(row[key] || 'Nao identificado')}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${columns.length}" class="table-empty">${escapeHtml(reason)}</td></tr>`;
+  $("#explorer-body").innerHTML = visible.length ? visible.map((row) => `<tr>${columns.map(([,key]) => `<td data-column="${key}"${key === 'averageRate' ? ' class="product-average-cell"' : ''}>${key === 'line' ? lineProductsCell(row) : key === 'averageRate' ? productAverageCell(row, view) : ['pedidos','sessoes','receita','rate'].includes(key) ? metricComparisonCell(row, key) : key === 'semaphore' ? semaphoreMarkup(row) : key === 'nextIndicator' ? `${escapeHtml(nextIndicator(row))}${row.missingContext ? `<small class="cell-note missing-detail">${escapeHtml(row.missingContext.detail)}</small>` : ''}` : escapeHtml(row[key] || 'Nao identificado')}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${columns.length}" class="table-empty">${escapeHtml(reason)}</td></tr>`;
   bindTableSort("explorer", renderExplorer);
 }
 
@@ -671,7 +770,7 @@ function entitySelection(side) {
   const sourceKey = sourceKeyForView(choice.view, entityState.scope !== 'independent');
   const summary = (rows, period) => ({ ...summarize(rows), periodGap: viewPeriodGap({key:choice.view}, period, entityState.scope !== 'independent') });
   return { label: entry?.label || 'Selecione um item', ...withComparison(summary(current, 'current'), summary(previous, 'compare')),
-    view: choice.view, sourceKey, missing, selected: Boolean(choice.key), aggregate: Boolean(entry?.aggregate),
+    view: choice.view, sourceKey, missing, selected: Boolean(choice.key), aggregate: Boolean(entry?.aggregate) || ['line', 'channel_line'].includes(choice.view),
     productGrain: sourceKey.endsWith('_product') };
 }
 function renderEntityComparison(pickersOnly = false) {
@@ -742,7 +841,7 @@ function setupAnalysisEvents() {
   };
   $("#clear-filters").onclick = () => {
     clearTimeout(analysisSearchTimer);
-    for (const key of ['selectedProduct','selectedModel','selectedColor','selectedSize','selectedChannel','productSearch','explorerSearch','chartFilter']) state[key] = "";
+    for (const key of ['selectedProduct','selectedProductType','selectedProductLine','selectedModel','selectedColor','selectedSize','selectedChannel','productSearch','explorerSearch','chartFilter']) state[key] = "";
     state.chartChannels = []; $("#product-search").value = ""; $("#explorer-search").value = ""; renderAll();
   };
   const sort = $("#explorer-sort");

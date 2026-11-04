@@ -5,11 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Painel de ritmo e performance comercial com dados SSOT.">
   <title>Reise | Performance comercial</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20261030-chart-visibility-01">
+  <link rel="stylesheet" href="assets/styles.css?v=20261104-line-audit-01">
   <link rel="stylesheet" href="assets/crm-sendflow.css?v=20261028-04">
   <link rel="stylesheet" href="assets/crm-artifact.css?v=20261028-sheet-11">
   <link rel="stylesheet" href="assets/data-refresh.css?v=20261029-01">
-  <link rel="stylesheet" href="assets/reise-theme.css?v=20261030-compact-loader-06">
+  <link rel="stylesheet" href="assets/reise-theme.css?v=20261104-average-signal-03">
+  <link rel="stylesheet" href="assets/vendor/flatpickr/flatpickr.min.css">
+  <link rel="stylesheet" href="assets/growth-date-picker.css?v=20261104-01">
+  <link rel="stylesheet" href="assets/reise-refinement.css?v=20261104-03">
+  <link rel="stylesheet" href="assets/crm-calculator.css?v=20261104-13">
 </head>
 <body>
   <div id="data-loader" class="data-loader" role="status" aria-live="polite" aria-label="Atualizando dados do painel">
@@ -61,46 +65,67 @@
     </section>
     <dialog id="growth-filter-dialog" aria-labelledby="filter-dialog-title">
     <form id="growth-filter-form">
-      <header class="filter-dialog-header"><div><p class="eyebrow">Growth Performance</p><h2 id="filter-dialog-title">Configurar analise</h2></div><button id="close-filters" class="filter-close" type="button" aria-label="Fechar filtros" title="Fechar">&times;</button></header>
+      <header class="filter-dialog-header"><div><p class="eyebrow">Growth Performance</p><h2 id="filter-dialog-title">Filtros da an&aacute;lise</h2></div><button id="close-filters" class="filter-close" type="button" aria-label="Fechar filtros" title="Fechar">&times;</button></header>
       <div class="filter-dialog-content">
     <section class="controls" aria-label="Filtros do painel">
-      <h3>Periodo e comparacao</h3>
-      <div class="filter-row filter-primary">
-      <div class="control-group control-wide">
-        <label for="period-preset">Janela</label>
+      <div class="filter-section-title"><h3>Per&iacute;odo</h3><span id="calendar-source-date"></span></div>
+      <div class="period-picker">
+      <aside class="period-shortcuts" aria-label="Atalhos de periodo">
+        <div id="period-shortcuts"></div>
+        <label for="period-preset">Mais per&iacute;odos</label>
         <select id="period-preset">
-          <option value="current-day">Ultimo dia disponivel</option>
-          <option value="previous-day">Dia anterior</option>
-          <option value="week">Semana atual</option>
-          <option value="fortnight">Quinzena atual</option>
-          <option value="month">Mes atual</option>
-          <option value="quarter">Trimestre atual</option>
-          <option value="semester">Semestre atual</option>
-          <option value="year">Ano atual</option>
+          <option value="today">Hoje</option>
+          <option value="yesterday">Ontem</option>
+          <option value="last-7">&Uacute;ltimos 7 dias</option>
+          <option value="last-30">&Uacute;ltimos 30 dias</option>
+          <option value="mtd">M&ecirc;s at&eacute; ontem (MTD)</option>
+          <option value="last-month">M&ecirc;s passado</option>
+          <option value="current-day">&Uacute;ltimo dia da base</option>
+          <option value="previous-day">Dia anterior ao da base</option>
+          <option value="week">Semana da base</option>
+          <option value="fortnight">Quinzena da base</option>
+          <option value="month">M&ecirc;s da base</option>
+          <option value="quarter">Trimestre da base</option>
+          <option value="semester">Semestre da base</option>
+          <option value="year">Ano da base</option>
           <option value="last-complete">Ultimos 12 meses completos</option>
-          <option value="custom">Data especifica</option>
+          <option value="custom">Personalizado</option>
           <option value="all">Toda a base</option>
         </select>
+      </aside>
+      <div class="period-calendar-main">
+        <div class="period-date-inputs">
+          <div class="control-group date-control"><label for="date-start">In&iacute;cio</label><input id="date-start" type="date" required></div>
+          <span class="period-date-arrow" aria-hidden="true">&rarr;</span>
+          <div class="control-group date-control"><label for="date-end">Fim</label><input id="date-end" type="date" required></div>
+        </div>
+        <div id="growth-range-calendar" class="range-calendar"><input id="growth-calendar-value" type="hidden"></div>
+        <div class="period-selection-meta"><span id="calendar-selection" role="status"></span><span>S&atilde;o Paulo &middot; D&minus;1 nos atalhos de 7/30 dias e MTD</span></div>
+        <p id="calendar-coverage-note" role="status" hidden></p>
       </div>
-      <div class="control-group date-control"><label for="date-start">Inicio</label><input id="date-start" type="date"></div>
-      <div class="control-group date-control"><label for="date-end">Fim</label><input id="date-end" type="date"></div>
+      </div>
+      <div class="period-comparison">
       <label class="comparison-toggle"><input id="compare-enabled" type="checkbox" role="switch" checked><span>Comparar periodos</span></label>
-      <div class="control-group comparison-control"><label for="compare-mode">Comparar com</label><select id="compare-mode"><option value="previous">Periodo anterior</option><option value="year-ago">Mesmo periodo do ano anterior</option><option value="custom">Periodo selecionado</option></select><div id="compare-custom-fields" class="compare-dates is-hidden"><input id="compare-start" type="date" aria-label="Inicio da comparacao"><input id="compare-end" type="date" aria-label="Fim da comparacao"></div><small id="comparison-window" class="muted-note">Comparacao automatica</small></div>
+      <div class="control-group comparison-control"><label for="compare-mode">Comparar com</label><select id="compare-mode"><option value="previous">Per&iacute;odo anterior</option><option value="year-ago">Mesmo per&iacute;odo do ano anterior</option><option value="custom">Per&iacute;odo personalizado</option></select><div id="compare-custom-fields" class="compare-dates is-hidden"><div><label for="compare-start">In&iacute;cio da compara&ccedil;&atilde;o</label><input id="compare-start" type="date"></div><div><label for="compare-end">Fim da compara&ccedil;&atilde;o</label><input id="compare-end" type="date"></div></div><small id="comparison-window" class="muted-note">Comparacao automatica</small></div>
       </div>
     </section>
 
     <section id="product-filters" class="product-filter-band" aria-label="Filtros de produto">
       <div class="filter-band-heading"><h3>Produto e canal</h3><span id="active-product-filter"></span></div>
+      <div class="filter-row product-taxonomy-filters">
+        <div class="control-group"><label for="product-type-filter" title="Classificacao pelo nome do produto. Itens ambiguos ficam sem classificacao.">Tipo de produto <small>(nome)</small></label><select id="product-type-filter"><option value="">Todos os tipos</option></select></div>
+        <div class="control-group"><label for="product-line-filter" title="Linhas identificadas pelo nome, incluindo mochilas, acessorios e vestuario. GT e Avant prevalecem sobre RS; Phantom Knit fica em Phantom; 911 inclui Carrera. Sem linha no nome preserva itens sem identificacao explicita.">Linha de produto <small>(nome)</small></label><select id="product-line-filter"><option value="">Todas as linhas</option></select></div>
+      </div>
       <div class="filter-row product-filter-primary">
         <div class="control-group"><label for="product-search">Pesquisar produto</label><input id="product-search" type="search" placeholder="Ex.: RS8 Avant cinza" autocomplete="off"></div>
         <div class="control-group"><label for="product-filter">Produto</label><select id="product-filter"><option value="">Todos os produtos</option></select></div>
         <div class="control-group"><label for="global-channel-filter">Canal</label><select id="global-channel-filter"></select></div>
       </div>
-      <div class="filter-row product-filter-secondary">
+      <details class="product-attributes"><summary>Modelo, cor e tamanho</summary><div class="filter-row product-filter-secondary">
         <div class="control-group"><label for="product-model-filter">Modelo</label><select id="product-model-filter"></select></div>
         <div class="control-group"><label for="product-color-filter">Cor</label><select id="product-color-filter"></select></div>
         <div class="control-group"><label for="product-size-filter">Tamanho</label><select id="product-size-filter"></select></div>
-      </div>
+      </div></details>
       <p id="growth-filter-warning" class="filter-context-warning" role="status" hidden></p>
     </section>
       <section class="filter-view-section"><h3>Visao e indicador</h3><div class="filter-row"><div class="control-group"><label for="filter-view">Visao</label><select id="filter-view"></select></div><div class="control-group"><label for="filter-metric">Indicador dos graficos</label><select id="filter-metric"><option value="pedidos">Pedidos</option><option value="sessoes">Visitas</option><option value="receita">Receita</option><option value="rate">Conversao</option></select></div></div></section>
@@ -156,13 +181,17 @@
     </section>
 
     <section id="growth-views" class="report-section">
-      <div class="section-heading"><span class="section-number">05</span><div><p class="eyebrow">Produto primeiro</p><h2>Produto, canal, campanha e criativo</h2><p class="section-intro">A investigação começa em Canal + produto e avança para campanha, grupo e anúncio quando a ponte de dados estiver disponível.</p></div><span id="explorer-status" class="status-pill pending">&mdash;</span></div>
-      <div class="explorer-toolbar"><label for="explorer-level">Visao</label><select id="explorer-level"></select><label for="explorer-sort">Ordenar por</label><select id="explorer-sort"><option value="pedidos">Pedidos</option><option value="receita">Receita</option><option value="sessoes">Sessoes</option><option value="rate">Conversao</option></select><label for="explorer-search">Buscar</label><input id="explorer-search" type="search" placeholder="Nome da campanha, criativo ou produto"><span id="explorer-count" class="muted-note">&mdash;</span></div>
-      <div id="explorer-summary" class="explorer-summary"></div>
+      <div class="section-heading"><span class="section-number">05</span><div><p class="eyebrow">Produto, canal e campanha</p><h2>Detalhamento de performance</h2></div><span id="explorer-status" class="status-pill pending">&mdash;</span></div>
+      <div class="explorer-toolbar">
+        <div class="explorer-control"><label for="explorer-level">Vis&atilde;o</label><select id="explorer-level"></select></div>
+        <div class="explorer-control explorer-search-control"><label for="explorer-search">Buscar</label><input id="explorer-search" type="search" placeholder="Produto, canal ou campanha"></div>
+        <div class="explorer-control"><label for="explorer-sort">Ordenar por</label><select id="explorer-sort"><option value="pedidos">Pedidos</option><option value="receita">Receita</option><option value="sessoes">Visitas</option><option value="rate">Convers&atilde;o</option></select></div>
+        <a class="product-filter-shortcut" href="#product-filters">Filtrar produtos</a>
+      </div>
+      <div class="explorer-context"><div id="explorer-summary" class="explorer-summary"></div><span id="explorer-count" class="muted-note" role="status">&mdash;</span></div>
       <p id="explorer-coverage" class="filter-context-warning" role="status" hidden></p>
-      <a class="product-filter-shortcut" href="#product-filters">Filtrar produto</a>
       <details id="entity-comparison" class="entity-comparison">
-        <summary>Comparar canais, produtos e combinacoes</summary>
+        <summary>Comparar sele&ccedil;&otilde;es A/B</summary>
         <div class="comparison-pickers">
           <label class="entity-charts-toggle"><input id="entity-charts" type="checkbox">Comparar A/B nos graficos</label>
           <div class="control-group entity-scope-control"><label for="entity-scope">Recorte A/B</label><select id="entity-scope"><option value="global">Filtros globais</option><option value="independent">Selecoes independentes</option></select></div>
@@ -171,7 +200,7 @@
         </div>
         <div id="entity-results" aria-live="polite"></div>
       </details>
-      <div class="table-scroll"><table class="data-table explorer-table"><thead id="explorer-head"></thead><tbody id="explorer-body"><tr><td colspan="8" class="table-empty">Carregando investigacao.</td></tr></tbody></table></div>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Detalhamento de performance por produto e canal"><table class="data-table explorer-table"><thead id="explorer-head"></thead><tbody id="explorer-body"><tr><td colspan="8" class="table-empty">Carregando investigacao.</td></tr></tbody></table></div>
     </section>
 
     <section id="quality" class="report-section">
@@ -193,6 +222,14 @@
       <div class="crm-header-meta"><span id="crm-freshness" class="status-pill" role="status">Consultando SSOT</span><span id="crm-period-label">Periodo da analise</span><button id="crm-refresh" class="outline-button" type="button" aria-label="Atualizar base" title="Atualizar base" disabled>Atualizar leitura</button><small id="crm-refresh-result" role="status"></small></div>
     </header>
 
+    <nav class="crm-view-nav" aria-label="Visao CRM">
+      <div role="tablist" aria-label="Realizado ou simulacao">
+        <button id="crm-realized-tab" type="button" role="tab" aria-selected="true" aria-controls="crm-realized-panel" data-crm-view="realized">Realizado</button>
+        <button id="crm-simulation-tab" type="button" role="tab" aria-selected="false" aria-controls="crm-simulation-panel" tabindex="-1" data-crm-view="simulation">Simuladores</button>
+      </div>
+      <span id="crm-view-context">Resultados observados</span>
+    </nav>
+    <div id="crm-realized-panel" role="tabpanel" aria-labelledby="crm-realized-tab">
     <section id="crm-analysis-bar" class="crm-analysis-bar" aria-label="Canais e filtros CRM">
       <div class="crm-analysis-context"><strong id="crm-filter-summary-period">Carregando recorte CRM</strong><span id="crm-filter-summary-channel" class="sr-only">WhatsApp Oficial</span><small id="crm-filter-summary-comparison"></small></div>
       <div class="crm-analysis-toolbar">
@@ -245,6 +282,8 @@
 
     <details class="crm-source-details"><summary>Conferencia das fontes e cobertura SSOT</summary><section id="crm-ssot-reconciliation" class="crm-reconciliation" hidden aria-live="polite"></section></details>
     <footer><strong>Regra CRM:</strong> pedidos, receita, sessões e conversão vêm do SSOT. Ativação operacional e metas do artefato são leituras separadas, sem alterar as fontes.</footer>
+    </div>
+    <section id="crm-simulation-panel" role="tabpanel" aria-labelledby="crm-simulation-tab" hidden></section>
   </main>
   <script src="assets/crm-sendflow.js?v=20261029-01"></script>
   <script src="assets/crm-email.js?v=20261028-01"></script>
@@ -255,16 +294,20 @@
   <script src="assets/chart-interactions.js?v=20261029-ui-02"></script>
   <script src="assets/performance-delta.js?v=20261029-01"></script>
   <script src="assets/data-refresh.js?v=20261103-independent-01"></script>
-  <script src="assets/app.js?v=20261030-cloud-01"></script>
-  <script src="assets/growth-analysis.js?v=20261030-chart-visibility-01"></script>
+  <script src="assets/app.js?v=20261104-line-audit-01"></script>
+  <script src="assets/growth-analysis.js?v=20261104-line-audit-01"></script>
   <script src="assets/search-suggestions.js?v=20261030-autocomplete-03"></script>
-  <script src="assets/growth-filters.js?v=20261030-growth-review-01"></script>
+  <script src="assets/vendor/flatpickr/flatpickr.min.js"></script>
+  <script src="assets/vendor/flatpickr/pt.js"></script>
+  <script src="assets/growth-date-picker.js?v=20261104-01"></script>
+  <script src="assets/growth-filters.js?v=20261104-product-taxonomy-01"></script>
   <script src="assets/crm-icons.js?v=20261030-provenance-01"></script>
-  <script src="assets/source-info.js?v=20261030-provenance-01"></script>
+  <script src="assets/source-info.js?v=20261104-layout-02"></script>
   <script src="assets/crm-whatsapp.js?v=20261028-01"></script>
   <script src="assets/crm-artifact.js?v=20261029-comparison-01"></script>
-  <script src="assets/crm-funnel.js?v=20261029-decision-01"></script>
+  <script src="assets/crm-funnel.js?v=20261104-01"></script>
   <script src="assets/crm-decision.js?v=20261029-decision-01"></script>
   <script src="assets/crm.js?v=20261030-cloud-01"></script>
+  <script src="assets/crm-calculator.js?v=20261104-13"></script>
 </body>
 </html>

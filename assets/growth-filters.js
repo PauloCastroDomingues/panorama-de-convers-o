@@ -1,4 +1,4 @@
-const filterKeys = ['start','end','compareStart','compareEnd','compareMode','compareEnabled','selectedChannel','selectedProduct','selectedModel','selectedColor','selectedSize','productSearch','selectedView','selectedGranularity','chartFilter','chartChannels','chartMetric','rhythmMetric'];
+const filterKeys = ['start','end','compareStart','compareEnd','compareMode','compareEnabled','selectedChannel','selectedProduct','selectedProductType','selectedProductLine','selectedModel','selectedColor','selectedSize','productSearch','selectedView','selectedGranularity','chartFilter','chartChannels','chartMetric','rhythmMetric'];
 let filterDraft = null;
 let filterSearchTimer = null;
 let filterOriginalPreset = 'current-day';
@@ -26,7 +26,7 @@ function refreshFilterSummary() {
   $("#filter-summary-comparison").textContent = comparisonWindowLabel();
   const channel = growthChannelLabel();
   $("#filter-summary-scope").textContent = `${productFilterActive() ? analysisScopeLabel() : 'Todos os produtos'} / ${channel}${entityState.charts ? ' / Graficos A/B' : ''}`;
-  $("#filter-count").textContent = 1 + Number(Boolean(entityState.charts)) + ['selectedChannel','selectedProduct','selectedModel','selectedColor','selectedSize','productSearch'].filter((key) => state[key]).length;
+  $("#filter-count").textContent = 1 + Number(Boolean(entityState.charts)) + ['selectedChannel','selectedProduct','selectedProductType','selectedProductLine','selectedModel','selectedColor','selectedSize','productSearch'].filter((key) => state[key]).length;
 }
 function renderFilterDraft() {
   for (const input of filterForm.querySelectorAll('input[type="date"]')) input.setCustomValidity('');
@@ -48,11 +48,21 @@ function renderFilterDraft() {
     $("#apply-filters").disabled = Boolean(issue);
   });
   window.ReiseSearch?.refresh();
+  GrowthDatePicker.render(filterDraft);
+}
+function setGrowthCalendarRange(start, end) {
+  if (!filterDraft) return;
+  filterDraft.preset = 'custom';
+  inFilterDraft(() => {
+    state.start = start; state.end = end;
+    applyComparison(); suggestGranularityForWindow();
+  });
+  renderFilterDraft();
 }
 function growthFilterIssue() {
   const availability = viewAvailability(state.selectedView);
   if (!availability.available) return `${availability.reason} Ajuste o canal, o produto ou a visao.`;
-  for (const id of ['product-filter','product-model-filter','product-color-filter','product-size-filter']) {
+  for (const id of ['product-type-filter','product-line-filter','product-filter','product-model-filter','product-color-filter','product-size-filter']) {
     const select = $(`#${id}`);
     if (select.value && select.selectedOptions[0]?.disabled) return 'Selecao de produto fora do recorte. Ajuste ou limpe o filtro para continuar.';
   }
@@ -77,12 +87,13 @@ function closeGrowthFilters() {
 }
 function handleFilterEdit(event) {
   const node = event.target;
+  if (node.closest('.flatpickr-calendar') || node.id === 'growth-calendar-value') return;
   if (!node.matches('input,select')) return;
   event.stopImmediatePropagation();
   if (!filterDraft) return;
   if (node.type === 'date') for (const input of filterForm.querySelectorAll('input[type="date"]')) input.setCustomValidity('');
   if (event.type === 'input' && node.type !== 'search') return;
-  const keyMap = { 'product-filter':'selectedProduct', 'product-model-filter':'selectedModel', 'product-color-filter':'selectedColor', 'product-size-filter':'selectedSize', 'global-channel-filter':'selectedChannel', 'product-search':'productSearch', 'filter-view':'selectedView' };
+  const keyMap = { 'product-type-filter':'selectedProductType', 'product-line-filter':'selectedProductLine', 'product-filter':'selectedProduct', 'product-model-filter':'selectedModel', 'product-color-filter':'selectedColor', 'product-size-filter':'selectedSize', 'global-channel-filter':'selectedChannel', 'product-search':'productSearch', 'filter-view':'selectedView' };
   const key = keyMap[node.id];
   if (key) {
     const changed = filterDraft.values[key] !== node.value;
@@ -145,7 +156,7 @@ filterForm.addEventListener('submit', (event) => {
 });
 $("#clear-filters").onclick = () => {
   clearTimeout(filterSearchTimer);
-  for (const key of ['selectedProduct','selectedModel','selectedColor','selectedSize','selectedChannel','productSearch','chartFilter']) filterDraft.values[key] = '';
+  for (const key of ['selectedProduct','selectedProductType','selectedProductLine','selectedModel','selectedColor','selectedSize','selectedChannel','productSearch','chartFilter']) filterDraft.values[key] = '';
   filterDraft.values.chartChannels = [];
   filterDraft.values.compareMode = 'previous';
   filterDraft.values.compareEnabled = true;

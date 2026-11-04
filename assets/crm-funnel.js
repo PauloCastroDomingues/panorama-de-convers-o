@@ -57,8 +57,8 @@
     return `<div class="crm-sliced-funnel" role="group" aria-label="${esc(label)}. Diagrama de etapas sem escala de volume.">${stages.map((stage, index) => {
       const top = 100 - index * step, bottom = top - step;
       return `<div class="crm-funnel-band" data-funnel-band="${esc(stage.label)}" style="--band-inset:${(100 - bottom) / 2}%;--band-opacity:${.12 + index * .04}">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="${(100-top)/2},1 ${(100+top)/2},1 ${(100+bottom)/2},99 ${(100-bottom)/2},99"/></svg>
-        <span>${esc(stage.label)}</span><strong>${count(stage.value)}</strong>${stage.caption || ''}
+        <div class="crm-funnel-stage-copy"><span class="crm-funnel-stage-name">${esc(stage.label)}</span>${stage.caption || ''}</div>
+        <div class="crm-funnel-stage-shape"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="${(100-top)/2},1 ${(100+top)/2},1 ${(100+bottom)/2},99 ${(100-bottom)/2},99"/></svg><strong>${count(stage.value)}</strong></div>
       </div>`;
     }).join('')}</div>`;
   }

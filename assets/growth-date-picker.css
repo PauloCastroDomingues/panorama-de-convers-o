@@ -1,0 +1,91 @@
+#growth-filter-dialog { inset: 0; margin: auto; width: min(960px, calc(100% - 32px)); height: min(900px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); border: 1px solid var(--line-strong); border-radius: 8px; color-scheme: dark; }
+#growth-filter-dialog[open] { animation: growth-filter-in 140ms ease-out; }
+#growth-filter-dialog .filter-dialog-header { padding: 18px 24px; }
+#growth-filter-dialog .filter-dialog-content { padding: 0 24px; }
+#growth-filter-dialog .filter-dialog-content section { padding: 20px 0; }
+#growth-filter-dialog .filter-dialog-content h3 { font-size: 14px; margin: 0 0 12px; }
+#growth-filter-dialog .filter-dialog-content label { font-size: 12px; margin-bottom: 5px; }
+#growth-filter-dialog :is(input, select) { min-width: 0; font-size: 13px; }
+#growth-filter-dialog .filter-dialog-footer { padding: 14px 24px; }
+#growth-filter-dialog .filter-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+#growth-filter-dialog .filter-section-title h3 { margin: 0; }
+#calendar-source-date { font-size: 11px; color: var(--muted); }
+.period-picker { display: grid; grid-template-columns: 166px minmax(0, 1fr); gap: 18px; }
+.period-shortcuts { border-right: 1px solid var(--line); padding-right: 14px; min-width: 0; }
+#period-shortcuts { display: grid; gap: 2px; margin-bottom: 16px; }
+#period-shortcuts button { min-height: 36px; padding: 8px 10px; border: 0; border-radius: 4px; background: transparent; color: var(--ink-soft); text-align: left; font: 12px/1.4 var(--body); }
+#period-shortcuts button:hover { background: var(--panel); color: var(--ink); }
+#period-shortcuts button[aria-pressed="true"] { background: #34332f; color: var(--ink); box-shadow: inset 2px 0 var(--orange); font-weight: 600; }
+#period-shortcuts button:disabled { opacity: .4; cursor: not-allowed; }
+#growth-filter-dialog #period-preset { width: 100%; height: 36px; min-height: 36px; padding: 5px; font-size: 11px; }
+.period-calendar-main { min-width: 0; }
+.period-date-inputs { display: grid; grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr); align-items: end; gap: 10px; }
+#growth-filter-dialog .period-date-inputs input { width: 100%; min-height: 38px; height: 38px; }
+.period-date-arrow { align-self: end; line-height: 38px; color: var(--muted); text-align: center; }
+.range-calendar { margin-top: 12px; min-height: 280px; }
+#growth-calendar-value { display: none; }
+#growth-filter-dialog .flatpickr-calendar { background: transparent; border: 0; box-shadow: none; width: 100% !important; max-width: 100%; font-family: var(--body); }
+#growth-filter-dialog .flatpickr-calendar::before, #growth-filter-dialog .flatpickr-calendar::after { display: none; }
+#growth-filter-dialog .flatpickr-months { align-items: center; margin-bottom: 8px; }
+#growth-filter-dialog .flatpickr-month { height: 38px; color: var(--ink); background: transparent; }
+#growth-filter-dialog .flatpickr-current-month { display: flex; justify-content: center; align-items: center; height: 36px; gap: 5px; padding: 0; font: 600 13px/1.4 var(--body); }
+#growth-filter-dialog .flatpickr-current-month span.cur-month { margin: 0; }
+#growth-filter-dialog .flatpickr-current-month input.cur-year { padding: 0 2px; min-height: 28px; height: 28px; border: 0; background: transparent; color: var(--ink); font-size: 13px; }
+#growth-filter-dialog .numInputWrapper { width: 62px; }
+#growth-filter-dialog .flatpickr-months :is(.flatpickr-prev-month, .flatpickr-next-month) { top: 1px; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 5px; border: 1px solid var(--line); border-radius: 50%; color: var(--ink); fill: currentColor; }
+#growth-filter-dialog .flatpickr-months :is(.flatpickr-prev-month, .flatpickr-next-month).flatpickr-disabled { display: none; }
+#growth-filter-dialog .flatpickr-months svg { width: 18px; height: 18px; fill: none; }
+#growth-filter-dialog .flatpickr-months svg path { fill: none; }
+#growth-filter-dialog .flatpickr-innerContainer, #growth-filter-dialog .flatpickr-rContainer { display: block; width: 100%; }
+#growth-filter-dialog .flatpickr-weekdays { display: flex; height: 28px; gap: 14px; }
+#growth-filter-dialog .flatpickr-weekdaycontainer { flex: 1; }
+#growth-filter-dialog span.flatpickr-weekday { font-size: 11px; font-weight: 400; color: var(--muted); }
+#growth-filter-dialog .flatpickr-days { display: flex; width: 100% !important; gap: 14px; border: 0; }
+#growth-filter-dialog .dayContainer { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-rows: 36px; flex: 1; min-width: 0; max-width: none; width: auto; padding: 0; opacity: 1; box-shadow: none; }
+#growth-filter-dialog .flatpickr-day { display: flex; align-items: center; justify-content: center; justify-self: center; width: 36px; max-width: 100%; height: 36px; line-height: 36px; font-size: 12px; font-weight: 500; color: var(--ink-soft); border: 1px solid transparent; border-radius: 0; }
+#growth-filter-dialog .flatpickr-day.hidden { visibility: hidden; }
+#growth-filter-dialog .flatpickr-day.today { border-color: var(--line-strong); border-radius: 50%; }
+#growth-filter-dialog .flatpickr-day:is(:hover, :focus) { background: var(--panel); border-color: var(--line-strong); }
+#growth-filter-dialog .flatpickr-day.inRange { width: 100%; background: #34332f; border-color: transparent; box-shadow: none; }
+#growth-filter-dialog .flatpickr-day:is(.selected, .startRange, .endRange) { background: var(--orange); color: #151513; border-color: var(--orange); border-radius: 50%; box-shadow: none; }
+#growth-filter-dialog .flatpickr-day.flatpickr-disabled { color: #6e6d66; background: transparent; cursor: not-allowed; }
+#growth-filter-dialog .flatpickr-day:is(.prevMonthDay, .nextMonthDay) { color: #6e6d66; }
+#growth-filter-dialog .flatpickr-day.selected:is(.prevMonthDay, .nextMonthDay) { color: #151513; }
+.period-selection-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding-top: 10px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+#calendar-selection { color: var(--ink-soft); }
+#calendar-coverage-note { margin: 8px 0 0; color: var(--yellow); font-size: 11px; line-height: 1.5; }
+#growth-filter-dialog .period-comparison { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; gap: 18px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+#growth-filter-dialog .period-comparison .comparison-toggle { grid-column: auto; min-height: 40px; margin: 0; font-size: 13px; }
+#growth-filter-dialog .period-comparison .comparison-control { grid-column: auto; }
+#growth-filter-dialog .period-comparison .comparison-control > label { display: none; }
+#growth-filter-dialog .comparison-off .comparison-control { display: none; }
+#growth-filter-dialog #compare-custom-fields:not(.is-hidden) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+#growth-filter-dialog #compare-custom-fields input { width: 100%; padding-inline: 6px; }
+#growth-filter-dialog .product-filter-primary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#growth-filter-dialog .product-filter-primary .control-group:first-child { grid-column: 1 / -1; }
+#growth-filter-dialog .product-attributes { margin-top: 14px; }
+#growth-filter-dialog .product-attributes summary { font-size: 12px; color: var(--muted); cursor: pointer; padding: 4px 0; }
+#growth-filter-dialog .product-filter-secondary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#growth-filter-dialog .filter-entity-options summary { font-size: 13px; }
+#growth-filter-dialog :is([data-period], .flatpickr-day, .flatpickr-prev-month, .flatpickr-next-month, summary):focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+@keyframes growth-filter-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 720px) {
+  #growth-filter-dialog { width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
+  #growth-filter-dialog .filter-dialog-header { padding: 14px 16px; }
+  #growth-filter-dialog .filter-dialog-content { padding: 0 16px; }
+  #growth-filter-dialog .filter-dialog-footer { padding: 12px; }
+  .period-picker { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .period-shortcuts { border: 0; padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+  #period-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin-bottom: 10px; }
+  #period-shortcuts button { min-height: 32px; font-size: 11px; }
+  #growth-filter-dialog .period-shortcuts > label { display: inline-block; margin: 0 8px 0 0; }
+  #growth-filter-dialog #period-preset { width: auto; max-width: 65%; }
+  .period-date-inputs { gap: 6px; grid-template-columns: minmax(0, 1fr) 10px minmax(0, 1fr); }
+  #growth-filter-dialog .period-date-inputs input { padding: 6px; font-size: 12px; }
+  #growth-filter-dialog .period-comparison { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  #growth-filter-dialog .product-filter-primary, #growth-filter-dialog .product-filter-secondary { grid-template-columns: minmax(0, 1fr); }
+  #growth-filter-dialog .filter-section-title { flex-wrap: wrap; gap: 4px; }
+  #growth-filter-dialog .flatpickr-days { gap: 0; }
+  .period-selection-meta { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { #growth-filter-dialog[open] { animation: none; } }

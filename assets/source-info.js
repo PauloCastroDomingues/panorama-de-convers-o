@@ -44,6 +44,10 @@
     const rect = active.getBoundingClientRect();
     const width = document.documentElement.clientWidth;
     const height = window.innerHeight;
+    const below = Math.max(0, height - rect.bottom - 20);
+    const above = Math.max(0, rect.top - 20);
+    // Keep long disclosures scrollable without covering their trigger.
+    panel.style.maxHeight = `${Math.min(height - 24, Math.max(above, below, 80))}px`;
     panel.style.left = `${Math.max(12, Math.min(rect.left, width - panel.offsetWidth - 12))}px`;
     const top = rect.bottom + 8 + panel.offsetHeight <= height - 12 ? rect.bottom + 8 : rect.top - panel.offsetHeight - 8;
     panel.style.top = `${Math.max(12, Math.min(top, height - panel.offsetHeight - 12))}px`;
