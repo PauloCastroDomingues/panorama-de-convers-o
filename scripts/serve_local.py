@@ -12,10 +12,10 @@ import refresh_crm_ssot as ssot
 LOCK = threading.Lock()
 
 
-def refresh_worker():
+def refresh_worker(scope='all'):
     try:
         with refresh.refresh_lock(ssot.ROOT / '.local/data-refresh.lock'):
-            refresh.run()
+            refresh.run(scope=scope)
     finally:
         LOCK.release()
 
@@ -57,13 +57,16 @@ class Handler(SimpleHTTPRequestHandler):
         return self.reply(405, {'error': 'method_not_allowed'})
 
     def do_POST(self):
-        if self.path != '/api/local-refresh':
+        path = urlsplit(self.path)
+        if path.path != '/api/local-refresh':
             return self.reply(404, {'error': 'not_found'})
+        if path.query not in ('', 'scope=growth'):
+            return self.reply(400, {'error': 'invalid_scope'})
         if not self.allowed_host() or self.headers.get('Origin') != 'http://' + self.headers.get('Host', '') or self.headers.get('X-Panorama-Refresh') != '1':
             return self.reply(403, {'error': 'same_origin_required'})
         if not LOCK.acquire(blocking=False):
             return self.reply(202, {'started': False, 'running': True})
-        threading.Thread(target=refresh_worker, daemon=True).start()
+        threading.Thread(target=refresh_worker, args=('growth' if path.query else 'all',), daemon=True).start()
         return self.reply(202, {'started': True, 'running': True})
 
     def end_headers(self):

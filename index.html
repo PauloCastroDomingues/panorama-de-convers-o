@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Painel de ritmo e performance comercial com dados SSOT.">
   <title>Reise | Performance comercial</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20261104-line-audit-01">
+  <link rel="stylesheet" href="assets/styles.css?v=20261104-missing-metrics-01">
   <link rel="stylesheet" href="assets/crm-sendflow.css?v=20261028-04">
   <link rel="stylesheet" href="assets/crm-artifact.css?v=20261028-sheet-11">
   <link rel="stylesheet" href="assets/data-refresh.css?v=20261029-01">
-  <link rel="stylesheet" href="assets/reise-theme.css?v=20261104-average-signal-03">
+  <link rel="stylesheet" href="assets/reise-theme.css?v=20261104-growth-refresh-01">
   <link rel="stylesheet" href="assets/vendor/flatpickr/flatpickr.min.css">
   <link rel="stylesheet" href="assets/growth-date-picker.css?v=20261104-01">
   <link rel="stylesheet" href="assets/reise-refinement.css?v=20261104-03">
@@ -55,7 +55,9 @@
       <div class="top-meta">
         <span id="source-pill" class="status-pill pending">Validando fonte</span>
         <span id="source-status">Carregando SSOT</span>
-        <button id="reload-data" class="text-button" type="button" aria-label="Atualizar base" title="Atualizar base">Atualizar leitura</button>
+        <small id="growth-updated-at">Ultima atualizacao: conferindo</small>
+        <small id="growth-refresh-feedback" role="status" hidden></small>
+        <button id="reload-data" class="text-button" type="button" aria-label="Atualizar dados de Growth" title="Atualizar dados de Growth">Atualizar Growth</button>
       </div>
     </header>
 
@@ -293,9 +295,10 @@
   <script src="assets/release-data.js?v=20261103-independent-01"></script>
   <script src="assets/chart-interactions.js?v=20261029-ui-02"></script>
   <script src="assets/performance-delta.js?v=20261029-01"></script>
-  <script src="assets/data-refresh.js?v=20261103-independent-01"></script>
-  <script src="assets/app.js?v=20261104-line-audit-01"></script>
-  <script src="assets/growth-analysis.js?v=20261104-line-audit-01"></script>
+  <script src="assets/data-refresh.js?v=20261104-growth-refresh-01"></script>
+  <script src="assets/app.js?v=20261104-growth-refresh-01"></script>
+  <script src="assets/growth-analysis.js?v=20261104-growth-refresh-01"></script>
+  <script src="assets/growth-refresh.js?v=20261104-growth-refresh-01"></script>
   <script src="assets/search-suggestions.js?v=20261030-autocomplete-03"></script>
   <script src="assets/vendor/flatpickr/flatpickr.min.js"></script>
   <script src="assets/vendor/flatpickr/pt.js"></script>

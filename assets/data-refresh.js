@@ -50,7 +50,7 @@
         }
       }
     }
-    document.querySelectorAll('#base-refresh, #reload-data, #crm-refresh').forEach((button) => {
+    document.querySelectorAll('#base-refresh, #crm-refresh').forEach((button) => {
       button.disabled = busy || requesting;
       button.textContent = busy ? 'Atualizando...' : local ? 'Atualizar base' : 'Atualizar leitura';
     });

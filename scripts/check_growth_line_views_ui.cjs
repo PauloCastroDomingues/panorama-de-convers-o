@@ -24,6 +24,7 @@ const output=path.resolve(__dirname,'../output/growth-line-views');
         await page.locator('#explorer-level').selectOption(key);
         assert.match(await page.locator('#explorer-head').innerText(),/Linha/);
         assert.match(await page.locator('#explorer-body').innerText(),/Avant/);
+        assert.doesNotMatch(await page.locator('#explorer-body').innerText(),/Sem linha no nome|Sem classificacao/);
         assert.match(await page.locator('#explorer-head').innerText(),/M.dia de convers.o/);
         const result=await page.evaluate(()=>{
           const view=VIEWS.find(v=>v.key===state.selectedView);
@@ -45,11 +46,13 @@ const output=path.resolve(__dirname,'../output/growth-line-views');
       console.log('Line views UI: '+width+'px');
     }
     await page.setViewportSize({width:1440,height:1000});
-    const unknown=page.locator('#explorer-body tr').filter({hasText:'Sem linha no nome'}).first();
-    await unknown.locator('.line-products summary').click();
-    assert.ok(await unknown.locator('.line-products li').count()>0);
-    assert.match(await unknown.locator('.line-products ul').innerText(),/Sneaker Bag|Cadar|Limpador|Surpresa/);
-    await unknown.screenshot({path:path.join(output,'unidentified-products.png')});
+    const known=page.locator('#explorer-body tr').filter({hasText:'Avant'}).first();
+    await known.locator('.line-products summary').click();
+    assert.ok(await known.locator('.line-products li').count()>0);
+    await known.screenshot({path:path.join(output,'identified-products.png')});
+    await page.locator('#explorer-level').selectOption('product');
+    assert.equal(await page.evaluate(()=>recordsForDisplay(VIEWS.find(v=>v.key==='product')).records.some(r=>/Sneaker Bag/.test(r.product))),true);
+    await page.locator('#explorer-level').selectOption('channel_line');
     await page.locator('#open-filters').click();
     assert.equal(await page.locator('#filter-view').inputValue(),'channel_line');
     await page.locator('#filter-view').selectOption('line');

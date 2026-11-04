@@ -124,8 +124,13 @@ def collect_operational(name, read, end, directory, attempts=3, pause=time.sleep
         pause(60)
 
 
-def collect_candidate(end, directory, collectors=None, preparation_errors=()):
+def collect_candidate(end, directory, collectors=None, preparation_errors=(), scope='all'):
+    if scope not in ('all', 'growth'):
+        raise ssot.RefreshError('invalid_refresh_scope')
     started = datetime.now(ssot.TIMEZONE).isoformat()
+    requested = list(refresh.SOURCES) if scope == 'all' else ['ssot', 'growth']
+    previous = json.loads((directory / 'data-refresh-status.json').read_text()) if scope == 'growth' else {}
+    retained = {row['id']: row for row in previous.get('sources', []) if row['id'] not in requested}
     if collectors is None:
         def commercial_and_growth():
             result = ssot.run(end, output=directory / SNAPSHOTS[0], status_output=directory / 'crm-refresh-status.json')
@@ -139,9 +144,11 @@ def collect_candidate(end, directory, collectors=None, preparation_errors=()):
             return {'ssot': result, 'growth': growth_result}
         collectors = {'commercial': commercial_and_growth}
         for name, read in (('whatsapp', operational.read_whatsapp), ('rd', operational.read_rd), ('sendflow', operational.read_sendflow)):
+            if name not in requested:
+                continue
             collectors[name] = lambda name=name, read=read: {
                 name: collect_operational(name, read, end, directory)}
-    results = {}
+    results = dict(retained)
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(collect): key for key, collect in collectors.items()}
         for future in as_completed(futures):
@@ -155,6 +162,7 @@ def collect_candidate(end, directory, collectors=None, preparation_errors=()):
     finished = datetime.now(ssot.TIMEZONE).isoformat()
     status = {'schemaVersion': 1, 'runId': started, 'startedAt': started, 'checkedAt': finished,
               'finishedAt': finished, 'targetDate': end.isoformat(), 'readOnly': True,
+              'requestedSources': requested,
               'preparationErrors': list(preparation_errors),
               'sources': [{'id': key, 'label': label, **results.get(key, {'status': 'error', 'error': 'missing_result'})}
                           for key, label in refresh.SOURCES.items()]}
@@ -242,6 +250,10 @@ def reconcile_available(directory, status, baseline):
     accepted = []
     for index, record in enumerate(status['sources']):
         key = record['id']
+        if key not in status.get('requestedSources', refresh.SOURCES):
+            (directory / files[key]).write_bytes(baseline['snapshots'][files[key]])
+            status['sources'][index] = previous[key]
+            continue
         eligible = record['status'] == 'current' and not any(reason.startswith(key + ':') for reason in reasons)
         if key == 'growth' and 'ssot' not in accepted:
             eligible = False
@@ -376,7 +388,10 @@ def main():
     mode.add_argument('--publish', action='store_true', help='Stage, verify and promote only a complete current cycle.')
     mode.add_argument('--diagnose', action='store_true', help='Collect every available source in isolation; never seal or deploy.')
     parser.add_argument('--independent-sources', action='store_true', help='Publish valid sources without waiting for delayed providers.')
+    parser.add_argument('--scope', choices=('all', 'growth'), default='all')
     args = parser.parse_args()
+    if args.scope == 'growth' and not args.independent_sources:
+        parser.error('--scope growth requires --independent-sources')
     if args.check_only:
         status = json.loads((ssot.ROOT / 'data/data-refresh-status.json').read_text(encoding='utf-8'))
         reasons = blockers(status, expected_target=ssot.yesterday())
@@ -399,7 +414,7 @@ def main():
         catalogs.mkdir()
         preparation_errors = prepare_catalogs(catalogs)
         baseline = download_baseline(directory, get)
-        status = collect_candidate(ssot.yesterday(), directory, preparation_errors=preparation_errors)
+        status = collect_candidate(ssot.yesterday(), directory, preparation_errors=preparation_errors, scope=args.scope)
         if args.diagnose:
             report = report_diagnostic(status)
             return 1 if report['publicationBlockers'] else 0

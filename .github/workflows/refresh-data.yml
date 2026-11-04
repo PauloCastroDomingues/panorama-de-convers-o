@@ -7,6 +7,11 @@ on:
         description: Publish validated sources while retaining delayed sources
         type: boolean
         default: false
+      scope:
+        description: Sources to collect (Growth includes its commercial SSOT dependency)
+        type: choice
+        options: [all, growth]
+        default: all
   schedule:
     # Hourly recovery checks, 08:17-20:17 Sao Paulo. GitHub may delay or drop runs.
     # Collect every four hours, or sooner when core data is behind D-1.
@@ -72,6 +77,7 @@ jobs:
           python -m unittest discover -s scripts -p 'test_growth_observed_bridge.py'
           node scripts/test_release_contract.cjs
           node scripts/test_release_data.cjs
+          node scripts/test_growth_refresh_api.cjs
       - name: Check fixed identity configuration
         env:
           PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -93,15 +99,16 @@ jobs:
           PANORAMA_CATALOG_BUCKET: ${{ vars.PANORAMA_CATALOG_BUCKET }}
           VERCEL_TOKEN: ${{ (github.event_name == 'schedule' || inputs.publish) && secrets.VERCEL_TOKEN || '' }}
           PUBLISH: ${{ github.event_name == 'schedule' || inputs.publish }}
+          REFRESH_SCOPE: ${{ inputs.scope || 'all' }}
         run: |
           if [ "$PUBLISH" = "true" ]; then
             test -n "$VERCEL_TOKEN"
-            python scripts/cloud_refresh.py --independent-sources --publish
+            python scripts/cloud_refresh.py --independent-sources --scope "$REFRESH_SCOPE" --publish
           else
-            python scripts/cloud_refresh.py --independent-sources
+            python scripts/cloud_refresh.py --independent-sources --scope "$REFRESH_SCOPE"
           fi
       - name: Verify published core data reaches yesterday
-        if: github.event_name == 'schedule' || inputs.publish
+        if: (github.event_name == 'schedule' || inputs.publish) && inputs.scope != 'growth'
         run: python scripts/check_data_freshness.py --verify
       - name: Report failed cycle
         if: failure()

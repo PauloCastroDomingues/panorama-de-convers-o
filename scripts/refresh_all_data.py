@@ -53,7 +53,10 @@ def aggregate(sources):
     return 'current' if all(row['status'] == 'current' for row in sources) else 'stale'
 
 
-def run(end=None, output=OUTPUT, collectors=None):
+def run(end=None, output=OUTPUT, collectors=None, scope='all'):
+    if scope not in ('all', 'growth'):
+        raise ssot.RefreshError('invalid_refresh_scope')
+    requested = list(SOURCES) if scope == 'all' else ['ssot', 'growth']
     end = end or ssot.yesterday()
     if collectors is None:
         collectors = {'ssot': lambda: ssot.run(end), 'growth': lambda: collect_growth(end),
@@ -65,14 +68,21 @@ def run(end=None, output=OUTPUT, collectors=None):
     now = datetime.now(ssot.TIMEZONE).isoformat()
     status = {'schemaVersion': 1, 'runId': now, 'startedAt': now, 'checkedAt': now, 'finishedAt': None,
         'targetDate': end.isoformat(), 'status': 'running', 'readOnly': True,
-        'sources': [{**old.get(key, {}), 'id': key, 'label': label, 'status': 'queued'} for key, label in SOURCES.items()],
+        'requestedSources': requested,
+        'sources': [{**old.get(key, {}), 'id': key, 'label': label if key in requested else old.get(key, {}).get('label', label),
+                     'status': 'queued' if key in requested else old.get(key, {}).get('status', 'error')}
+                    for key, label in SOURCES.items()],
         'excluded': [{'id': 'crm-weekly-reference', 'reason': 'Referencia de metas, nao e realizado.'},
                      {'id': 'ga4-alternative', 'reason': 'Fonte alternativa inativa; conversao comercial permanece SSOT.'}]}
     ssot.atomic_json(output, status)
     for record in status['sources']:
+        if record['id'] not in requested:
+            continue
         record['status'] = 'running'
         ssot.atomic_json(output, status)
         try:
+            if scope == 'growth' and record['id'] == 'growth' and next(row for row in status['sources'] if row['id'] == 'ssot')['status'] != 'current':
+                raise ssot.RefreshError('ssot_dependency_not_current')
             result = collectors[record['id']]()
             if result['status'] not in ('current', 'stale', 'error'):
                 raise ssot.RefreshError('invalid_refresh_result')

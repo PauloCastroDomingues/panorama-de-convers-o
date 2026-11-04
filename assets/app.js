@@ -155,6 +155,10 @@ const NAMED_PRODUCT_LINES = ["Ambition", "Barcelona", "Manhattan", "Minimal", "M
   "Nord", "Vancouver", "Silverstone", "Suzuka", "Serie 1", "R8"];
 const PRODUCT_LINES = ["RS", "GT", "Avant", "Phantom", "Knit", "911", "Macan", ...NAMED_PRODUCT_LINES, "Sem classificacao"];
 function productLineLabel(line) { return line === "Sem classificacao" ? "Sem linha no nome" : line; }
+function matchesViewLine(viewKey, row) {
+  return !['line', 'channel_line'].includes(viewKey)
+    || Boolean(row.productLine && row.productLine !== 'Sem classificacao');
+}
 function productClassification(name) {
   const text = searchKey(name);
   // Name-based taxonomy: GT/Avant take precedence over RS; Carrera belongs to 911.
@@ -389,6 +393,7 @@ function viewRows(view, period) {
   if (!Array.isArray(entry?.rows)) return [];
   return normalizedViewRows(sourceKey).filter((row) => {
     if (!isAnalysisRow(row)) return false;
+    if (!matchesViewLine(view.key, row)) return false;
     if ((view.product || productFilterActive()) && !isMerchandiseProduct(row)) return false;
     if (!inPeriod(row, period)) return false;
     if (!matchesSelectedChannel(row)) return false;
@@ -742,7 +747,7 @@ function hydrateData(commercial, growth, alternative, cached = false) {
 }
 
 function setupEvents() {
-  $("#reload-data").onclick = () => window.PanoramaRefresh ? window.PanoramaRefresh.request() : loadData();
+  $("#reload-data").onclick = () => window.GrowthRefresh?.request();
   $("#clear-filters").onclick = () => { state.selectedChannel = ""; state.selectedModel = ""; state.selectedColor = ""; state.selectedSize = ""; state.productSearch = ""; state.chartChannels = []; state.chartFilter = ""; state.explorerSearch = ""; $("#explorer-search").value = ""; renderAll(); };
   $("#period-preset").onchange = (event) => { applyPeriodPreset(event.target.value); $("#date-start").value = state.start; $("#date-end").value = state.end; renderAll(); };
   $("#date-start").onchange = (event) => { state.start = event.target.value; $("#period-preset").value = "custom"; applyComparison(); suggestGranularityForWindow(); renderAll(); };

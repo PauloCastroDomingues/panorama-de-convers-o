@@ -210,6 +210,7 @@ function recordsForDisplay(view) {
   const previous = new Map(groups(view, "compare").map((row) => [row.key, row]));
   const outside = { current: new Map(), compare: new Map() };
   normalizedViewRows(sourceKeyForView(view.key)).forEach(row => {
+    if (!matchesViewLine(view.key, row)) return;
     if (isAnalysisRow(row) && matchesSelectedChannel(row)) return;
     if ((view.product || productFilterActive()) && (!isMerchandiseProduct(row) || !matchesProductFilter(row))) return;
     for (const period of ['current', 'compare']) {
@@ -233,8 +234,8 @@ function recordsForDisplay(view) {
 }
 const CONVERSION_SIGNAL_BAND = 0.002;
 function recordSemaphore(record) {
-  if (record?.missingContext) return { tone: 'warn', label: record.missingContext.label, title: record.missingContext.detail };
   if (record?.periodGap || record?.compare?.periodGap) return { tone: 'warn', label: 'Periodo incompleto', title: record.periodGap || record.compare.periodGap };
+  if (record?.missingContext) return { tone: 'warn', label: record.missingContext.label, title: record.missingContext.detail };
   if (record?.provenance?.partialLinkage) return { tone: 'warn', label: 'Parcial por IDs', title: 'Pedidos identificados; cobertura de vinculos incompleta. Nao representa o total do canal.' };
   if (record?.rate == null) return { tone: "warn", label: "Validar base", title: "A conversao exige pedidos e visitas completos no mesmo recorte." };
   if (state.compareEnabled === false) return { tone: "neutral", label: "Atual", title: "Comparacao de periodos desligada." };
@@ -246,8 +247,8 @@ function recordSemaphore(record) {
   return { tone: "neutral", label: "Estavel", title: "Variacao de conversao inferior a 0,20 p.p." };
 }
 function nextIndicator(record) {
-  if (record.missingContext) return record.missingContext.action;
   if (record.periodGap || record.compare?.periodGap) return 'Conferir atualizacao e cobertura';
+  if (record.missingContext) return record.missingContext.action;
   if (record.provenance?.partialLinkage) return 'Conferir cobertura dos vinculos';
   if (record.rate == null) return "Validar cobertura de visitas e pedidos";
   if (state.compareEnabled === false) return "Investigar produto, oferta e mix do canal";
@@ -268,6 +269,18 @@ function semaphoreMarkup(record) {
 }
 function metricComparisonCell(record, key) {
   const info = item => key === 'rate' ? provenanceMarkup(item, 'base da conversao') : '';
+  const unavailable = (item, reason) => {
+    const metric = { pedidos: 'Pedidos', sessoes: 'Visitas', receita: 'Receita', rate: 'Conversao' }[key] || key;
+    const period = item === record.compare ? 'compare' : 'current';
+    const bounds = periodBounds(period);
+    const windowLabel = bounds.start && bounds.end ? `${dayLabel(bounds.start)} a ${dayLabel(bounds.end)}` : '';
+    const note = [`${metric} / ${period === 'compare' ? 'Anterior' : 'Atual'}: ${windowLabel}.`,
+      item?.periodGap, reason, item?.missingContext?.detail,
+      key === 'rate' ? 'Conversao exige pedidos e visitas completos no mesmo recorte, com visitas maiores que zero.' : '',
+      'Valor indisponivel nao significa zero. Valores anteriores nao substituem o periodo atual.'
+    ].filter(Boolean).join('\n\n');
+    return `<span class="metric-missing metric-unavailable"><span aria-hidden="true">&ndash;</span><button type="button" class="source-info" data-source-note="${escapeHtml(note)}" aria-label="${escapeHtml(metric + ': ' + reason)}" aria-haspopup="dialog" aria-expanded="false">${typeof CrmIcons === 'function' ? CrmIcons('Info') : 'i'}</button></span>`;
+  };
   const outsideValues = item => key === 'rate' || item?.[key] != null ? []
     : (item?.missingContext?.available || []).filter(source => Number.isFinite(source[key]));
   const valueMarkup = (item) => {
@@ -284,7 +297,7 @@ function metricComparisonCell(record, key) {
         ].filter(Boolean).join('\n');
         return `<span class="available-outside"><span class="outside-value">${metricText(source[key], key)}<button type="button" class="source-info" data-source-note="${escapeHtml(note)}" aria-label="Detalhes do valor em ${escapeHtml(source.channel)} fora do filtro" aria-haspopup="dialog" aria-expanded="false">${typeof CrmIcons === 'function' ? CrmIcons('Info') : 'i'}</button></span><small class="cell-note">${escapeHtml(source.channel)} &middot; fora do filtro</small></span>`;
       }).join('');
-      return available || `<span class="metric-missing" title="${escapeHtml(item.missingContext.detail)}">${escapeHtml(key === 'rate' ? 'Nao calculavel' : 'Sem registro neste filtro')}</span>`;
+      return available || unavailable(item, item.periodGap ? 'Periodo incompleto' : item.missingContext.label);
     }
     if (item?.provenance?.partialLinkage && Number.isFinite(item?.[key])) {
       return `${metricText(item[key], key)}<small class="cell-note">Identificados / parcial</small>`;
@@ -293,11 +306,11 @@ function metricComparisonCell(record, key) {
       const coverage = item.expectedDays ? `${item.observedDays}/${item.expectedDays} dias completos` : 'somente observacoes completas';
       return `${fmtPercent(item.observedRate)}<small class="cell-note">Parcial: ${coverage}</small>`;
     }
-    if (key === 'rate' && item?.rate == null && item?.sessoes > 0) return 'Base incompleta';
+    if (key === 'rate' && item?.rate == null && item?.sessoes > 0) return unavailable(item, 'Base incompleta');
     if (item?.[key] == null) {
       const label = !item?.rows ? 'Sem registros no recorte' : key !== 'rate' ? 'Nao informado na fonte'
         : item.sessoes === 0 ? 'Sem visitas (base zero)' : item.sessoes == null ? 'Visitas nao informadas' : 'Pedidos nao informados';
-      return `<span class="metric-missing">${label}</span>`;
+      return unavailable(item, label);
     }
     return `${metricText(item[key], key)}${item.periodGap ? '<small class="cell-note">Parcial no periodo</small>' : ''}`;
   };
@@ -611,7 +624,7 @@ function productConversionHistory(view) {
   if (!['product', 'channel_product', 'line', 'channel_line'].includes(view.key)) return grouped;
   for (const row of normalizedViewRows('channel_product')) {
     if (!state.end || row.data > state.end || !isAnalysisRow(row) || !isMerchandiseProduct(row)
-        || !matchesSelectedChannel(row) || !matchesProductFilter(row)) continue;
+        || !matchesViewLine(view.key, row) || !matchesSelectedChannel(row) || !matchesProductFilter(row)) continue;
     const key = dimensionKey(view, row);
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(row);
@@ -705,7 +718,7 @@ function renderExplorer() {
   $("#explorer-count").textContent = records.length > visible.length ? `${visible.length} de ${records.length} resultados` : `${records.length} resultado${records.length === 1 ? '' : 's'}`;
   $("#explorer-summary").innerHTML = `<span><strong>${escapeHtml(view.title)}</strong> / ${escapeHtml(analysisScopeLabel())}</span><span>Atual: ${formatWindow()} / ${comparisonWindowLabel()}</span>`;
   if (['line', 'channel_line'].includes(view.key)) $("#explorer-summary").insertAdjacentHTML('beforeend',
-    '<span title="Linhas identificadas pelo nome. Um pedido com varios produtos pode aparecer mais de uma vez na soma.">Linha pelo nome / Pedidos somados por produto, nao unicos</span>');
+    '<span title="Somente produtos com linha identificada pelo nome. Produtos sem linha continuam nas visoes de produtos e totais gerais. Um pedido com varios produtos pode aparecer mais de uma vez na soma.">Linhas identificadas / Pedidos somados por produto, nao unicos</span>');
   const gaps = [viewPeriodGap(view, 'current'), viewPeriodGap(view, 'compare')].filter(Boolean);
   const coverage = $('#explorer-coverage');
   coverage.hidden = !gaps.length;
@@ -729,6 +742,7 @@ function entityCatalog(viewKey) {
   const source = normalizedViewRows(sourceKey);
   const choices = new Map();
   source.filter(isAnalysisRow).forEach((row) => {
+    if (!matchesViewLine(viewKey, row)) return;
     if (sourceKey.endsWith('_product') && !isMerchandiseProduct(row)) return;
     const key = dimensionKey(view, row);
     const description = dimensions(view, row);
@@ -830,6 +844,7 @@ function renderEntityResults() {
   if (a.aggregate || b.aggregate) $('#entity-results').insertAdjacentHTML('beforeend', '<p class="comparison-period">Pedidos somados por produto; um pedido pode conter mais de um produto. Conversao = soma dos pedidos / soma das visitas ao produto.</p>');
 }
 function renderAll() {
+  window.GrowthRefresh?.renderTimestamp();
   reorderGrowthSections(); setupFilters(); renderTemporalControls();
   renderSummary(); renderExplorer(); renderEntityComparison(); renderRhythm(); renderChannelTable(); renderChart(); renderQuality();
   if (typeof refreshFilterSummary === "function") refreshFilterSummary();

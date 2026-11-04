@@ -30,7 +30,18 @@ assert.equal(run('sourceKeyForView("line")'),'channel_product');
 assert.equal(run('viewAvailability("channel_line").available'),true);
 assert.equal(run('VIEWS.find(v=>v.key==="line").number'),'10');
 assert.equal(run('VIEWS.find(v=>v.key==="channel_line").number'),'11');
-assert.equal(run('groups(lineView,"current").length'),3);
+assert.equal(run('groups(lineView,"current").length'),2);
+for (const key of ['line','channel_line']) {
+  assert.equal(run(`recordsForDisplay(VIEWS.find(v=>v.key==='${key}')).records.some(r=>r.key.includes('Sem classificacao'))`),false);
+  assert.equal(run(`entityCatalog('${key}').some(r=>r.key.includes('Sem classificacao'))`),false);
+  assert.equal(run(`[...productConversionHistory(VIEWS.find(v=>v.key==='${key}')).keys()].some(k=>k.includes('Sem classificacao'))`),false);
+}
+assert.equal(run('groups(VIEWS.find(v=>v.key==="product"),"current").find(r=>r.key==="unknown").pedidos'),1);
+assert.equal(run('groups(VIEWS.find(v=>v.key==="channel_product"),"current").find(r=>r.key==="Google ADS|unknown").pedidos'),1);
+run('state.selectedProductLine="Sem classificacao"');
+assert.equal(run('summarize(selectedPaidRows("current")).pedidos'),1, 'Global totals still include unclassified products');
+assert.equal(run('groups(lineView,"current").length'),0);
+run('state.selectedProductLine=""');
 assert.equal(run('groups(lineView,"current").find(r=>r.key==="Avant").pedidos'),11);
 assert.equal(run('groups(lineView,"current").find(r=>r.key==="Avant").rate'),11/250);
 assert.equal(run('groups(channelLineView,"current").find(r=>r.key==="Google ADS|Avant").rate'),10/200);

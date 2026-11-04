@@ -14,7 +14,9 @@ Nao escreve no BigQuery, nao altera metricas e nao interpreta ausencia como zero
   Nao classificar roupas como acessorios apenas para preencher uma categoria.
 - Sem linha no nome: a fonte nao permite identificar uma linha com essas regras.
   Isto nao comprova que o produto nao pertence a uma linha no cadastro comercial.
-- Produtos novos sem correspondencia permanecem visiveis e sem classificacao.
+- Produtos novos sem correspondencia permanecem nas visoes de produtos e totais
+  gerais. As visoes Linha e Canal + linha, incluindo selecoes A/B de linhas,
+  mostram somente produtos com linha identificada.
 
 ## Auditoria de 04/11/2026
 
