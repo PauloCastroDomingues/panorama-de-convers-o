@@ -566,8 +566,10 @@ function viewQuality(view) {
   const alternative = Boolean(state.alternativePayload?.views?.[sourceKey]);
   if (!loaded) return { source: source || 'Sem fonte SSOT validada', status: 'Pendente', tone: 'pending',
     note: `${declaration?.reason || 'Cruzamento SSOT nao validado.'}${alternative ? ' GA4 historico disponivel em arquivo, sem homologacao para os filtros atuais.' : ''}` };
+  const periodGap = viewPeriodGap(view, 'current') || viewPeriodGap(view, 'compare');
+  if (periodGap && observed && !provisional) return { source: source || 'SSOT', status: 'Periodo incompleto', tone: 'warn', note: periodGap };
   if (!observed) return { source: source || 'SSOT', status: 'Sem dados no recorte', tone: 'warn',
-    note: historical ? 'Observacoes apenas no periodo comparado; atual indisponivel.' : 'Fonte carregada, sem observacoes para os filtros e datas selecionados.' };
+    note: (historical ? 'Observacoes apenas no periodo comparado; atual indisponivel.' : 'Fonte carregada, sem observacoes para os filtros e datas selecionados.') + (periodGap ? ` ${periodGap}.` : '') };
   const totals = summarize(current); const oldTotals = summarize(previous);
   const comparison = state.compareEnabled === false ? '' : oldTotals.rate === null ? ' Comparacao sem base completa de conversao.' : ' Comparacao com denominador conhecido.';
   return { source: source || 'SSOT', status: provisional ? 'SSOT provisorio / UTM' : totals.rate === null ? 'SSOT parcial' : 'SSOT no recorte',
@@ -575,7 +577,7 @@ function viewQuality(view) {
     note: (provisional ? 'Pedidos e receita por UTM; vinculo com grupo/criativo nao homologado. Sem conversao oficial.'
       : totals.rate === null ? 'Indicadores conhecidos preservados; conversao sem base completa.'
       : view.product || productFilterActive() ? 'Pedidos por produto / visitas ao produto; pedidos nao deduplicados entre produtos.'
-      : 'Pedidos / sessoes do SSOT no mesmo recorte.') + comparison + (totals.provenance ? ` ${provenanceNote(totals)}` : '') };
+      : 'Pedidos / sessoes do SSOT no mesmo recorte.') + comparison + (periodGap ? ` ${periodGap}.` : '') + (totals.provenance ? ` ${provenanceNote(totals)}` : '') };
 }
 function renderQuality() {
   const entries = VIEWS.map(view => ({ view, ...viewQuality(view) }));

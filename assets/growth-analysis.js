@@ -149,7 +149,8 @@ function filtersForProducts() {
 function withComparison(current, compare) {
   if (state.compareEnabled === false) compare = null;
   const base = current || { ...summarize([]), dimension: compare?.dimension || "", key: compare?.key || "" };
-  const comparable = !base.provenance?.partialLinkage && !compare?.provenance?.partialLinkage;
+  const comparable = !base.provenance?.partialLinkage && !compare?.provenance?.partialLinkage
+    && !base.periodGap && !compare?.periodGap;
   return { ...base, compare,
     comparisonPedidos: compare?.pedidos ?? null, comparisonSessoes: compare?.sessoes ?? null,
     comparisonReceita: compare?.receita ?? null, comparisonRate: compare?.rate ?? null,
@@ -158,17 +159,68 @@ function withComparison(current, compare) {
     deltaReceita: comparable ? relativeComparison(base.receita, compare?.receita) : null, deltaRate: comparable ? delta(base, compare) : null,
   };
 }
+function viewPeriodGap(view, period, inherit = true) {
+  if (period === 'compare' && state.compareEnabled === false) return '';
+  const source = sourceKeyForView(view.key, inherit);
+  const entry = viewEntry(source);
+  const check = state.growthPayload?.refresh?.views?.find(item => item.id === source);
+  const dates = [...(entry?.rows || []), ...(source === 'channel' ? state.rows : [])].map(row => row.data).filter(Boolean).sort();
+  const declaredEnd = check?.coveredThrough || entry?.validatedWindow?.end;
+  const end = source === 'channel' ? [declaredEnd, dates.at(-1)].filter(Boolean).sort().at(-1) : declaredEnd || dates.at(-1);
+  const start = dates[0];
+  const bounds = periodBounds(period);
+  const notes = [];
+  if (start && bounds.start < start) notes.push(`Historico carregado desde ${dayLabel(start)}`);
+  if (end && bounds.end > end) notes.push(`Base carregada ate ${dayLabel(end)}; recorte termina em ${dayLabel(bounds.end)}`);
+  return notes.join('. ');
+}
+function missingRecordContext(view, key, candidates, gap) {
+  const source = sourceKeyForView(view.key);
+  if (!viewEntry(source)?.rows?.length && !(source === 'channel' && state.rows.length)) return { label: 'Fonte indisponivel',
+    detail: readiness(source)?.reason || 'A fonte deste cruzamento nao foi carregada.', action: 'Conferir disponibilidade da fonte' };
+  const other = candidates.get(key) || [];
+  if (other.length) {
+    const channels = [...new Set(other.map(row => displayChannel(row.canal)))].join(', ');
+    const available = [...new Set(other.map(row => row.canal))].map(channel => ({
+      channel: displayChannel(channel), ...summarize(other.filter(row => row.canal === channel)) }));
+    const unassigned = other.some(row => row.provenance?.methods?.some(method => /sem quebra real por canal/i.test(method)));
+    return { label: state.selectedChannel ? 'Fora do canal selecionado' : 'Sem atribuicao paga',
+      detail: `Ha registros em ${channels}, fora dos canais selecionados. ${unassigned ? 'O SSOT preservou valores em Outros por falta de quebra por canal. ' : ''}Isso nao comprova zero no recorte.`,
+      action: 'Conferir atribuicao por canal', available };
+  }
+  if (gap) return { label: 'Periodo incompleto', detail: gap, action: 'Conferir atualizacao e cobertura' };
+  return { label: 'Sem registros no recorte', detail: 'A fonte carregada nao retornou linhas para este item, periodo e filtros. Ausencia de linha nao comprova zero.',
+    action: 'Conferir periodo e filtros' };
+}
 function recordsForDisplay(view) {
   const current = new Map(groups(view, "current").map((row) => [row.key, row]));
   const previous = new Map(groups(view, "compare").map((row) => [row.key, row]));
+  const outside = { current: new Map(), compare: new Map() };
+  normalizedViewRows(sourceKeyForView(view.key)).forEach(row => {
+    if (isAnalysisRow(row) && matchesSelectedChannel(row)) return;
+    if ((view.product || productFilterActive()) && (!isMerchandiseProduct(row) || !matchesProductFilter(row))) return;
+    for (const period of ['current', 'compare']) {
+      if (!inPeriod(row, period) || !hasGrowthObservation(row)) continue;
+      const key = dimensionKey(view, row);
+      if (!outside[period].has(key)) outside[period].set(key, []);
+      outside[period].get(key).push(row);
+    }
+  });
+  const gaps = { current: viewPeriodGap(view, 'current'), compare: viewPeriodGap(view, 'compare') };
   const keys = new Set([...current.keys(), ...previous.keys()]);
   const records = [...keys].map((key) => {
-    const item = current.get(key) || { ...previous.get(key), ...summarize([]) };
-    return withComparison(item, previous.get(key) || null);
+    const decorate = (item, period, fallback) => ({ ...(item || { ...fallback, ...summarize([]) }),
+      periodGap: gaps[period],
+      missingContext: !item?.rows ? missingRecordContext(view, key, outside[period], gaps[period]) : null });
+    const item = decorate(current.get(key), 'current', previous.get(key));
+    const old = state.compareEnabled === false ? null : decorate(previous.get(key), 'compare', current.get(key));
+    return withComparison(item, old);
   });
   return { records, official: true, sourceLabel: "SSOT" };
 }
 function recordSemaphore(record) {
+  if (record?.missingContext) return { tone: 'warn', label: record.missingContext.label, title: record.missingContext.detail };
+  if (record?.periodGap || record?.compare?.periodGap) return { tone: 'warn', label: 'Periodo incompleto', title: record.periodGap || record.compare.periodGap };
   if (record?.provenance?.partialLinkage) return { tone: 'warn', label: 'Parcial por IDs', title: 'Pedidos identificados; cobertura de vinculos incompleta. Nao representa o total do canal.' };
   if (record?.rate == null) return { tone: "warn", label: "Validar base", title: "A conversao exige pedidos e visitas completos no mesmo recorte." };
   if (state.compareEnabled === false) return { tone: "neutral", label: "Atual", title: "Comparacao de periodos desligada." };
@@ -180,6 +232,8 @@ function recordSemaphore(record) {
   return { tone: "neutral", label: "Estavel", title: "Variacao de conversao inferior a 0,20 p.p." };
 }
 function nextIndicator(record) {
+  if (record.missingContext) return record.missingContext.action;
+  if (record.periodGap || record.compare?.periodGap) return 'Conferir atualizacao e cobertura';
   if (record.provenance?.partialLinkage) return 'Conferir cobertura dos vinculos';
   if (record.rate == null) return "Validar cobertura de visitas e pedidos";
   if (state.compareEnabled === false) return "Investigar produto, oferta e mix do canal";
@@ -200,7 +254,24 @@ function semaphoreMarkup(record) {
 }
 function metricComparisonCell(record, key) {
   const info = item => key === 'rate' ? provenanceMarkup(item, 'base da conversao') : '';
+  const outsideValues = item => key === 'rate' || item?.[key] != null ? []
+    : (item?.missingContext?.available || []).filter(source => Number.isFinite(source[key]));
   const valueMarkup = (item) => {
+    if (item?.[key] == null && item?.missingContext) {
+      // Keep known values visible without attributing other channels to this filter.
+      const available = outsideValues(item).map(source => {
+        const previous = item === record && state.compareEnabled !== false ? record.compare : null;
+        const note = [
+          `${source.channel}: ${metricText(source[key], key)}. Valor fora do filtro; nao integra o total dos canais selecionados.`,
+          item.missingContext.detail,
+          item.periodGap,
+          previous ? `Anterior nos canais selecionados: ${metricText(previous[key], key)}. Nao comparavel com este valor de ${source.channel}.` : '',
+          previous?.periodGap
+        ].filter(Boolean).join('\n');
+        return `<span class="available-outside"><span class="outside-value">${metricText(source[key], key)}<button type="button" class="source-info" data-source-note="${escapeHtml(note)}" aria-label="Detalhes do valor em ${escapeHtml(source.channel)} fora do filtro" aria-haspopup="dialog" aria-expanded="false">${typeof CrmIcons === 'function' ? CrmIcons('Info') : 'i'}</button></span><small class="cell-note">${escapeHtml(source.channel)} &middot; fora do filtro</small></span>`;
+      }).join('');
+      return available || `<span class="metric-missing" title="${escapeHtml(item.missingContext.detail)}">${escapeHtml(key === 'rate' ? 'Nao calculavel' : 'Sem registro neste filtro')}</span>`;
+    }
     if (item?.provenance?.partialLinkage && Number.isFinite(item?.[key])) {
       return `${metricText(item[key], key)}<small class="cell-note">Identificados / parcial</small>`;
     }
@@ -209,13 +280,21 @@ function metricComparisonCell(record, key) {
       return `${fmtPercent(item.observedRate)}<small class="cell-note">Parcial: ${coverage}</small>`;
     }
     if (key === 'rate' && item?.rate == null && item?.sessoes > 0) return 'Base incompleta';
-    return metricText(item?.[key] ?? null, key);
+    if (item?.[key] == null) {
+      const label = !item?.rows ? 'Sem registros no recorte' : key !== 'rate' ? 'Nao informado na fonte'
+        : item.sessoes === 0 ? 'Sem visitas (base zero)' : item.sessoes == null ? 'Visitas nao informadas' : 'Pedidos nao informados';
+      return `<span class="metric-missing">${label}</span>`;
+    }
+    return `${metricText(item[key], key)}${item.periodGap ? '<small class="cell-note">Parcial no periodo</small>' : ''}`;
   };
+  // The previous filtered value belongs in the disclosure, not beside another scope.
+  if (outsideValues(record).length) return `<div class="metric-pair"><strong>${valueMarkup(record)}</strong></div>`;
   if (state.compareEnabled === false) return `<strong>${valueMarkup(record)}${info(record)}</strong>`;
   const previous = record.compare?.[key] ?? null;
   const partial = record.provenance?.partialLinkage || record.compare?.provenance?.partialLinkage;
+  const incompletePeriod = record.periodGap || record.compare?.periodGap;
   if (partial && record[key] == null && previous == null) return `<strong>${valueMarkup(record)}${info(record.provenance ? record : record.compare)}</strong>`;
-  const change = partial
+  const change = partial || incompletePeriod || record.missingContext || record.compare?.missingContext
     ? ''
     : PerformanceDelta.markup(PerformanceDelta.describe(record[key], previous, { rate: key === 'rate' }));
   return `<div class="metric-pair"><strong>${valueMarkup(record)}${info(record)}</strong><small>Anterior: ${valueMarkup(record.compare)}${info(record.compare)}</small>${change}</div>`;
@@ -233,7 +312,8 @@ function analysisScopeLabel() {
   return name || [state.selectedModel, state.selectedColor, state.selectedSize, state.productSearch].filter(Boolean).join(" / ");
 }
 function renderSummary() {
-  const total = withComparison(summarize(selectedPaidRows("current")), summarize(selectedPaidRows("compare")));
+  const totals = period => ({ ...summarize(selectedPaidRows(period)), periodGap: viewPeriodGap({key:'channel'}, period) });
+  const total = withComparison(totals('current'), totals('compare'));
   const ids = { pedidos: "metric-orders", sessoes: "metric-sessions", receita: "metric-revenue", rate: "metric-rate" };
   Object.entries(ids).forEach(([key, id]) => {
     const node = $(`#${id}`); node.textContent = metricText(total[key], key);
@@ -241,11 +321,11 @@ function renderSummary() {
     let compare = node.parentElement.querySelector(".kpi-comparison");
     if (!compare) { compare = document.createElement("div"); compare.className = "kpi-comparison"; node.after(compare); }
     compare.hidden = state.compareEnabled === false;
-    compare.innerHTML = compare.hidden ? '' : `<span>Anterior: ${metricText(total.compare?.[key], key)}${key === 'rate' ? provenanceMarkup(total.compare, 'periodo anterior') : ''}</span>${PerformanceDelta.markup(PerformanceDelta.describe(total[key], total.compare?.[key], { rate: key === 'rate' }))}`;
+    compare.innerHTML = compare.hidden ? '' : `<span>Anterior: ${metricText(total.compare?.[key], key)}${key === 'rate' ? provenanceMarkup(total.compare, 'periodo anterior') : ''}</span>${PerformanceDelta.markup(PerformanceDelta.describe(total[key], total.compare?.[key], { rate: key === 'rate', complete: !total.periodGap && !total.compare?.periodGap }))}`;
   });
   $("#metric-sessions").parentElement.firstElementChild.textContent = productFilterActive() ? "Visitas ao produto" : "Sessoes SSOT";
   $("#metric-orders").parentElement.firstElementChild.textContent = productFilterActive() ? "Pedidos por produto" : "Pedidos";
-  $("#metric-sessions-note").textContent = coverageLabel(total);
+  $("#metric-sessions-note").textContent = total.periodGap || coverageLabel(total);
   $("#metric-rate-note").textContent = total.complete ? "Pedidos / visitas do mesmo recorte" : "Cobertura incompleta; validar a fonte";
   $("#summary-window").textContent = `${formatWindow()} / ${comparisonWindowLabel()}`;
   const productNote = productFilterActive() ? " Pedidos por produto nao sao pedidos unicos entre produtos." : "";
@@ -527,8 +607,16 @@ function renderExplorer() {
   if ($('#explorer-status .source-info')) $('#explorer-status').removeAttribute('title');
   $("#explorer-count").textContent = `${records.length} resultados / ${visible.length} exibidos`;
   $("#explorer-summary").innerHTML = `<span><strong>${escapeHtml(view.title)}</strong> / ${escapeHtml(analysisScopeLabel())}</span><span>Atual: ${formatWindow()} / ${comparisonWindowLabel()}</span>`;
+  const gaps = [viewPeriodGap(view, 'current'), viewPeriodGap(view, 'compare')].filter(Boolean);
+  const coverage = $('#explorer-coverage');
+  coverage.hidden = !gaps.length;
+  coverage.textContent = [...new Set(gaps)].join('. ') + (gaps.length ? '. Valores parciais; variacoes entre periodos indisponiveis.' : '');
+  if (gaps.length) {
+    $('#explorer-status').firstChild.textContent = 'Periodo incompleto';
+    $('#explorer-status').className = 'status-pill warn';
+  }
   const reason = availability.reason || 'Sem observacoes de pedidos, visitas ou receita para esta combinacao nos periodos selecionados.';
-  $("#explorer-body").innerHTML = visible.length ? visible.map((row) => `<tr>${columns.map(([,key]) => `<td>${['pedidos','sessoes','receita','rate'].includes(key) ? metricComparisonCell(row, key) : key === 'semaphore' ? semaphoreMarkup(row) : key === 'nextIndicator' ? escapeHtml(nextIndicator(row)) : escapeHtml(row[key] || 'Nao identificado')}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${columns.length}" class="table-empty">${escapeHtml(reason)}</td></tr>`;
+  $("#explorer-body").innerHTML = visible.length ? visible.map((row) => `<tr>${columns.map(([,key]) => `<td>${['pedidos','sessoes','receita','rate'].includes(key) ? metricComparisonCell(row, key) : key === 'semaphore' ? semaphoreMarkup(row) : key === 'nextIndicator' ? `${escapeHtml(nextIndicator(row))}${row.missingContext ? `<small class="cell-note missing-detail">${escapeHtml(row.missingContext.detail)}</small>` : ''}` : escapeHtml(row[key] || 'Nao identificado')}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${columns.length}" class="table-empty">${escapeHtml(reason)}</td></tr>`;
   bindTableSort("explorer", renderExplorer);
 }
 
@@ -581,7 +669,8 @@ function entitySelection(side) {
   const current = rows('current'); const previous = rows('compare');
   const missing = ![...current, ...previous].some(hasGrowthObservation);
   const sourceKey = sourceKeyForView(choice.view, entityState.scope !== 'independent');
-  return { label: entry?.label || 'Selecione um item', ...withComparison(summarize(current), summarize(previous)),
+  const summary = (rows, period) => ({ ...summarize(rows), periodGap: viewPeriodGap({key:choice.view}, period, entityState.scope !== 'independent') });
+  return { label: entry?.label || 'Selecione um item', ...withComparison(summary(current, 'current'), summary(previous, 'compare')),
     view: choice.view, sourceKey, missing, selected: Boolean(choice.key), aggregate: Boolean(entry?.aggregate),
     productGrain: sourceKey.endsWith('_product') };
 }
@@ -633,7 +722,7 @@ function renderEntityResults() {
     };
     return;
   }
-  const sameGrain = a.sourceKey === b.sourceKey && !a.provenance?.partialLinkage && !b.provenance?.partialLinkage;
+  const sameGrain = a.sourceKey === b.sourceKey && !a.provenance?.partialLinkage && !b.provenance?.partialLinkage && !a.periodGap && !b.periodGap;
   const context = entityState.scope === 'independent' ? 'A/B independente dos filtros de canal e produto' : `A/B no recorte global: ${growthChannelLabel()} / ${analysisScopeLabel()}`;
   const missing = [a.missing ? 'A' : '', b.missing ? 'B' : ''].filter(Boolean).join(' e ');
   const measures = [[a.productGrain && b.productGrain ? 'Pedidos por produto' : 'Pedidos', 'pedidos'],
